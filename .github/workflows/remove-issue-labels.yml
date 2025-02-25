@@ -11,7 +11,7 @@ jobs:
       issues: write
     runs-on: ubuntu-latest
     steps:
-    - uses: actions-ecosystem/action-remove-labels@v2
+    - uses: actions-ecosystem/action-remove-labels@v1
       with:
         labels: |
           status:triaged
