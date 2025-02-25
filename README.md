@@ -3,7 +3,7 @@
 <p align="center">
 
 ### 페르소나
-> 영상 자막을 자동으로 첨부 하고 싶은 파이널 컷 프로 사용자 
+> 영상 자막을 자동으로 첨부 하고 싶은 파이널 컷 프로 사용자
 
 ### ADS
 > 음성 및 영상 속 말을 텍스트로 변환하여 자동으로 자막을 생성하는 앱
@@ -14,7 +14,7 @@
 <br>
 
 ### 문의
-- 
+-
 
 <br>
 
@@ -34,7 +34,7 @@
 
 
 ## 도구
-<img src="https://img.shields.io/badge/Figma-000000?style=&logo=Figma&logoColor=white"> 
+<img src="https://img.shields.io/badge/Figma-000000?style=&logo=Figma&logoColor=white">
 
 <br>
 

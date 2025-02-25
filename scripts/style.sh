@@ -59,7 +59,6 @@ swift_disable=(
 )
 
 swift_options=(
-  # Mimic Google style.
   --indent 4
   --maxwidth 100
   --wrapparameters afterfirst
