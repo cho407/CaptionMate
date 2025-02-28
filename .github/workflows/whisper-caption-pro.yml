@@ -1,10 +1,9 @@
-name: Whisper Caption Pro
+name: Whisper Caption Pro Build & Archive
 
 on:
   pull_request:
   schedule:
-    # Run every day at 11pm (KST) - cron uses UTC times
-    - cron:  '0 14 * * *'
+    - cron: '0 14 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -12,21 +11,27 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  swift-build-run:
-    strategy:
-      matrix:
-        # Test build with debug and release configs (whether or not DEBUG is set and optimization level)
-        build: [build, archive]
-        os: [macos-latest]
-        include:
-          - os: macos-latest
-            xcode: Xcode_16.2
-    runs-on: ${{ matrix.os }}
+  build-archive:
+    runs-on: macOS-latest
     steps:
-    - uses: actions/checkout@v4
-    - name: Xcode
-      run: sudo xcode-select -s /Applications/${{ matrix.xcode }}.app/Contents/Developer
-    - name: Initialize xcodebuild
-      run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
-    - name: Build the Whisper Caption Pro
-      run: scripts/third_party/travis/retry.sh scripts/build.sh WhisperCaptionPro macOS ${{ matrix.build }} WhisperCaptionPro/WhisperCaptionPro.xcodeproj
+      - uses: actions/checkout@v4
+      - name: Set Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+      - name: List available SDKs
+        run: xcodebuild -showsdks
+      - name: Build the Whisper Caption Pro (Build)
+        run: |
+          xcodebuild \
+            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
+            -scheme "Whisper Caption Pro" \
+            -sdk macosx \
+            -destination 'platform=macOS' \
+            build
+      - name: Archive the Whisper Caption Pro
+        run: |
+          xcodebuild \
+            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
+            -scheme "Whisper Caption Pro" \
+            -sdk macosx \
+            -destination 'platform=macOS' \
+            archive
