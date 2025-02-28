@@ -17,9 +17,9 @@ jobs:
       matrix:
         # Test build with debug and release configs (whether or not DEBUG is set and optimization level)
         build: [build, archive]
-        os: [macos-15]
+        os: [macos-latest]
         include:
-          - os: macos-15
+          - os: macos-latest
             xcode: Xcode_16.2
     runs-on: ${{ matrix.os }}
     steps:
