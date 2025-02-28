@@ -1,4 +1,4 @@
-name: Whisper Caption Pro Build, Test & Archive
+name: WhisperCaptionPro Build, Test & Archive
 
 on:
   pull_request:
