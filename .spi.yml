@@ -3,6 +3,6 @@ metadata:
   authors: "Harrison Cho"
 builder:
   configs:
-    - platform: ios
-      documentation_targets: [WhipserCaptionPro]
-      scheme: WhipserCaptionPro
+    - platform: macos
+      documentation_targets: [WhisperCaptionPro]
+      scheme: WhisperCaptionPro

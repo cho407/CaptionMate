@@ -149,7 +149,7 @@ case "$platform" in
   iPad)
     xcb_flags=("${ipad_flags[@]}")
     destination='platform=iOS Simulator,name=iPad Pro (9.7-inch)'
-    ;;
+  ;;
 
   macOS)
     xcb_flags=("${macos_flags[@]}")
@@ -192,21 +192,12 @@ case "$platform" in
     ;;
 esac
 
-# For macOS builds on Apple Silicon, remove ONLY_ACTIVE_ARCH flag.
-if [[ "$platform" == "macOS" ]]; then
-  xcb_flags+=(
-    CODE_SIGNING_REQUIRED=NO
-    CODE_SIGNING_ALLOWED=YES
-    COMPILER_INDEX_STORE_ENABLE=NO
-  )
-else
-  xcb_flags+=(
-    ONLY_ACTIVE_ARCH=YES
-    CODE_SIGNING_REQUIRED=NO
-    CODE_SIGNING_ALLOWED=YES
-    COMPILER_INDEX_STORE_ENABLE=NO
-  )
-fi
+xcb_flags+=(
+  ONLY_ACTIVE_ARCH=YES
+  CODE_SIGNING_REQUIRED=NO
+  CODE_SIGNING_ALLOWED=YES
+  COMPILER_INDEX_STORE_ENABLE=NO
+)
 
 fail_on_warnings=SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
