@@ -15,9 +15,12 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Set Xcode Version
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Initialize xcodebuild
-        run: xcodebuild -list
+        run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
 
       - name: Test the Whisper Caption Pro
         run: |
