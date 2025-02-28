@@ -27,6 +27,6 @@ jobs:
     - name: Xcode
       run: sudo xcode-select -s /Applications/${{ matrix.xcode }}.app/Contents/Developer
     - name: Initialize xcodebuild
-      run: xcodebuild -list -project WhipserCaptionPro/WhipserCaptionPro.xcodeproj
+      run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
     - name: Build the Whipser Caption Pro
       run: scripts/third_party/travis/retry.sh scripts/build.sh WhipserCaptionPro macOS ${{ matrix.build }} WhipserCaptionPro/WhipserCaptionPro.xcodeproj
