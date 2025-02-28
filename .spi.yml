@@ -1,8 +1,0 @@
-version: 1
-metadata:
-  authors: "Harrison Cho"
-builder:
-  configs:
-    - platform: macos
-      documentation_targets: [WhisperCaptionPro]
-      scheme: WhisperCaptionPro
