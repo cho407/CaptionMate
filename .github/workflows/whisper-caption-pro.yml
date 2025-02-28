@@ -5,6 +5,7 @@ on:
   schedule:
     # Run every day at 11pm (KST) - cron uses UTC times
     - cron:  '0 14 * * *'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
