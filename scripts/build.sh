@@ -20,24 +20,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  cat 1>&2 <<EOF
-USAGE: $0 product [platform] [method]
-product can be one of:
-  whisper-caption-pro
-platform can be one of:
-  iOS (default)
-  iOS-device
-  macOS
-  tvOS
-  watchOS
-  catalyst
-  visionOS
-method can be one of:
-  xcodebuild (default)
-  unit
-  integration
-  spm
-EOF
+  echo "Usage: $0 product [platform] [method] [workspace]"
   exit 1
 fi
 
@@ -65,7 +48,7 @@ esac
 # Source secrets-check script, if any.
 source "${scripts_dir}/check_secrets.sh"
 
-# Runs xcodebuild with given flags, piping output to xcpretty.
+# Function: Run xcodebuild with output piped to xcpretty.
 function RunXcodebuild() {
   echo "Running: xcodebuild $@"
   xcpretty_cmd=(xcpretty)
@@ -85,7 +68,7 @@ function RunXcodebuild() {
   fi
 }
 
-# Exports logs from the xcresult bundle.
+# Function: Export logs from the xcresult bundle.
 function ExportLogs() {
   python3 "${scripts_dir}/xcresult_logs.py" "$@"
 }
@@ -94,6 +77,7 @@ function ExportLogs() {
 ios_flags=(-sdk 'iphonesimulator')
 ios_device_flags=(-sdk 'iphoneos')
 ipad_flags=(-sdk 'iphonesimulator')
+# macOS SDK는 정확한 이름으로 지정.
 macos_flags=(-sdk 'macosx15.2')
 tvos_flags=(-sdk "appletvsimulator")
 watchos_flags=()
@@ -127,8 +111,8 @@ case "$platform" in
     ;;
   macOS)
     xcb_flags=("${macos_flags[@]}")
-    # Universal destination: Xcode will choose the appropriate architecture (arm64 on Apple Silicon, x86_64 on Intel).
-    destination="platform=macOS"
+    # destination에 arm64만 지정하여, Apple Silicon 환경에서 오직 arm64로 빌드.
+    destination="platform=macOS,arch=arm64"
     ;;
   tvOS)
     xcb_flags=("${tvos_flags[@]}")
@@ -156,27 +140,24 @@ case "$platform" in
 esac
 
 # Append common flags.
-# For macOS Archive builds, remove ONLY_ACTIVE_ARCH to support Universal builds.
-if [[ "$platform" == "macOS" && "$method" == "archive" ]]; then
-  xcb_flags+=(CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO)
+if [[ "$platform" == "macOS" ]]; then
+  # Archive 빌드 시에는 ONLY_ACTIVE_ARCH 제거하고 arm64만 명시.
+  if [[ "$method" == "archive" ]]; then
+    xcb_flags+=(ARCHS=arm64 VALID_ARCHS=arm64 CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO)
+  else
+    # 일반 빌드 시에도 arm64만 사용.
+    xcb_flags+=(ONLY_ACTIVE_ARCH=YES ARCHS=arm64 VALID_ARCHS=arm64 CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO)
+  fi
 else
   xcb_flags+=(ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO)
 fi
 
 fail_on_warnings=SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
-# Build command: if workspace is an .xcodeproj, use -project; otherwise, -workspace.
+# Build command: if workspace ends with .xcodeproj, use -project; otherwise, use -workspace.
 if [[ $workspace == *.xcodeproj ]]; then
-  # For macOS Archive builds, omit destination so that Xcode uses its default target.
-  if [[ "$platform" == "macOS" && "$method" == "archive" ]]; then
-    RunXcodebuild -project "$workspace" -scheme "$product" "${xcb_flags[@]}" $fail_on_warnings $method
-  else
-    RunXcodebuild -project "$workspace" -scheme "$product" -destination "$destination" "${xcb_flags[@]}" $fail_on_warnings $method
-  fi
+  # macOS Archive 빌드: destination 옵션은 그대로 전달.
+  RunXcodebuild -project "$workspace" -scheme "$product" -destination "$destination" "${xcb_flags[@]}" $fail_on_warnings $method
 else
-  if [[ "$platform" == "macOS" && "$method" == "archive" ]]; then
-    RunXcodebuild -workspace "$workspace" -scheme "$product" "${xcb_flags[@]}" $fail_on_warnings $method
-  else
-    RunXcodebuild -workspace "$workspace" -scheme "$product" -destination "$destination" "${xcb_flags[@]}" $fail_on_warnings $method
-  fi
+  RunXcodebuild -workspace "$workspace" -scheme "$product" -destination "$destination" "${xcb_flags[@]}" $fail_on_warnings $method
 fi
