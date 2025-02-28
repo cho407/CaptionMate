@@ -29,4 +29,4 @@ jobs:
     - name: Initialize xcodebuild
       run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
     - name: Build the Whipser Caption Pro
-      run: scripts/third_party/travis/retry.sh scripts/build.sh WhipserCaptionPro macOS ${{ matrix.build }} WhipserCaptionPro/WhipserCaptionPro.xcodeproj
+      run: scripts/third_party/travis/retry.sh scripts/build.sh WhisperCaptionPro macOS ${{ matrix.build }} WhipserCaptionPro/WhipserCaptionPro.xcodeproj
