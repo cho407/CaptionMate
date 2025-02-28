@@ -1,4 +1,4 @@
-name: Whipser Caption Pro
+name: Whisper Caption Pro
 
 on:
   pull_request:
@@ -28,5 +28,5 @@ jobs:
       run: sudo xcode-select -s /Applications/${{ matrix.xcode }}.app/Contents/Developer
     - name: Initialize xcodebuild
       run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
-    - name: Build the Whipser Caption Pro
+    - name: Build the Whisper Caption Pro
       run: scripts/third_party/travis/retry.sh scripts/build.sh WhisperCaptionPro macOS ${{ matrix.build }} WhisperCaptionPro/WhisperCaptionPro.xcodeproj
