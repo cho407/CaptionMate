@@ -13,10 +13,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# USAGE: build.sh product [platform] [method] [workspace]
+#
+# Builds the given product for the given platform using the given build method
+
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-  echo "Usage: $0 product [platform] [method] [workspace]"
+  cat 1>&2 <<EOF
+USAGE: $0 product [platform] [method]
+product can be one of:
+  whisper-caption-pro
+platform can be one of:
+  iOS (default)
+  iOS-device
+  macOS
+  tvOS
+  watchOS
+  catalyst
+  visionOS
+method can be one of:
+  xcodebuild (default)
+  unit
+  integration
+  spm
+EOF
   exit 1
 fi
 
@@ -29,7 +50,6 @@ echo "Building $product for $platform using $method"
 
 scripts_dir=$(dirname "${BASH_SOURCE[0]}")
 
-# Determine Xcode version (if needed)
 system=$(uname -s)
 case "$system" in
   Darwin)
@@ -42,15 +62,22 @@ case "$system" in
     ;;
 esac
 
-# Source secrets-check script (if any)
+# Source secrets-check script, if any.
 source "${scripts_dir}/check_secrets.sh"
 
-# Function: Run xcodebuild and pipe output to xcpretty.
+# Runs xcodebuild with given flags, piping output to xcpretty.
 function RunXcodebuild() {
   echo "Running: xcodebuild $@"
   xcpretty_cmd=(xcpretty)
   result=0
   xcodebuild "$@" | tee xcodebuild.log | "${xcpretty_cmd[@]}" || result=$?
+  if [[ $result == 65 ]]; then
+    ExportLogs "$@"
+    echo "xcodebuild exited with 65, retrying" 1>&2
+    sleep 5
+    result=0
+    xcodebuild "$@" | tee xcodebuild.log | "${xcpretty_cmd[@]}" || result=$?
+  fi
   if [[ $result != 0 ]]; then
     echo "xcodebuild exited with $result" 1>&2
     ExportLogs "$@"
@@ -58,16 +85,16 @@ function RunXcodebuild() {
   fi
 }
 
-# Function: Export logs from xcresult (if build fails)
+# Exports logs from the xcresult bundle.
 function ExportLogs() {
   python3 "${scripts_dir}/xcresult_logs.py" "$@"
 }
 
-# SDK flags per platform
+# SDK flags per platform.
 ios_flags=(-sdk 'iphonesimulator')
 ios_device_flags=(-sdk 'iphoneos')
 ipad_flags=(-sdk 'iphonesimulator')
-macos_flags=(-sdk 'macosx')
+macos_flags=(-sdk 'macosx15.2')
 tvos_flags=(-sdk "appletvsimulator")
 watchos_flags=()
 visionos_flags=()
@@ -75,7 +102,7 @@ catalyst_flags=(
   ARCHS=x86_64
   VALID_ARCHS=x86_64
   SUPPORTS_MACCATALYST=YES
-  -sdk macosx
+  -sdk 'macosx15.2'
   CODE_SIGN_IDENTITY=-
   CODE_SIGNING_REQUIRED=NO
   CODE_SIGNING_ALLOWED=NO
@@ -100,7 +127,7 @@ case "$platform" in
     ;;
   macOS)
     xcb_flags=("${macos_flags[@]}")
-    # Universal destination: let Xcode choose appropriate architecture (Apple Silicon or Intel)
+    # Universal destination: Xcode will choose the appropriate architecture (arm64 on Apple Silicon, x86_64 on Intel).
     destination="platform=macOS"
     ;;
   tvOS)
@@ -129,7 +156,7 @@ case "$platform" in
 esac
 
 # Append common flags.
-# For macOS Archive builds, remove ONLY_ACTIVE_ARCH for Universal build.
+# For macOS Archive builds, remove ONLY_ACTIVE_ARCH to support Universal builds.
 if [[ "$platform" == "macOS" && "$method" == "archive" ]]; then
   xcb_flags+=(CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=YES COMPILER_INDEX_STORE_ENABLE=NO)
 else
@@ -138,9 +165,9 @@ fi
 
 fail_on_warnings=SWIFT_TREAT_WARNINGS_AS_ERRORS=YES
 
-# Build command: use -project if workspace ends with .xcodeproj, otherwise -workspace.
+# Build command: if workspace is an .xcodeproj, use -project; otherwise, -workspace.
 if [[ $workspace == *.xcodeproj ]]; then
-  # macOS Archive builds: destination 옵션 생략하여 Xcode 기본값 사용
+  # For macOS Archive builds, omit destination so that Xcode uses its default target.
   if [[ "$platform" == "macOS" && "$method" == "archive" ]]; then
     RunXcodebuild -project "$workspace" -scheme "$product" "${xcb_flags[@]}" $fail_on_warnings $method
   else
