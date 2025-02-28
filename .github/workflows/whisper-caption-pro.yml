@@ -29,7 +29,10 @@ jobs:
             -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
-            test
+            test \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=""
 
       - name: Build the Whisper Caption Pro
         run: |
@@ -38,7 +41,10 @@ jobs:
             -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
-            build
+            build \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=""
 
       - name: Archive the Whisper Caption Pro
         run: |
@@ -47,4 +53,7 @@ jobs:
             -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
-            archive
+            archive \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=""
