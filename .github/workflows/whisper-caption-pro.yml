@@ -19,19 +19,17 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
       - name: List available SDKs
         run: xcodebuild -showsdks
-      - name: Build the Whisper Caption Pro (Build)
+      - name: Build the Whisper Caption Pro
         run: |
           xcodebuild \
-            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
-            -scheme "Whisper Caption Pro" \
+            -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
             build
       - name: Archive the Whisper Caption Pro
         run: |
           xcodebuild \
-            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
-            -scheme "Whisper Caption Pro" \
+            -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
             archive
