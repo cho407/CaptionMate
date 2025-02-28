@@ -1,4 +1,4 @@
-name: Whisper Caption Pro Build & Archive
+name: Whisper Caption Pro Build, Test & Archive
 
 on:
   pull_request:
@@ -11,24 +11,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-archive:
-    runs-on: macOS-latest
+  build-archive-test:
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Set Xcode Version
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-      - name: List available SDKs
-        run: xcodebuild -showsdks
+
+      - name: Initialize xcodebuild
+        run: xcodebuild -list
+
+      - name: Test the Whisper Caption Pro
+        run: |
+          xcodebuild \
+            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
+            -scheme "WhisperCaptionPro" \
+            -sdk macosx \
+            -destination 'platform=macOS' \
+            test
+
       - name: Build the Whisper Caption Pro
         run: |
           xcodebuild \
+            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
             -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
             build
+
       - name: Archive the Whisper Caption Pro
         run: |
           xcodebuild \
+            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
             -scheme "WhisperCaptionPro" \
             -sdk macosx \
             -destination 'platform=macOS' \
