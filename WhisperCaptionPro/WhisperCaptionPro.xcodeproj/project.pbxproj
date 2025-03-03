@@ -29,20 +29,47 @@
 		9941C9B52D6A137A0086EB91 /* WhisperCaptionProUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhisperCaptionProUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		99A3BC182D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionPro" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				WhisperCaptionProTests/WhisperCaptionProTests.swift,
+				WhisperCaptionProUITests/WhisperCaptionProUITests.swift,
+				WhisperCaptionProUITests/WhisperCaptionProUITestsLaunchTests.swift,
+			);
+			target = 9941C9972D6A13770086EB91 /* WhisperCaptionPro */;
+		};
+		99A3BC192D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionProTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				WhisperCaptionProTests/WhisperCaptionProTests.swift,
+			);
+			target = 9941C9AA2D6A137A0086EB91 /* WhisperCaptionProTests */;
+		};
+		99A3BC1A2D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionProUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				WhisperCaptionProUITests/WhisperCaptionProUITests.swift,
+				WhisperCaptionProUITests/WhisperCaptionProUITestsLaunchTests.swift,
+			);
+			target = 9941C9B42D6A137A0086EB91 /* WhisperCaptionProUITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9941C99A2D6A13770086EB91 /* WhisperCaptionPro */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = WhisperCaptionPro;
 			sourceTree = "<group>";
 		};
-		9941C9AE2D6A137A0086EB91 /* WhisperCaptionProTests */ = {
+		99A3BC142D75A50B00479850 /* Tests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WhisperCaptionProTests;
-			sourceTree = "<group>";
-		};
-		9941C9B82D6A137A0086EB91 /* WhisperCaptionProUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = WhisperCaptionProUITests;
+			exceptions = (
+				99A3BC182D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionPro" target */,
+				99A3BC192D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionProTests" target */,
+				99A3BC1A2D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionProUITests" target */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -76,8 +103,7 @@
 			isa = PBXGroup;
 			children = (
 				9941C99A2D6A13770086EB91 /* WhisperCaptionPro */,
-				9941C9AE2D6A137A0086EB91 /* WhisperCaptionProTests */,
-				9941C9B82D6A137A0086EB91 /* WhisperCaptionProUITests */,
+				99A3BC142D75A50B00479850 /* Tests */,
 				9941C9992D6A13770086EB91 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -109,6 +135,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				9941C99A2D6A13770086EB91 /* WhisperCaptionPro */,
+				99A3BC142D75A50B00479850 /* Tests */,
 			);
 			name = WhisperCaptionPro;
 			packageProductDependencies = (
@@ -130,9 +157,6 @@
 			dependencies = (
 				9941C9AD2D6A137A0086EB91 /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				9941C9AE2D6A137A0086EB91 /* WhisperCaptionProTests */,
-			);
 			name = WhisperCaptionProTests;
 			packageProductDependencies = (
 			);
@@ -152,9 +176,6 @@
 			);
 			dependencies = (
 				9941C9B72D6A137A0086EB91 /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				9941C9B82D6A137A0086EB91 /* WhisperCaptionProUITests */,
 			);
 			name = WhisperCaptionProUITests;
 			packageProductDependencies = (
