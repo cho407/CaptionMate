@@ -13,11 +13,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
-jobs:
   pre-commit:
     runs-on: ubuntu-latest
-    env:
-      MINT_PATH: ${{ github.workspace }}/mint
     steps:
       - uses: actions/checkout@v4
 
@@ -43,25 +40,6 @@ jobs:
           key: ${{ runner.os }}-pip-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pip-pre-commit
-
-      - name: Cache Mint packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.MINT_PATH }}
-          key: ${{ runner.os }}-mint-${{ hashFiles('**/Mintfile') }}
-          restore-keys: ${{ runner.os }}-mint-
-
-      - name: Setup check (Install Mint)
-        run: |
-          if ! command -v mint >/dev/null 2>&1; then
-            echo "Mint not found, installing Mint..."
-            curl -Ls https://github.com/yonaskolb/mint/releases/download/0.19.1/mint-0.19.1-linux.zip -o mint.zip
-            unzip mint.zip
-            chmod +x mint
-            sudo mv mint /usr/local/bin/
-            rm mint.zip
-          fi
-          mint bootstrap
 
       - name: Run pre-commit hooks
         run: |
