@@ -51,16 +51,19 @@ jobs:
           key: ${{ runner.os }}-mint-${{ hashFiles('**/Mintfile') }}
           restore-keys: ${{ runner.os }}-mint-
 
-      - name: Setup check
+      - name: Setup check (Install Mint)
         run: |
           if ! command -v mint >/dev/null 2>&1; then
             echo "Mint not found, installing Mint..."
-            curl -Ls https://github.com/yonaskolb/mint/releases/download/0.19.1/mint-0.19.1-linux.tar.gz | tar xz
+            curl -Ls https://github.com/yonaskolb/mint/releases/download/0.19.1/mint-0.19.1-linux.zip -o mint.zip
+            unzip mint.zip
+            chmod +x mint
             sudo mv mint /usr/local/bin/
+            rm mint.zip
           fi
           mint bootstrap
 
-      - name: pre-commit
+      - name: Run pre-commit hooks
         run: |
           pip install --upgrade pre-commit
           pre-commit install --install-hooks
@@ -71,12 +74,16 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - name: Whitespace
+
+      - name: Check Whitespace
         run: scripts/check_whitespace.sh
-      - name: Filename spaces
+
+      - name: Check Filename Spaces
         run: scripts/check_filename_spaces.sh
-      - name: Copyrights
+
+      - name: Check Copyrights
         run: scripts/check_copyright.sh
