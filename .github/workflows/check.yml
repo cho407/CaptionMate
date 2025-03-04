@@ -3,12 +3,11 @@ name: check
 on:
   pull_request:
     branches:
-     - main
-
+      - main
   push:
     branches:
-     - main
-     - develop
+      - main
+      - develop
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
@@ -21,8 +20,10 @@ jobs:
       MINT_PATH: ${{ github.workspace }}/mint
     steps:
       - uses: actions/checkout@v4
+
       - name: Fetch base branch
         run: git fetch origin ${{ github.base_ref }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.9"
@@ -42,19 +43,19 @@ jobs:
           key: ${{ runner.os }}-pip-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pip-pre-commit
-            
+
       - name: Cache Mint packages
         uses: actions/cache@v4
         with:
-         path: ${{ env.MINT_PATH }}
-         key: ${{ runner.os }}-mint-${{ hashFiles('**/Mintfile') }}
-         restore-keys: ${{ runner.os }}-mint-
+          path: ${{ env.MINT_PATH }}
+          key: ${{ runner.os }}-mint-${{ hashFiles('**/Mintfile') }}
+          restore-keys: ${{ runner.os }}-mint-
 
-    - name: Setup check
-      run: |
-        brew update
-        brew install mint
-        mint bootstrap
+      - name: Setup check
+        run: |
+          brew update
+          brew install mint
+          mint bootstrap
 
       - name: pre-commit
         run: |
@@ -65,20 +66,14 @@ jobs:
   check:
     needs: pre-commit
     runs-on: macos-latest
-    env:
-      MINT_PATH: ${{ github.workspace }}/mint
     steps:
-    - uses: actions/checkout@v4
-
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-
-    - name: Whitespace
-      run: scripts/check_whitespace.sh
-
-    - name: Filename spaces
-      run: scripts/check_filename_spaces.sh
-
-    - name: Copyrights
-      run: scripts/check_copyright.sh
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Whitespace
+        run: scripts/check_whitespace.sh
+      - name: Filename spaces
+        run: scripts/check_filename_spaces.sh
+      - name: Copyrights
+        run: scripts/check_copyright.sh
