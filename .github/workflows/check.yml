@@ -53,8 +53,11 @@ jobs:
 
       - name: Setup check
         run: |
-          brew update
-          brew install mint
+          if ! command -v mint >/dev/null 2>&1; then
+            echo "Mint not found, installing Mint..."
+            curl -Ls https://github.com/yonaskolb/mint/releases/download/0.19.1/mint-0.19.1-linux.tar.gz | tar xz
+            sudo mv mint /usr/local/bin/
+          fi
           mint bootstrap
 
       - name: pre-commit
