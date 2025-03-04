@@ -2,15 +2,50 @@ name: check
 
 on:
   pull_request:
+    branches:
+     - main
+
   push:
-    branches: main
+    branches:
+     - main
+     - develop
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch base branch
+        run: git fetch origin ${{ github.base_ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+          architecture: x64
+      - name: Get pip cache dir
+        id: pip-cache
+        run: |
+          echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+      - name: pip/pre-commit cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.pip-cache.outputs.dir }}
+            ~/.cache/pre-commit
+          key: ${{ runner.os }}-pip-pre-commit-${{ hashFiles('**/.pre-commit-config.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-pre-commit
+      - name: pre-commit
+        run: |
+          pip install --upgrade pre-commit
+          pre-commit install --install-hooks
+          pre-commit run --all-files
+          
   check:
+    needs: pre-commit
     runs-on: macos-latest
     env:
       MINT_PATH: ${{ github.workspace }}/mint
