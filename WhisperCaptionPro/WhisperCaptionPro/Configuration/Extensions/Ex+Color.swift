@@ -17,10 +17,11 @@ extension Color { // 사용법: Color(hex: "#439F47")
         scanner.scanHexInt64(&rgb)
 
         let r = Double((rgb >> 16) & 0xFF) / 255.0
-        let g = Double((rgb >>  8) & 0xFF) / 255.0
-        let b = Double((rgb >>  0) & 0xFF) / 255.0
+        let g = Double((rgb >> 8) & 0xFF) / 255.0
+        let b = Double((rgb >> 0) & 0xFF) / 255.0
         self.init(red: r, green: g, blue: b)
     }
+
     static let textGray = Color(hex: "495057")
     static let boxGray = Color(hex: "323232")
     static let brightGray = Color(hex: "bbbbbb")
@@ -49,7 +50,6 @@ extension Color { // 사용법: Color(hex: "#439F47")
     static let graySand = Color(hex: "#e5ccaf")
     static let paleKhaki = Color(hex: "#bfaf92")
 
-
     static let communityPurple = Color(hex: "#807EFC")
     static let communityGreen = Color(hex: "#6CD9B7")
     static let communityLime = Color(hex: "#E3F084")
@@ -59,6 +59,4 @@ extension Color { // 사용법: Color(hex: "#439F47")
     static let floralWhite = Color(hex: "#FFFAF1")
     static let paleWhite = Color(hex: "#f8f8ff")
     static let saleGreen = Color(hex: "#4C9E77")
-
-
 }
