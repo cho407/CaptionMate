@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		99193C782D8BC069008B205B /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 99193C772D8BC069008B205B /* WhisperKit */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		9941C9AC2D6A137A0086EB91 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -79,6 +83,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				99193C782D8BC069008B205B /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -139,6 +144,7 @@
 			);
 			name = WhisperCaptionPro;
 			packageProductDependencies = (
+				99193C772D8BC069008B205B /* WhisperKit */,
 			);
 			productName = WhisperCaptionPro;
 			productReference = 9941C9982D6A13770086EB91 /* WhisperCaptionPro.app */;
@@ -216,6 +222,9 @@
 			);
 			mainGroup = 9941C98F2D6A13770086EB91;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				99193C762D8BC069008B205B /* XCRemoteSwiftPackageReference "WhisperKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9941C9992D6A13770086EB91 /* Products */;
 			projectDirPath = "";
@@ -574,6 +583,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		99193C762D8BC069008B205B /* XCRemoteSwiftPackageReference "WhisperKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		99193C772D8BC069008B205B /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99193C762D8BC069008B205B /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 9941C9902D6A13770086EB91 /* Project object */;
 }
