@@ -29,6 +29,5 @@ struct WhisperCaptionProApp: App {
                 .frame(minWidth: 1000, minHeight: 700)
         }
         .modelContainer(sharedModelContainer)
-        
     }
 }
