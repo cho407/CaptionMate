@@ -44,7 +44,7 @@ struct TranscriptionView: View {
                             .end ?? 0
                         let timestampText = (viewModel.enableTimestamps && viewModel.eagerResults
                             .first != nil) ?
-                            "[\(String(format: "%.2f", startSeconds)) --> \(String(format: "%.2f", endSeconds))]" :
+                            TimeInterval(startSeconds).formatTimeRange(to: TimeInterval(endSeconds)) :
                             ""
                         Text(
                             "\(timestampText) \(Text(viewModel.confirmedText).fontWeight(.bold))\(Text(viewModel.hypothesisText).fontWeight(.bold).foregroundColor(.gray))"
@@ -66,7 +66,7 @@ struct TranscriptionView: View {
                                 id: \.element) { _, segment in
                             let timestampText = viewModel
                                 .enableTimestamps ?
-                                "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" :
+                                TimeInterval(segment.start).formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
                             Text(timestampText + segment.text)
                                 .font(.headline)
@@ -79,7 +79,7 @@ struct TranscriptionView: View {
                                 id: \.element) { _, segment in
                             let timestampText = viewModel
                                 .enableTimestamps ?
-                                "[\(String(format: "%.2f", segment.start)) --> \(String(format: "%.2f", segment.end))]" :
+                                TimeInterval(segment.start).formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
                             Text(timestampText + segment.text)
                                 .font(.headline)
