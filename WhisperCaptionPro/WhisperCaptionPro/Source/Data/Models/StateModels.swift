@@ -1,0 +1,94 @@
+//
+//  StateModels.swift
+//  WhisperCaptionPro
+//
+//  Created by 조형구 on 3/25/25.
+//
+
+import AVFoundation
+import Combine
+import CoreML
+import SwiftUI
+import WhisperKit
+
+// MARK: - Transcription Models
+
+/// 전사(Transcription) 관련 상태
+struct TranscriptionState {
+    var currentText: String = ""
+    var currentChunks: [Int: (chunkText: [String], fallbacks: Int)] = [:]
+
+    // 전사 결과 관련
+    var tokensPerSecond: TimeInterval = 0
+    var firstTokenTime: TimeInterval = 0
+    var modelLoadingTime: TimeInterval = 0
+    var pipelineStart: TimeInterval = 0
+    var currentLag: TimeInterval = 0
+    var currentFallbacks: Int = 0
+    var currentEncodingLoops: Int = 0
+    var currentDecodingLoops: Int = 0
+    var lastBufferSize: Int = 0
+    var lastConfirmedSegmentEndSeconds: Float = 0
+    var bufferEnergy: [Float] = []
+    var bufferSeconds: Double = 0
+    var confirmedSegments: [TranscriptionSegment] = []
+    var unconfirmedSegments: [TranscriptionSegment] = []
+
+    // 전사 처리 시간 및 속도 관련
+    var effectiveRealTimeFactor: TimeInterval = 0
+    var effectiveSpeedFactor: TimeInterval = 0
+    var totalInferenceTime: TimeInterval = 0
+
+    // Eager mode 관련
+    var eagerResults: [TranscriptionResult?] = []
+    var prevResult: TranscriptionResult? = nil
+    var lastAgreedSeconds: Float = 0.0
+    var prevWords: [WordTiming] = []
+    var lastAgreedWords: [WordTiming] = []
+    var confirmedWords: [WordTiming] = []
+    var confirmedText: String = ""
+    var hypothesisWords: [WordTiming] = []
+    var hypothesisText: String = ""
+}
+
+// MARK: - ModelManagement Models
+
+/// 모델 관리 관련 상태
+struct ModelManagementState {
+    var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
+    var appStartTime: Date = .init()
+    var modelState: ModelState = .unloaded
+    var localModels: [String] = []
+    var localModelPath: String = ""
+    var availableModels: [String] = []
+    var availableLanguages: [String] = []
+    var disabledModels: [String] = WhisperKit.recommendedModels().disabled
+
+    // 다운로드/로딩 진행률 등
+    var loadingProgressValue: Float = 0.0
+    var specializationProgressRatio: Float = 0.7
+}
+
+// MARK: - Audio Models
+
+/// 오디오 관련 상태
+struct AudioState {
+    var isRecording: Bool = false
+    var isTranscribing: Bool = false
+    #if os(macOS)
+        var audioDevices: [AudioDevice]?
+    #endif
+}
+
+// MARK: - UIState Models
+
+/// UI 관련 상태
+struct UIState {
+    var isFilePickerPresented: Bool = false
+    var columnVisibility: NavigationSplitViewVisibility = .all
+    var showComputeUnits: Bool = true
+    var showAdvancedOptions: Bool = false
+    var transcriptionTask: Task<Void, Never>? = nil
+    var selectedCategoryId: UUID? = nil
+    var transcribeTask: Task<Void, Never>? = nil
+}

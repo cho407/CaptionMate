@@ -16,22 +16,24 @@ struct ModelSelectorView: View {
             HStack {
                 Image(systemName: "circle.fill")
                     .foregroundStyle(viewModel
-                        .modelState == .loaded ? .green :
-                        (viewModel.modelState == .unloaded ? .red : .yellow))
+                        .modelManagementState.modelState == .loaded ? .green :
+                        (viewModel.modelManagementState
+                            .modelState == .unloaded ? .red : .yellow))
                     .symbolEffect(
                         .variableColor,
-                        isActive: viewModel.modelState != .loaded && viewModel
-                            .modelState != .unloaded
+                        isActive: viewModel.modelManagementState.modelState != .loaded && viewModel
+                            .modelManagementState.modelState != .unloaded
                     )
-                Text(viewModel.modelState.description)
+                Text(viewModel.modelManagementState.modelState.description)
 
                 Spacer()
 
-                if !viewModel.availableModels.isEmpty {
-                    Picker("", selection: $viewModel.selectedModel) {
-                        ForEach(viewModel.availableModels, id: \.self) { model in
+                if !viewModel.modelManagementState.availableModels.isEmpty {
+                    Picker("", selection: $viewModel.settings.selectedModel) {
+                        ForEach(viewModel.modelManagementState.availableModels,
+                                id: \.self) { model in
                             HStack {
-                                let modelIcon = viewModel.localModels
+                                let modelIcon = viewModel.modelManagementState.localModels
                                     .contains { $0 == model.description } ? "checkmark.circle" :
                                     "arrow.down.circle.dotted"
                                 Text(
@@ -42,8 +44,8 @@ struct ModelSelectorView: View {
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
-                    .onChange(of: viewModel.selectedModel) { _, _ in
-                        viewModel.modelState = .unloaded
+                    .onChange(of: viewModel.settings.selectedModel) { _, _ in
+                        viewModel.modelManagementState.modelState = .unloaded
                     }
                 } else {
                     ProgressView()
@@ -58,16 +60,20 @@ struct ModelSelectorView: View {
                 }
                 .help("Delete model")
                 .buttonStyle(BorderlessButtonStyle())
-                .disabled(viewModel.localModels.isEmpty || !viewModel.localModels
-                    .contains(viewModel.selectedModel))
+                .disabled(viewModel.modelManagementState.localModels.isEmpty || !viewModel
+                    .modelManagementState.localModels
+                    .contains(viewModel.settings.selectedModel))
 
                 #if os(macOS)
                     Button {
                         let folderURL = viewModel.whisperKit?
                             .modelFolder ??
-                            (viewModel.localModels
-                                .contains(viewModel.selectedModel) ?
-                                URL(fileURLWithPath: viewModel.localModelPath) : nil)
+                            (viewModel.modelManagementState.localModels
+                                .contains(viewModel.settings.selectedModel) ?
+                                URL(
+                                    fileURLWithPath: viewModel.modelManagementState.localModelPath
+                                ) :
+                                nil)
                         if let folder = folderURL {
                             NSWorkspace.shared.open(folder)
                         }
@@ -78,7 +84,8 @@ struct ModelSelectorView: View {
                 #endif
 
                 Button {
-                    if let url = URL(string: "https://huggingface.co/\(viewModel.repoName)") {
+                    if let url =
+                        URL(string: "https://huggingface.co/\(viewModel.settings.repoName)") {
                         #if os(macOS)
                             NSWorkspace.shared.open(url)
                         #else
@@ -91,32 +98,38 @@ struct ModelSelectorView: View {
                 .buttonStyle(BorderlessButtonStyle())
             }
 
-            if viewModel.modelState == .unloaded {
+            if viewModel.modelManagementState.modelState == .unloaded {
                 Divider()
                 Button {
                     viewModel.resetState()
-                    viewModel.loadModel(viewModel.selectedModel)
-                    viewModel.modelState = .loading
+                    viewModel.loadModel(viewModel.settings.selectedModel)
+                    viewModel.modelManagementState.modelState = .loading
                 } label: {
                     Text("Load Model")
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                 }
                 .buttonStyle(.borderedProminent)
-            } else if viewModel.loadingProgressValue < 1.0 {
+            } else if viewModel.modelManagementState.loadingProgressValue < 1.0 {
                 VStack {
                     HStack {
-                        ProgressView(value: viewModel.loadingProgressValue, total: 1.0)
-                            .progressViewStyle(LinearProgressViewStyle())
-                            .frame(maxWidth: .infinity)
+                        ProgressView(
+                            value: viewModel.modelManagementState.loadingProgressValue,
+                            total: 1.0
+                        )
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .frame(maxWidth: .infinity)
 
-                        Text(String(format: "%.1f%%", viewModel.loadingProgressValue * 100))
-                            .font(.caption)
-                            .foregroundColor(.gray)
+                        Text(String(
+                            format: "%.1f%%",
+                            viewModel.modelManagementState.loadingProgressValue * 100
+                        ))
+                        .font(.caption)
+                        .foregroundColor(.gray)
                     }
-                    if viewModel.modelState == .prewarming {
+                    if viewModel.modelManagementState.modelState == .prewarming {
                         Text(
-                            "Specializing \(viewModel.selectedModel) for your device...\nThis can take several minutes on first load"
+                            "Specializing \(viewModel.settings.selectedModel) for your device...\nThis can take several minutes on first load"
                         )
                         .font(.caption)
                         .foregroundColor(.gray)

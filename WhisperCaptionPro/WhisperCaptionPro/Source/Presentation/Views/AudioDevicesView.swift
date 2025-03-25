@@ -14,23 +14,23 @@ struct AudioDevicesView: View {
     var body: some View {
         #if os(macOS)
             HStack {
-                if let devices = viewModel.audioDevices, !devices.isEmpty {
-                    Picker("", selection: $viewModel.selectedAudioInput) {
+                if let devices = viewModel.audioState.audioDevices, !devices.isEmpty {
+                    Picker("", selection: $viewModel.settings.selectedAudioInput) {
                         ForEach(devices, id: \.self) { device in
                             Text(device.name).tag(device.name)
                         }
                     }
                     .frame(width: 250)
-                    .disabled(viewModel.isRecording)
+                    .disabled(viewModel.audioState.isRecording)
                 }
             }
             .onAppear {
-                viewModel.audioDevices = AudioProcessor.getAudioDevices()
-                if let devices = viewModel.audioDevices,
+                viewModel.audioState.audioDevices = AudioProcessor.getAudioDevices()
+                if let devices = viewModel.audioState.audioDevices,
                    !devices.isEmpty,
-                   viewModel.selectedAudioInput == "No Audio Input",
+                   viewModel.settings.selectedAudioInput == "No Audio Input",
                    let device = devices.first {
-                    viewModel.selectedAudioInput = device.name
+                    viewModel.settings.selectedAudioInput = device.name
                 }
             }
         #else

@@ -14,7 +14,7 @@ struct ControlsView: View {
         VStack {
             BasicSettingsView(viewModel: viewModel)
 
-            if let selectedCategoryId = viewModel.selectedCategoryId,
+            if let selectedCategoryId = viewModel.uiState.selectedCategoryId,
                let item = viewModel.menu.first(where: { $0.id == selectedCategoryId }) {
                 switch item.name {
                 case "Transcribe":
@@ -34,7 +34,7 @@ struct ControlsView: View {
                             Spacer()
 
                             Button {
-                                viewModel.showAdvancedOptions.toggle()
+                                viewModel.uiState.showAdvancedOptions.toggle()
                             } label: {
                                 Label("Settings", systemImage: "slider.horizontal.3")
                             }
@@ -42,7 +42,8 @@ struct ControlsView: View {
                         }
 
                         HStack {
-                            let color: Color = viewModel.modelState != .loaded ? .gray : .red
+                            let color: Color = viewModel.modelManagementState
+                                .modelState != .loaded ? .gray : .red
                             Button {
                                 withAnimation {
                                     viewModel.selectFile()
@@ -60,7 +61,7 @@ struct ControlsView: View {
                                     )
                             }
                             .fileImporter(
-                                isPresented: $viewModel.isFilePickerPresented,
+                                isPresented: $viewModel.uiState.isFilePickerPresented,
                                 allowedContentTypes: [.audio],
                                 allowsMultipleSelection: false,
                                 onCompletion: viewModel.handleFilePicker
@@ -68,7 +69,7 @@ struct ControlsView: View {
                             .lineLimit(1)
                             .contentTransition(.symbolEffect(.replace))
                             .buttonStyle(BorderlessButtonStyle())
-                            .disabled(viewModel.modelState != .loaded)
+                            .disabled(viewModel.modelManagementState.modelState != .loaded)
                             .frame(minWidth: 0, maxWidth: .infinity)
                             .padding()
 
@@ -78,7 +79,7 @@ struct ControlsView: View {
                                         viewModel.toggleRecording(shouldLoop: false)
                                     }
                                 } label: {
-                                    if !viewModel.isRecording {
+                                    if !viewModel.audioState.isRecording {
                                         Text("RECORD")
                                             .font(.headline)
                                             .foregroundColor(color)
@@ -96,21 +97,27 @@ struct ControlsView: View {
                                             .frame(width: 70, height: 70)
                                             .padding()
                                             .foregroundColor(viewModel
-                                                .modelState != .loaded ? .gray : .red)
+                                                .modelManagementState
+                                                .modelState !=
+                                                .loaded ?
+                                                .gray :
+                                                .red)
                                     }
                                 }
                                 .lineLimit(1)
                                 .contentTransition(.symbolEffect(.replace))
                                 .buttonStyle(BorderlessButtonStyle())
-                                .disabled(viewModel.modelState != .loaded)
+                                .disabled(viewModel.modelManagementState.modelState != .loaded)
                                 .frame(minWidth: 0, maxWidth: .infinity)
                                 .padding()
 
-                                if viewModel.isRecording {
-                                    Text("\(String(format: "%.1f", viewModel.bufferSeconds)) s")
-                                        .font(.caption)
-                                        .foregroundColor(.gray)
-                                        .offset(x: 80, y: 0)
+                                if viewModel.audioState.isRecording {
+                                    Text(
+                                        "\(String(format: "%.1f", viewModel.transcriptionState.bufferSeconds)) s"
+                                    )
+                                    .font(.caption)
+                                    .foregroundColor(.gray)
+                                    .offset(x: 80, y: 0)
                                 }
                             }
                         }
@@ -134,7 +141,7 @@ struct ControlsView: View {
 
                             VStack {
                                 Button {
-                                    viewModel.showAdvancedOptions.toggle()
+                                    viewModel.uiState.showAdvancedOptions.toggle()
                                 } label: {
                                     Label("Settings", systemImage: "slider.horizontal.3")
                                 }
@@ -149,32 +156,39 @@ struct ControlsView: View {
                                     viewModel.toggleRecording(shouldLoop: true)
                                 }
                             } label: {
-                                Image(systemName: !viewModel
+                                Image(systemName: !viewModel.audioState
                                     .isRecording ? "record.circle" : "stop.circle.fill")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 70, height: 70)
                                     .padding()
-                                    .foregroundColor(viewModel.modelState != .loaded ? .gray : .red)
+                                    .foregroundColor(viewModel.modelManagementState
+                                        .modelState != .loaded ? .gray : .red)
                             }
                             .contentTransition(.symbolEffect(.replace))
                             .buttonStyle(BorderlessButtonStyle())
-                            .disabled(viewModel.modelState != .loaded)
+                            .disabled(viewModel.modelManagementState.modelState != .loaded)
                             .frame(minWidth: 0, maxWidth: .infinity)
 
                             VStack {
-                                Text("Encoder runs: \(viewModel.currentEncodingLoops)")
-                                    .font(.caption)
-                                Text("Decoder runs: \(viewModel.currentDecodingLoops)")
-                                    .font(.caption)
+                                Text(
+                                    "Encoder runs: \(viewModel.transcriptionState.currentEncodingLoops)"
+                                )
+                                .font(.caption)
+                                Text(
+                                    "Decoder runs: \(viewModel.transcriptionState.currentDecodingLoops)"
+                                )
+                                .font(.caption)
                             }
                             .offset(x: -120, y: 0)
 
-                            if viewModel.isRecording {
-                                Text("\(String(format: "%.1f", viewModel.bufferSeconds)) s")
-                                    .font(.caption)
-                                    .foregroundColor(.gray)
-                                    .offset(x: 80, y: 0)
+                            if viewModel.audioState.isRecording {
+                                Text(
+                                    "\(String(format: "%.1f", viewModel.transcriptionState.bufferSeconds)) s"
+                                )
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                                .offset(x: 80, y: 0)
                             }
                         }
                     }
@@ -185,7 +199,7 @@ struct ControlsView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal)
-        .sheet(isPresented: $viewModel.showAdvancedOptions) {
+        .sheet(isPresented: $viewModel.uiState.showAdvancedOptions) {
             SettingsView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled)

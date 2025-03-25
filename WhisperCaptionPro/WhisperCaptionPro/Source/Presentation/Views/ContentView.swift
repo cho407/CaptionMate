@@ -12,15 +12,16 @@ struct ContentView: View {
     @StateObject var viewModel = ContentViewModel()
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $viewModel.columnVisibility) {
+        NavigationSplitView(columnVisibility: $viewModel.uiState.columnVisibility) {
             VStack(alignment: .leading) {
                 ModelSelectorView(viewModel: viewModel)
                     .padding(.vertical)
                 ComputeUnitsView(viewModel: viewModel)
-                    .disabled(viewModel.modelState != .loaded && viewModel.modelState != .unloaded)
+                    .disabled(viewModel.modelManagementState.modelState != .loaded && viewModel
+                        .modelManagementState.modelState != .unloaded)
                     .padding(.bottom)
 
-                List(viewModel.menu, selection: $viewModel.selectedCategoryId) { item in
+                List(viewModel.menu, selection: $viewModel.uiState.selectedCategoryId) { item in
                     HStack {
                         Image(systemName: item.image)
                         Text(item.name)
@@ -28,12 +29,14 @@ struct ContentView: View {
                             .bold()
                     }
                 }
-                .onChange(of: viewModel.selectedCategoryId) { newValue, _ in
-                    viewModel.selectedTab = viewModel.menu.first(where: { $0.id == newValue })?
+                .onChange(of: viewModel.uiState.selectedCategoryId) { newValue, _ in
+                    viewModel.settings.selectedTab = viewModel.menu
+                        .first(where: { $0.id == newValue })?
                         .name ?? "Transcribe"
                 }
-                .disabled(viewModel.modelState != .loaded)
-                .foregroundColor(viewModel.modelState != .loaded ? .secondary : .primary)
+                .disabled(viewModel.modelManagementState.modelState != .loaded)
+                .foregroundColor(viewModel.modelManagementState
+                    .modelState != .loaded ? .secondary : .primary)
 
                 Spacer()
 
@@ -77,10 +80,11 @@ struct ContentView: View {
             .toolbar {
                 ToolbarItem {
                     Button {
-                        if !viewModel.enableEagerDecoding {
+                        if !viewModel.settings.enableEagerDecoding {
                             let fullTranscript = formatSegments(
-                                viewModel.confirmedSegments + viewModel.unconfirmedSegments,
-                                withTimestamps: viewModel.enableTimestamps
+                                viewModel.transcriptionState.confirmedSegments + viewModel
+                                    .transcriptionState.unconfirmedSegments,
+                                withTimestamps: viewModel.settings.enableTimestamps
                             ).joined(separator: "\n")
                             #if os(iOS)
                                 UIPasteboard.general.string = fullTranscript
@@ -90,12 +94,14 @@ struct ContentView: View {
                             #endif
                         } else {
                             #if os(iOS)
-                                UIPasteboard.general.string = viewModel.confirmedText + viewModel
-                                    .hypothesisText
+                                UIPasteboard.general.string = viewModel.transcriptionState
+                                    .confirmedText + viewModel
+                                    .transcriptionState.hypothesisText
                             #elseif os(macOS)
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(
-                                    viewModel.confirmedText + viewModel.hypothesisText,
+                                    viewModel.transcriptionState.confirmedText + viewModel
+                                        .transcriptionState.hypothesisText,
                                     forType: .string
                                 )
                             #endif
@@ -111,12 +117,12 @@ struct ContentView: View {
         }
         .onAppear {
             #if os(macOS)
-                viewModel.selectedCategoryId = viewModel.menu
-                    .first(where: { $0.name == viewModel.selectedTab })?.id
+                viewModel.uiState.selectedCategoryId = viewModel.menu
+                    .first(where: { $0.name == viewModel.settings.selectedTab })?.id
             #else
                 if UIDevice.current.userInterfaceIdiom == .pad {
-                    viewModel.selectedCategoryId = viewModel.menu
-                        .first(where: { $0.name == viewModel.selectedTab })?.id
+                    viewModel.uiState.selectedCategoryId = viewModel.menu
+                        .first(where: { $0.name == viewModel.settings.selectedTab })?.id
                 }
             #endif
             viewModel.fetchModels()

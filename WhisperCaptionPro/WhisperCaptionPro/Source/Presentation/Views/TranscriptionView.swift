@@ -12,12 +12,16 @@ struct TranscriptionView: View {
 
     var body: some View {
         VStack {
-            if !viewModel.bufferEnergy.isEmpty {
+            if !viewModel.transcriptionState.bufferEnergy.isEmpty {
                 ScrollView(.horizontal) {
                     HStack(spacing: 1) {
-                        let startIndex = max(viewModel.bufferEnergy.count - 300, 0)
+                        let startIndex = max(
+                            viewModel.transcriptionState.bufferEnergy.count - 300,
+                            0
+                        )
                         ForEach(
-                            Array(viewModel.bufferEnergy.enumerated())[startIndex...],
+                            Array(viewModel.transcriptionState.bufferEnergy
+                                .enumerated())[startIndex...],
                             id: \.element
                         ) { _, energy in
                             ZStack {
@@ -25,7 +29,8 @@ struct TranscriptionView: View {
                                     .frame(width: 2, height: CGFloat(energy) * 24)
                             }
                             .frame(maxHeight: 24)
-                            .background(energy > Float(viewModel.silenceThreshold) ? Color.green
+                            .background(energy > Float(viewModel.settings.silenceThreshold) ? Color
+                                .green
                                 .opacity(0.2) : Color.red.opacity(0.2))
                         }
                     }
@@ -37,24 +42,30 @@ struct TranscriptionView: View {
 
             ScrollView {
                 VStack(alignment: .leading) {
-                    if viewModel.enableEagerDecoding && viewModel.selectedTab == "Stream" {
-                        let startSeconds = viewModel.eagerResults.first??.segments.first?.start ?? 0
-                        let endSeconds = viewModel.lastAgreedSeconds > 0 ? viewModel
-                            .lastAgreedSeconds : viewModel.eagerResults.last??.segments.last?
+                    if viewModel.settings.enableEagerDecoding && viewModel.settings
+                        .selectedTab == "Stream" {
+                        let startSeconds = viewModel.transcriptionState.eagerResults.first??
+                            .segments.first?.start ?? 0
+                        let endSeconds = viewModel.transcriptionState
+                            .lastAgreedSeconds > 0 ? viewModel
+                            .transcriptionState.lastAgreedSeconds : viewModel.transcriptionState
+                            .eagerResults.last??.segments.last?
                             .end ?? 0
-                        let timestampText = (viewModel.enableTimestamps && viewModel.eagerResults
+                        let timestampText = (viewModel.settings.enableTimestamps && viewModel
+                            .transcriptionState.eagerResults
                             .first != nil) ?
-                            TimeInterval(startSeconds).formatTimeRange(to: TimeInterval(endSeconds)) :
+                            TimeInterval(startSeconds)
+                            .formatTimeRange(to: TimeInterval(endSeconds)) :
                             ""
                         Text(
-                            "\(timestampText) \(Text(viewModel.confirmedText).fontWeight(.bold))\(Text(viewModel.hypothesisText).fontWeight(.bold).foregroundColor(.gray))"
+                            "\(timestampText) \(Text(viewModel.transcriptionState.confirmedText).fontWeight(.bold))\(Text(viewModel.transcriptionState.hypothesisText).fontWeight(.bold).foregroundColor(.gray))"
                         )
                         .font(.headline)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if viewModel.enableDecoderPreview {
-                            Text("\(viewModel.currentText)")
+                        if viewModel.settings.enableDecoderPreview {
+                            Text("\(viewModel.transcriptionState.currentText)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.leading)
@@ -62,11 +73,12 @@ struct TranscriptionView: View {
                                 .padding(.top)
                         }
                     } else {
-                        ForEach(Array(viewModel.confirmedSegments.enumerated()),
+                        ForEach(Array(viewModel.transcriptionState.confirmedSegments.enumerated()),
                                 id: \.element) { _, segment in
                             let timestampText = viewModel
-                                .enableTimestamps ?
-                                TimeInterval(segment.start).formatTimeRange(to: TimeInterval(segment.end)) :
+                                .settings.enableTimestamps ?
+                                TimeInterval(segment.start)
+                                .formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
                             Text(timestampText + segment.text)
                                 .font(.headline)
@@ -75,11 +87,14 @@ struct TranscriptionView: View {
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        ForEach(Array(viewModel.unconfirmedSegments.enumerated()),
-                                id: \.element) { _, segment in
+                        ForEach(
+                            Array(viewModel.transcriptionState.unconfirmedSegments.enumerated()),
+                            id: \.element
+                        ) { _, segment in
                             let timestampText = viewModel
-                                .enableTimestamps ?
-                                TimeInterval(segment.start).formatTimeRange(to: TimeInterval(segment.end)) :
+                                .settings.enableTimestamps ?
+                                TimeInterval(segment.start)
+                                .formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
                             Text(timestampText + segment.text)
                                 .font(.headline)
@@ -88,8 +103,8 @@ struct TranscriptionView: View {
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        if viewModel.enableDecoderPreview {
-                            Text("\(viewModel.currentText)")
+                        if viewModel.settings.enableDecoderPreview {
+                            Text("\(viewModel.transcriptionState.currentText)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.leading)
@@ -104,9 +119,9 @@ struct TranscriptionView: View {
             .padding()
 
             if let whisperKit = viewModel.whisperKit,
-               viewModel.selectedTab != "Stream",
-               viewModel.isTranscribing,
-               let task = viewModel.transcribeTask,
+               viewModel.settings.selectedTab != "Stream",
+               viewModel.audioState.isTranscribing,
+               let task = viewModel.uiState.transcribeTask,
                !task.isCancelled,
                whisperKit.progress.fractionCompleted < 1 {
                 HStack {
@@ -116,8 +131,8 @@ struct TranscriptionView: View {
                         .padding(.horizontal)
 
                     Button {
-                        viewModel.transcribeTask?.cancel()
-                        viewModel.transcribeTask = nil
+                        viewModel.uiState.transcribeTask?.cancel()
+                        viewModel.uiState.transcribeTask = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)

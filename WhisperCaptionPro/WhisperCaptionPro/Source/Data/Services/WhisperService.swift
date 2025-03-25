@@ -65,12 +65,10 @@ class WhisperService {
 
         if let modelFolder = folder {
             kit.modelFolder = modelFolder
-
             await MainActor.run {
                 updateProgress(specializationProgressRatio, .prewarming)
             }
             try await kit.prewarmModels()
-
             await MainActor.run {
                 updateProgress(
                     specializationProgressRatio + 0.9 * (1 - specializationProgressRatio),
@@ -94,9 +92,8 @@ class WhisperService {
             decodeOptions: options,
             callback: decodingCallback
         )
-        let merged = mergeTranscriptionResults(results)
-        return merged
+        return mergeTranscriptionResults(results)
     }
 
-    // 추가적인 eager mode 전사 등 필요한 기능을 별도 메서드로 구현할 수 있습니다.
+    // 추가적인 eager mode 전사 등 필요한 기능을 메서드로 구현 가능.
 }

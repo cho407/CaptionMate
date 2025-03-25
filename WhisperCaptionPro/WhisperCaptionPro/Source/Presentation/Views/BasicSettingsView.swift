@@ -14,7 +14,7 @@ struct BasicSettingsView: View {
     var body: some View {
         VStack {
             HStack {
-                Picker("", selection: $viewModel.selectedTask) {
+                Picker("", selection: $viewModel.settings.selectedTask) {
                     ForEach(DecodingTask.allCases, id: \.self) { task in
                         Text(task.description.capitalized).tag(task.description)
                     }
@@ -25,8 +25,9 @@ struct BasicSettingsView: View {
             .padding(.horizontal)
 
             LabeledContent {
-                Picker("", selection: $viewModel.selectedLanguage) {
-                    ForEach(viewModel.availableLanguages, id: \.self) { language in
+                Picker("", selection: $viewModel.settings.selectedLanguage) {
+                    ForEach(viewModel.modelManagementState.availableLanguages,
+                            id: \.self) { language in
                         Text(language.description).tag(language.description)
                     }
                 }
@@ -38,20 +39,24 @@ struct BasicSettingsView: View {
             .padding(.top)
 
             HStack {
-                Text("\(viewModel.effectiveRealTimeFactor, specifier: "%.3f") RTF")
-                    .font(.body)
+                Text(
+                    "\(viewModel.transcriptionState.effectiveRealTimeFactor, specifier: "%.3f") RTF"
+                )
+                .font(.body)
                 Spacer()
                 #if os(macOS)
-                    Text("\(viewModel.effectiveSpeedFactor, specifier: "%.1f") Speed Factor")
-                        .font(.body)
-                        .lineLimit(1)
+                    Text(
+                        "\(viewModel.transcriptionState.effectiveSpeedFactor, specifier: "%.1f") Speed Factor"
+                    )
+                    .font(.body)
+                    .lineLimit(1)
                     Spacer()
                 #endif
-                Text("\(viewModel.tokensPerSecond, specifier: "%.0f") tok/s")
+                Text("\(viewModel.transcriptionState.tokensPerSecond, specifier: "%.0f") tok/s")
                     .font(.body)
                 Spacer()
                 Text(
-                    "First token: \(viewModel.firstTokenTime - viewModel.pipelineStart, specifier: "%.2f")s"
+                    "First token: \(viewModel.transcriptionState.firstTokenTime - viewModel.transcriptionState.pipelineStart, specifier: "%.2f")s"
                 )
                 .font(.body)
             }

@@ -13,27 +13,29 @@ struct ComputeUnitsView: View {
     @ObservedObject var viewModel: ContentViewModel
 
     var body: some View {
-        DisclosureGroup(isExpanded: $viewModel.showComputeUnits) {
+        DisclosureGroup(isExpanded: $viewModel.uiState.showComputeUnits) {
             VStack(alignment: .leading) {
                 HStack {
                     Image(systemName: "circle.fill")
                         .foregroundStyle((viewModel.whisperKit?.audioEncoder as? WhisperMLModel)?
                             .modelState == .loaded ? .green :
-                            (viewModel.modelState == .unloaded ? .red : .yellow))
+                            (viewModel.modelManagementState
+                                .modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(
                             .variableColor,
-                            isActive: viewModel.modelState != .loaded && viewModel
-                                .modelState != .unloaded
+                            isActive: viewModel.modelManagementState
+                                .modelState != .loaded && viewModel
+                                .modelManagementState.modelState != .unloaded
                         )
                     Text("Audio Encoder")
                     Spacer()
-                    Picker("", selection: $viewModel.encoderComputeUnits) {
+                    Picker("", selection: $viewModel.settings.encoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
-                    .onChange(of: viewModel.encoderComputeUnits) { _, _ in
-                        viewModel.loadModel(viewModel.selectedModel)
+                    .onChange(of: viewModel.settings.encoderComputeUnits) { _, _ in
+                        viewModel.loadModel(viewModel.settings.selectedModel)
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
@@ -42,21 +44,23 @@ struct ComputeUnitsView: View {
                     Image(systemName: "circle.fill")
                         .foregroundStyle((viewModel.whisperKit?.textDecoder as? WhisperMLModel)?
                             .modelState == .loaded ? .green :
-                            (viewModel.modelState == .unloaded ? .red : .yellow))
+                            (viewModel.modelManagementState
+                                .modelState == .unloaded ? .red : .yellow))
                         .symbolEffect(
                             .variableColor,
-                            isActive: viewModel.modelState != .loaded && viewModel
-                                .modelState != .unloaded
+                            isActive: viewModel.modelManagementState
+                                .modelState != .loaded && viewModel
+                                .modelManagementState.modelState != .unloaded
                         )
                     Text("Text Decoder")
                     Spacer()
-                    Picker("", selection: $viewModel.decoderComputeUnits) {
+                    Picker("", selection: $viewModel.settings.decoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
-                    .onChange(of: viewModel.decoderComputeUnits) { _, _ in
-                        viewModel.loadModel(viewModel.selectedModel)
+                    .onChange(of: viewModel.settings.decoderComputeUnits) { _, _ in
+                        viewModel.loadModel(viewModel.settings.selectedModel)
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
@@ -65,7 +69,7 @@ struct ComputeUnitsView: View {
             .padding(.top)
         } label: {
             Button {
-                viewModel.showComputeUnits.toggle()
+                viewModel.uiState.showComputeUnits.toggle()
             } label: {
                 Text("Compute Units")
                     .font(.headline)
