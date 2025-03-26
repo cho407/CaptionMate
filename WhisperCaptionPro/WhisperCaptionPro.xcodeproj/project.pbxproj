@@ -34,6 +34,13 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		999461872D93EB94003ABB4C /* Exceptions for "WhisperCaptionPro" folder in "WhisperCaptionPro" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 9941C9972D6A13770086EB91 /* WhisperCaptionPro */;
+		};
 		99A3BC182D75A50B00479850 /* Exceptions for "Tests" folder in "WhisperCaptionPro" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -63,6 +70,9 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		9941C99A2D6A13770086EB91 /* WhisperCaptionPro */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				999461872D93EB94003ABB4C /* Exceptions for "WhisperCaptionPro" folder in "WhisperCaptionPro" target */,
+			);
 			path = WhisperCaptionPro;
 			sourceTree = "<group>";
 		};
@@ -431,7 +441,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WhisperCaptionPro/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "이 앱은 음성 녹음을 위해 마이크 접근 권한이 필요합니다.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -459,7 +471,9 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WhisperCaptionPro/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "이 앱은 음성 녹음을 위해 마이크 접근 권한이 필요합니다.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

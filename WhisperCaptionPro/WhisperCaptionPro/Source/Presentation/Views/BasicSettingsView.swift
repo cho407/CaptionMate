@@ -20,20 +20,26 @@ struct BasicSettingsView: View {
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
-                .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
             }
             .padding(.horizontal)
+            // TODO: - 자동 언어 감지 관련해서 모델별 UI 로직 조금더 세세하게 고려
+            HStack {
+                Toggle("Auto Language", isOn: $viewModel.settings.isAutoLanguageEnable)
+                    .toggleStyle(.checkbox)
 
-            LabeledContent {
-                Picker("", selection: $viewModel.settings.selectedLanguage) {
-                    ForEach(viewModel.modelManagementState.availableLanguages,
-                            id: \.self) { language in
-                        Text(language.description).tag(language.description)
+                LabeledContent {
+                    Picker("", selection: $viewModel.settings.selectedLanguage) {
+                        ForEach(viewModel.modelManagementState.availableLanguages,
+                                id: \.self) { language in
+                            Text(language.description).tag(language.description)
+                        }
                     }
+                    .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
+                } label: {
+                    Label("Source Language", systemImage: "globe")
                 }
+                .disabled(viewModel.settings.isAutoLanguageEnable)
                 .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
-            } label: {
-                Label("Source Language", systemImage: "globe")
             }
             .padding(.horizontal)
             .padding(.top)

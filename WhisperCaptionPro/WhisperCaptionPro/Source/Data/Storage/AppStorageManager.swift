@@ -38,4 +38,5 @@ struct SettingsState {
     var chunkingStrategy: ChunkingStrategy = .vad
     var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
+    var isAutoLanguageEnable: Bool = false
 }

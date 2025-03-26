@@ -5,6 +5,8 @@
 //  Created by 조형구 on 2/22/25.
 //
 
+import AVFAudio
+import AVFoundation
 import SwiftUI
 import WhisperKit
 
@@ -59,7 +61,7 @@ struct ContentView: View {
                 .foregroundColor(.secondary)
                 .padding(.vertical)
             }
-            .navigationTitle("WhisperAX")
+            .navigationTitle("WhisperCaptionPro")
             .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             .padding(.horizontal)
             Spacer()

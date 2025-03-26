@@ -139,6 +139,11 @@ class ContentViewModel: ObservableObject {
         didSet { settings.decoderComputeUnits = storedDecoderComputeUnits }
     }
 
+    @AppStorage("autoLanguage") var storedAutoLanguageOption: Bool =
+        false {
+        didSet { settings.isAutoLanguageEnable = storedAutoLanguageOption }
+    }
+
     // MARK: - Methods
 
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
@@ -541,22 +546,45 @@ class ContentViewModel: ObservableObject {
         ]
         let task: DecodingTask = settings.selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
-        let options = DecodingOptions(
-            verbose: true,
-            task: task,
-            language: languageCode,
-            temperature: Float(settings.temperatureStart),
-            temperatureFallbackCount: Int(settings.fallbackCount),
-            sampleLength: Int(settings.sampleLength),
-            usePrefillPrompt: settings.enablePromptPrefill,
-            usePrefillCache: settings.enableCachePrefill,
-            skipSpecialTokens: !settings.enableSpecialCharacters,
-            withoutTimestamps: !settings.enableTimestamps,
-            wordTimestamps: true,
-            clipTimestamps: seekClip,
-            concurrentWorkerCount: Int(settings.concurrentWorkerCount),
-            chunkingStrategy: settings.chunkingStrategy
-        )
+        // 언어 자동 감지 기능을 위한 분기처리
+        var options: DecodingOptions
+
+        if settings.isAutoLanguageEnable == true {
+            options = DecodingOptions(
+                verbose: true,
+                task: task,
+                language: nil, // 자동 언어 감지 모드
+                temperature: Float(settings.temperatureStart),
+                temperatureFallbackCount: Int(settings.fallbackCount),
+                sampleLength: Int(settings.sampleLength),
+                usePrefillPrompt: settings.enablePromptPrefill,
+                usePrefillCache: settings.enableCachePrefill,
+                detectLanguage: true,
+                skipSpecialTokens: !settings.enableSpecialCharacters,
+                withoutTimestamps: !settings.enableTimestamps,
+                wordTimestamps: true,
+                clipTimestamps: seekClip,
+                concurrentWorkerCount: Int(settings.concurrentWorkerCount),
+                chunkingStrategy: settings.chunkingStrategy
+            )
+        } else {
+            options = DecodingOptions(
+                verbose: true,
+                task: task,
+                language: languageCode,
+                temperature: Float(settings.temperatureStart),
+                temperatureFallbackCount: Int(settings.fallbackCount),
+                sampleLength: Int(settings.sampleLength),
+                usePrefillPrompt: settings.enablePromptPrefill,
+                usePrefillCache: settings.enableCachePrefill,
+                skipSpecialTokens: !settings.enableSpecialCharacters,
+                withoutTimestamps: !settings.enableTimestamps,
+                wordTimestamps: true,
+                clipTimestamps: seekClip,
+                concurrentWorkerCount: Int(settings.concurrentWorkerCount),
+                chunkingStrategy: settings.chunkingStrategy
+            )
+        }
 
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
