@@ -15,15 +15,19 @@ import WhisperKit
 
 @MainActor
 class ContentViewModel: ObservableObject {
-    // 각 기능별 상태 모델을 @Published 프로퍼티로 관리
+    // WhisperKit 인스턴스
+    @Published var whisperKit: WhisperKit?
+    
+    // model
     @Published var transcriptionState = TranscriptionState()
     @Published var modelManagementState = ModelManagementState()
     @Published var audioState = AudioState()
     @Published var uiState = UIState()
     @Published var settings = SettingsState()
-
-    // WhisperKit 인스턴스
-    @Published var whisperKit: WhisperKit?
+    
+    // 자막 파일 타입
+    @Published var transcriptionResult: TranscriptionResult? // 전사 결과
+    @Published var isExporting: Bool = false
 
     // MARK: - 메뉴 (Menu Items)
 
@@ -523,6 +527,8 @@ class ContentViewModel: ObservableObject {
 
         await MainActor.run {
             transcriptionState.currentText = ""
+            transcriptionResult = transcription
+            
             guard let segments = transcription?.segments else { return }
             transcriptionState.tokensPerSecond = transcription?.timings.tokensPerSecond ?? 0
             transcriptionState.effectiveRealTimeFactor = transcription?.timings.realTimeFactor ?? 0
@@ -921,5 +927,16 @@ class ContentViewModel: ObservableObject {
             confirmedWords: transcriptionState.confirmedWords
         )
         return mergedResult
+    }
+    
+    /// 파일 export 하는 함수
+    func exportTranscription() async {
+        guard let result = transcriptionResult else {
+            print("No transcription result available.")
+            return
+        }
+        // 파일 내보내기 실행
+        await ExportService.exportTranscriptionResult(result: result,
+                                                      defaultFileName: "Subtitle")
     }
 }

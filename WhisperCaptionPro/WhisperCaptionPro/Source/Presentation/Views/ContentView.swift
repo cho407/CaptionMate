@@ -81,39 +81,14 @@ struct ContentView: View {
             }
             .toolbar {
                 ToolbarItem {
-                    Button {
-                        if !viewModel.settings.enableEagerDecoding {
-                            let fullTranscript = formatSegments(
-                                viewModel.transcriptionState.confirmedSegments + viewModel
-                                    .transcriptionState.unconfirmedSegments,
-                                withTimestamps: viewModel.settings.enableTimestamps
-                            ).joined(separator: "\n")
-                            #if os(iOS)
-                                UIPasteboard.general.string = fullTranscript
-                            #elseif os(macOS)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(fullTranscript, forType: .string)
-                            #endif
-                        } else {
-                            #if os(iOS)
-                                UIPasteboard.general.string = viewModel.transcriptionState
-                                    .confirmedText + viewModel
-                                    .transcriptionState.hypothesisText
-                            #elseif os(macOS)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(
-                                    viewModel.transcriptionState.confirmedText + viewModel
-                                        .transcriptionState.hypothesisText,
-                                    forType: .string
-                                )
-                            #endif
+                    Button("Export Subtitle") {
+                        Task {
+                            await viewModel.exportTranscription()
                         }
-                    } label: {
-                        Label("Copy Text", systemImage: "doc.on.doc")
+                  
                     }
-                    .keyboardShortcut("c", modifiers: .command)
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity)
+                    
+                    
                 }
             }
         }

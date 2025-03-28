@@ -33,7 +33,7 @@ struct TranscriptionState {
     var bufferSeconds: Double = 0
     var confirmedSegments: [TranscriptionSegment] = []
     var unconfirmedSegments: [TranscriptionSegment] = []
-
+    
     // 전사 처리 시간 및 속도 관련
     var effectiveRealTimeFactor: TimeInterval = 0
     var effectiveSpeedFactor: TimeInterval = 0
