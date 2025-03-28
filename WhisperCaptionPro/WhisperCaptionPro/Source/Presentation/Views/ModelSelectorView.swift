@@ -104,6 +104,11 @@ struct ModelSelectorView: View {
                     viewModel.resetState()
                     viewModel.loadModel(viewModel.settings.selectedModel)
                     viewModel.modelManagementState.modelState = .loading
+                    if !(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) {
+                        viewModel.settings.isAutoLanguageEnable = false
+                    }
+                   
+
                 } label: {
                     Text("Load Model")
                         .frame(maxWidth: .infinity)

@@ -549,7 +549,7 @@ class ContentViewModel: ObservableObject {
         // 언어 자동 감지 기능을 위한 분기처리
         var options: DecodingOptions
 
-        if settings.isAutoLanguageEnable == true {
+        if (settings.isAutoLanguageEnable == true) && (whisperKit.modelVariant.isMultilingual == true) {
             options = DecodingOptions(
                 verbose: true,
                 task: task,
