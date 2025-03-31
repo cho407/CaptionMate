@@ -14,7 +14,7 @@ struct BasicSettingsView: View {
     var body: some View {
         VStack {
             HStack {
-                Picker("", selection: $viewModel.settings.selectedTask) {
+                Picker("", selection: $viewModel.selectedTask) {
                     ForEach(DecodingTask.allCases, id: \.self) { task in
                         Text(task.description.capitalized).tag(task.description)
                     }
@@ -24,12 +24,12 @@ struct BasicSettingsView: View {
             .padding(.horizontal)
             // TODO: - 자동 언어 감지 관련해서 모델별 UI 로직 조금더 세세하게 고려
             HStack {
-                Toggle("Auto Language", isOn: $viewModel.settings.isAutoLanguageEnable)
+                Toggle("Auto Language", isOn: $viewModel.isAutoLanguageEnable)
                     .toggleStyle(.checkbox)
                     .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
 
                 LabeledContent {
-                    Picker("", selection: $viewModel.settings.selectedLanguage) {
+                    Picker("", selection: $viewModel.selectedLanguage) {
                         ForEach(viewModel.modelManagementState.availableLanguages,
                                 id: \.self) { language in
                             Text(language.description).tag(language.description)
@@ -39,7 +39,7 @@ struct BasicSettingsView: View {
                 } label: {
                     Label("Source Language", systemImage: "globe")
                 }
-                .disabled(viewModel.settings.isAutoLanguageEnable)
+                .disabled(viewModel.isAutoLanguageEnable)
                 .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
             }
             .padding(.horizontal)

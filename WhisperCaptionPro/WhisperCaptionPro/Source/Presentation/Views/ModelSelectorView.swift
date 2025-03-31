@@ -29,7 +29,7 @@ struct ModelSelectorView: View {
                 Spacer()
 
                 if !viewModel.modelManagementState.availableModels.isEmpty {
-                    Picker("", selection: $viewModel.settings.selectedModel) {
+                    Picker("", selection: $viewModel.selectedModel) {
                         ForEach(viewModel.modelManagementState.availableModels,
                                 id: \.self) { model in
                             HStack {
@@ -44,7 +44,7 @@ struct ModelSelectorView: View {
                         }
                     }
                     .pickerStyle(MenuPickerStyle())
-                    .onChange(of: viewModel.settings.selectedModel) { _, _ in
+                    .onChange(of: viewModel.selectedModel) { _, _ in
                         viewModel.modelManagementState.modelState = .unloaded
                     }
                 } else {
@@ -62,14 +62,14 @@ struct ModelSelectorView: View {
                 .buttonStyle(BorderlessButtonStyle())
                 .disabled(viewModel.modelManagementState.localModels.isEmpty || !viewModel
                     .modelManagementState.localModels
-                    .contains(viewModel.settings.selectedModel))
+                    .contains(viewModel.selectedModel))
 
                 #if os(macOS)
                     Button {
                         let folderURL = viewModel.whisperKit?
                             .modelFolder ??
                             (viewModel.modelManagementState.localModels
-                                .contains(viewModel.settings.selectedModel) ?
+                                .contains(viewModel.selectedModel) ?
                                 URL(
                                     fileURLWithPath: viewModel.modelManagementState.localModelPath
                                 ) :
@@ -85,7 +85,7 @@ struct ModelSelectorView: View {
 
                 Button {
                     if let url =
-                        URL(string: "https://huggingface.co/\(viewModel.settings.repoName)") {
+                        URL(string: "https://huggingface.co/\(viewModel.repoName)") {
                         #if os(macOS)
                             NSWorkspace.shared.open(url)
                         #else
@@ -102,10 +102,10 @@ struct ModelSelectorView: View {
                 Divider()
                 Button {
                     viewModel.resetState()
-                    viewModel.loadModel(viewModel.settings.selectedModel)
+                    viewModel.loadModel(viewModel.selectedModel)
                     viewModel.modelManagementState.modelState = .loading
                     if !(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) {
-                        viewModel.settings.isAutoLanguageEnable = false
+                        viewModel.isAutoLanguageEnable = false
                     }
                    
 
@@ -134,7 +134,7 @@ struct ModelSelectorView: View {
                     }
                     if viewModel.modelManagementState.modelState == .prewarming {
                         Text(
-                            "Specializing \(viewModel.settings.selectedModel) for your device...\nThis can take several minutes on first load"
+                            "Specializing \(viewModel.selectedModel) for your device...\nThis can take several minutes on first load"
                         )
                         .font(.caption)
                         .foregroundColor(.gray)

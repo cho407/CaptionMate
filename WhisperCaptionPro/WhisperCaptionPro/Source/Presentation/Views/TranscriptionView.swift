@@ -29,7 +29,7 @@ struct TranscriptionView: View {
                                     .frame(width: 2, height: CGFloat(energy) * 24)
                             }
                             .frame(maxHeight: 24)
-                            .background(energy > Float(viewModel.settings.silenceThreshold) ? Color
+                            .background(energy > Float(viewModel.silenceThreshold) ? Color
                                 .green
                                 .opacity(0.2) : Color.red.opacity(0.2))
                         }
@@ -42,7 +42,7 @@ struct TranscriptionView: View {
 
             ScrollView {
                 VStack(alignment: .leading) {
-                    if viewModel.settings.enableEagerDecoding && viewModel.settings
+                    if viewModel.enableEagerDecoding && viewModel
                         .selectedTab == "Stream" {
                         let startSeconds = viewModel.transcriptionState.eagerResults.first??
                             .segments.first?.start ?? 0
@@ -51,7 +51,7 @@ struct TranscriptionView: View {
                             .transcriptionState.lastAgreedSeconds : viewModel.transcriptionState
                             .eagerResults.last??.segments.last?
                             .end ?? 0
-                        let timestampText = (viewModel.settings.enableTimestamps && viewModel
+                        let timestampText = (viewModel.enableTimestamps && viewModel
                             .transcriptionState.eagerResults
                             .first != nil) ?
                             TimeInterval(startSeconds)
@@ -64,7 +64,7 @@ struct TranscriptionView: View {
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        if viewModel.settings.enableDecoderPreview {
+                        if viewModel.enableDecoderPreview {
                             Text("\(viewModel.transcriptionState.currentText)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -76,7 +76,7 @@ struct TranscriptionView: View {
                         ForEach(Array(viewModel.transcriptionState.confirmedSegments.enumerated()),
                                 id: \.element) { _, segment in
                             let timestampText = viewModel
-                                .settings.enableTimestamps ?
+                                .enableTimestamps ?
                                 TimeInterval(segment.start)
                                 .formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
@@ -92,7 +92,7 @@ struct TranscriptionView: View {
                             id: \.element
                         ) { _, segment in
                             let timestampText = viewModel
-                                .settings.enableTimestamps ?
+                                .enableTimestamps ?
                                 TimeInterval(segment.start)
                                 .formatTimeRange(to: TimeInterval(segment.end)) :
                                 ""
@@ -103,7 +103,7 @@ struct TranscriptionView: View {
                                 .multilineTextAlignment(.leading)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        if viewModel.settings.enableDecoderPreview {
+                        if viewModel.enableDecoderPreview {
                             Text("\(viewModel.transcriptionState.currentText)")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -119,7 +119,7 @@ struct TranscriptionView: View {
             .padding()
 
             if let whisperKit = viewModel.whisperKit,
-               viewModel.settings.selectedTab != "Stream",
+               viewModel.selectedTab != "Stream",
                viewModel.audioState.isTranscribing,
                let task = viewModel.uiState.transcribeTask,
                !task.isCancelled,

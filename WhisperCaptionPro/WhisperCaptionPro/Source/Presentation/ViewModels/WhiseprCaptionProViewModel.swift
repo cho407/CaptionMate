@@ -23,7 +23,6 @@ class ContentViewModel: ObservableObject {
     @Published var modelManagementState = ModelManagementState()
     @Published var audioState = AudioState()
     @Published var uiState = UIState()
-    @Published var settings = SettingsState()
     
     // 자막 파일 타입
     @Published var transcriptionResult: TranscriptionResult? // 전사 결과
@@ -41,112 +40,34 @@ class ContentViewModel: ObservableObject {
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
     ]
-
-    // MARK: - AppStorage 동기화
-
-    @AppStorage("selectedAudioInput") var storedSelectedAudioInput: String = "No Audio Input" {
-        didSet { settings.selectedAudioInput = storedSelectedAudioInput }
-    }
-
-    @AppStorage("selectedModel") var storedSelectedModel: String = WhisperKit.recommendedModels()
-        .default {
-        didSet { settings.selectedModel = storedSelectedModel }
-    }
-
-    @AppStorage("selectedTab") var storedSelectedTab: String = "Transcribe" {
-        didSet { settings.selectedTab = storedSelectedTab }
-    }
-
-    @AppStorage("selectedTask") var storedSelectedTask: String = "transcribe" {
-        didSet { settings.selectedTask = storedSelectedTask }
-    }
-
-    @AppStorage("selectedLanguage") var storedSelectedLanguage: String = "english" {
-        didSet { settings.selectedLanguage = storedSelectedLanguage }
-    }
-
-    @AppStorage("repoName") var storedRepoName: String = "argmaxinc/whisperkit-coreml" {
-        didSet { settings.repoName = storedRepoName }
-    }
-
-    @AppStorage("enableTimestamps") var storedEnableTimestamps: Bool = true {
-        didSet { settings.enableTimestamps = storedEnableTimestamps }
-    }
-
-    @AppStorage("enablePromptPrefill") var storedEnablePromptPrefill: Bool = true {
-        didSet { settings.enablePromptPrefill = storedEnablePromptPrefill }
-    }
-
-    @AppStorage("enableCachePrefill") var storedEnableCachePrefill: Bool = true {
-        didSet { settings.enableCachePrefill = storedEnableCachePrefill }
-    }
-
-    @AppStorage("enableSpecialCharacters") var storedEnableSpecialCharacters: Bool = false {
-        didSet { settings.enableSpecialCharacters = storedEnableSpecialCharacters }
-    }
-
-    @AppStorage("enableEagerDecoding") var storedEnableEagerDecoding: Bool = false {
-        didSet { settings.enableEagerDecoding = storedEnableEagerDecoding }
-    }
-
-    @AppStorage("enableDecoderPreview") var storedEnableDecoderPreview: Bool = true {
-        didSet { settings.enableDecoderPreview = storedEnableDecoderPreview }
-    }
-
-    @AppStorage("temperatureStart") var storedTemperatureStart: Double = 0 {
-        didSet { settings.temperatureStart = storedTemperatureStart }
-    }
-
-    @AppStorage("fallbackCount") var storedFallbackCount: Double = 5 {
-        didSet { settings.fallbackCount = storedFallbackCount }
-    }
-
-    @AppStorage("compressionCheckWindow") var storedCompressionCheckWindow: Double = 60 {
-        didSet { settings.compressionCheckWindow = storedCompressionCheckWindow }
-    }
-
-    @AppStorage("sampleLength") var storedSampleLength: Double = 224 {
-        didSet { settings.sampleLength = storedSampleLength }
-    }
-
-    @AppStorage("silenceThreshold") var storedSilenceThreshold: Double = 0.3 {
-        didSet { settings.silenceThreshold = storedSilenceThreshold }
-    }
-
-    @AppStorage("realtimeDelayInterval") var storedRealtimeDelayInterval: Double = 1 {
-        didSet { settings.realtimeDelayInterval = storedRealtimeDelayInterval }
-    }
-
-    @AppStorage("useVAD") var storedUseVAD: Bool = true {
-        didSet { settings.useVAD = storedUseVAD }
-    }
-
-    @AppStorage("tokenConfirmationsNeeded") var storedTokenConfirmationsNeeded: Double = 2 {
-        didSet { settings.tokenConfirmationsNeeded = storedTokenConfirmationsNeeded }
-    }
-
-    @AppStorage("concurrentWorkerCount") var storedConcurrentWorkerCount: Double = 4 {
-        didSet { settings.concurrentWorkerCount = storedConcurrentWorkerCount }
-    }
-
-    @AppStorage("chunkingStrategy") var storedChunkingStrategy: ChunkingStrategy = .vad {
-        didSet { settings.chunkingStrategy = storedChunkingStrategy }
-    }
-
-    @AppStorage("encoderComputeUnits") var storedEncoderComputeUnits: MLComputeUnits =
-        .cpuAndNeuralEngine {
-        didSet { settings.encoderComputeUnits = storedEncoderComputeUnits }
-    }
-
-    @AppStorage("decoderComputeUnits") var storedDecoderComputeUnits: MLComputeUnits =
-        .cpuAndNeuralEngine {
-        didSet { settings.decoderComputeUnits = storedDecoderComputeUnits }
-    }
-
-    @AppStorage("autoLanguage") var storedAutoLanguageOption: Bool =
-        false {
-        didSet { settings.isAutoLanguageEnable = storedAutoLanguageOption }
-    }
+    // TODO: - userDefault로 획일화, decoding option 수정
+    // MARK: - AppStorage
+    @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
+    @AppStorage("selectedModel") var selectedModel: String = WhisperKit.recommendedModels().default
+    @AppStorage("selectedTab") var selectedTab: String = "Transcribe"
+    @AppStorage("selectedTask") var selectedTask: String = "transcribe"
+    @AppStorage("selectedLanguage") var selectedLanguage: String = "english"
+    @AppStorage("repoName") var repoName: String = "argmaxinc/whisperkit-coreml"
+    @AppStorage("enableTimestamps") var enableTimestamps: Bool = true
+    @AppStorage("enablePromptPrefill") var enablePromptPrefill: Bool = true
+    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true
+    @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool = false
+    @AppStorage("enableEagerDecoding") var enableEagerDecoding: Bool = false
+    @AppStorage("enableDecoderPreview") var enableDecoderPreview: Bool = true
+    @AppStorage("temperatureStart") var temperatureStart: Double = 0
+    @AppStorage("fallbackCount") var fallbackCount: Double = 5
+    @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double = 60
+    @AppStorage("sampleLength") var sampleLength: Double = 224
+    @AppStorage("silenceThreshold") var silenceThreshold: Double = 0.3
+    @AppStorage("realtimeDelayInterval") var realtimeDelayInterval: Double = 1
+    @AppStorage("useVAD") var useVAD: Bool = true
+    @AppStorage("tokenConfirmationsNeeded") var tokenConfirmationsNeeded: Double = 2
+    @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double = 4
+    @AppStorage("chunkingStrategy") var chunkingStrategy: ChunkingStrategy = .vad
+    @AppStorage("encoderComputeUnits") var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
+    @AppStorage("decoderComputeUnits") var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
+    @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
+    @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false
 
     // MARK: - Methods
 
@@ -190,14 +111,14 @@ class ContentViewModel: ObservableObject {
     /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
     func getComputeOptions() -> ModelComputeOptions {
         return ModelComputeOptions(
-            audioEncoderCompute: settings.encoderComputeUnits,
-            textDecoderCompute: settings.decoderComputeUnits
+            audioEncoderCompute: encoderComputeUnits,
+            textDecoderCompute: decoderComputeUnits
         )
     }
 
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
-        modelManagementState.availableModels = [settings.selectedModel]
+        modelManagementState.availableModels = [selectedModel]
         if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first {
             let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
@@ -223,7 +144,7 @@ class ContentViewModel: ObservableObject {
         }
 
         print("Found locally: \(modelManagementState.localModels)")
-        print("Previously selected model: \(settings.selectedModel)")
+        print("Previously selected model: \(selectedModel)")
 
         Task {
             let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
@@ -271,7 +192,7 @@ class ContentViewModel: ObservableObject {
             } else {
                 folder = try await WhisperKit.download(
                     variant: model,
-                    from: settings.repoName,
+                    from: repoName,
                     progressCallback: { progress in
                         DispatchQueue.main.async {
                             self.modelManagementState
@@ -340,13 +261,13 @@ class ContentViewModel: ObservableObject {
 
     /// 모델 삭제
     func deleteModel() {
-        if modelManagementState.localModels.contains(settings.selectedModel) {
+        if modelManagementState.localModels.contains(selectedModel) {
             let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)
-                .appendingPathComponent(settings.selectedModel)
+                .appendingPathComponent(selectedModel)
             do {
                 try FileManager.default.removeItem(at: modelFolder)
                 if let index = modelManagementState.localModels
-                    .firstIndex(of: settings.selectedModel) {
+                    .firstIndex(of: selectedModel) {
                     modelManagementState.localModels.remove(at: index)
                 }
                 modelManagementState.modelState = .unloaded
@@ -446,10 +367,10 @@ class ContentViewModel: ObservableObject {
                 }
                 var deviceId: DeviceID?
                 #if os(macOS)
-                    if settings.selectedAudioInput != "No Audio Input",
+                    if selectedAudioInput != "No Audio Input",
                        let devices = audioState.audioDevices,
                        let device = devices
-                       .first(where: { $0.name == settings.selectedAudioInput }) {
+                       .first(where: { $0.name == selectedAudioInput }) {
                         deviceId = device.id
                     }
                     if deviceId == nil {
@@ -547,55 +468,37 @@ class ContentViewModel: ObservableObject {
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
         let languageCode = Constants.languages[
-            settings.selectedLanguage,
+            selectedLanguage,
             default: Constants.defaultLanguageCode
         ]
-        let task: DecodingTask = settings.selectedTask == "transcribe" ? .transcribe : .translate
+        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
         // 언어 자동 감지 기능을 위한 분기처리
         var options: DecodingOptions
 
-        if (settings.isAutoLanguageEnable == true) && (whisperKit.modelVariant.isMultilingual == true) {
-            options = DecodingOptions(
-                verbose: true,
-                task: task,
-                language: nil, // 자동 언어 감지 모드
-                temperature: Float(settings.temperatureStart),
-                temperatureFallbackCount: Int(settings.fallbackCount),
-                sampleLength: Int(settings.sampleLength),
-                usePrefillPrompt: settings.enablePromptPrefill,
-                usePrefillCache: settings.enableCachePrefill,
-                detectLanguage: true,
-                skipSpecialTokens: !settings.enableSpecialCharacters,
-                withoutTimestamps: !settings.enableTimestamps,
-                wordTimestamps: true,
-                clipTimestamps: seekClip,
-                concurrentWorkerCount: Int(settings.concurrentWorkerCount),
-                chunkingStrategy: settings.chunkingStrategy
-            )
-        } else {
-            options = DecodingOptions(
-                verbose: true,
-                task: task,
-                language: languageCode,
-                temperature: Float(settings.temperatureStart),
-                temperatureFallbackCount: Int(settings.fallbackCount),
-                sampleLength: Int(settings.sampleLength),
-                usePrefillPrompt: settings.enablePromptPrefill,
-                usePrefillCache: settings.enableCachePrefill,
-                skipSpecialTokens: !settings.enableSpecialCharacters,
-                withoutTimestamps: !settings.enableTimestamps,
-                wordTimestamps: true,
-                clipTimestamps: seekClip,
-                concurrentWorkerCount: Int(settings.concurrentWorkerCount),
-                chunkingStrategy: settings.chunkingStrategy
-            )
-        }
+        options = DecodingOptions(
+            verbose: true,
+            task: task,
+            language: isAutoLanguageEnable ? nil : languageCode, // 자동 언어 감지 모드
+            temperature: Float(temperatureStart),
+            temperatureFallbackCount: Int(fallbackCount),
+            sampleLength: Int(sampleLength),
+            usePrefillPrompt: enablePromptPrefill,
+            usePrefillCache: enableCachePrefill,
+            detectLanguage: isAutoLanguageEnable,
+            skipSpecialTokens: !enableSpecialCharacters,
+            withoutTimestamps: !enableTimestamps,
+            wordTimestamps: enableWordTimestamp,
+            clipTimestamps: seekClip,
+            concurrentWorkerCount: Int(concurrentWorkerCount),
+            chunkingStrategy: chunkingStrategy
+        )
+        
 
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                let chunkId = self.settings.selectedTask == "transcribe" ? 0 : progress.windowId
+                let chunkId = self.selectedTask == "transcribe" ? 0 : progress.windowId
                 var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
                 if var currentChunk = self.transcriptionState.currentChunks[chunkId],
                    let previousChunkText = currentChunk.chunkText.last {
@@ -603,8 +506,8 @@ class ContentViewModel: ObservableObject {
                         currentChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
                         updatedChunk = currentChunk
                     } else {
-                        if fallbacks == currentChunk.fallbacks && self.settings
-                            .selectedTask == "transcribe" {
+                        if fallbacks == currentChunk.fallbacks &&
+                            self.selectedTask == "transcribe" {
                             updatedChunk
                                 .chunkText = [(updatedChunk.chunkText.first ?? "") + progress.text]
                         } else {
@@ -625,7 +528,7 @@ class ContentViewModel: ObservableObject {
             }
 
             let currentTokens = progress.tokens
-            let checkWindow = Int(self.settings.compressionCheckWindow)
+            let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
                 let checkTokens: [Int] = Array(currentTokens.suffix(checkWindow))
                 let compressionRatio = compressionRatio(of: checkTokens)
@@ -655,8 +558,8 @@ class ContentViewModel: ObservableObject {
         uiState.transcriptionTask = Task {
             while audioState.isRecording && audioState.isTranscribing {
                 do {
-                    try await transcribeCurrentBuffer(delayInterval: Float(settings
-                            .realtimeDelayInterval))
+                    try await transcribeCurrentBuffer(delayInterval: Float(
+                            realtimeDelayInterval))
                 } catch {
                     print("Error: \(error.localizedDescription)")
                     break
@@ -685,11 +588,11 @@ class ContentViewModel: ObservableObject {
             try await Task.sleep(nanoseconds: 100_000_000)
             return
         }
-        if settings.useVAD {
+        if useVAD {
             let voiceDetected = AudioProcessor.isVoiceDetected(
                 in: whisperKit.audioProcessor.relativeEnergy,
                 nextBufferInSeconds: nextBufferSeconds,
-                silenceThreshold: Float(settings.silenceThreshold)
+                silenceThreshold: Float(silenceThreshold)
             )
             guard voiceDetected else {
                 await MainActor.run {
@@ -702,7 +605,7 @@ class ContentViewModel: ObservableObject {
         }
         transcriptionState.lastBufferSize = currentBuffer.count
 
-        if settings.selectedTask == "transcribe" && settings.enableEagerDecoding {
+        if selectedTask == "transcribe" && enableEagerDecoding {
             let transcription = try await transcribeEagerMode(Array(currentBuffer))
             await MainActor.run {
                 transcriptionState.currentText = ""
@@ -776,28 +679,28 @@ class ContentViewModel: ObservableObject {
         guard whisperKit.textDecoder.supportsWordTimestamps else {
             transcriptionState
                 .confirmedText =
-                "Eager mode requires word timestamps, which are not supported by the current model: \(settings.selectedModel)."
+                "Eager mode requires word timestamps, which are not supported by the current model: \(selectedModel)."
             return nil
         }
         let languageCode = Constants.languages[
-            settings.selectedLanguage,
+            selectedLanguage,
             default: Constants.defaultLanguageCode
         ]
-        let task: DecodingTask = settings.selectedTask == "transcribe" ? .transcribe : .translate
-        print(settings.selectedLanguage)
+        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
+        print(selectedLanguage)
         print(languageCode)
         let options = DecodingOptions(
             verbose: true,
             task: task,
             language: languageCode,
-            temperature: Float(settings.temperatureStart),
-            temperatureFallbackCount: Int(settings.fallbackCount),
-            sampleLength: Int(settings.sampleLength),
-            usePrefillPrompt: settings.enablePromptPrefill,
-            usePrefillCache: settings.enableCachePrefill,
-            skipSpecialTokens: !settings.enableSpecialCharacters,
-            withoutTimestamps: !settings.enableTimestamps,
-            wordTimestamps: true,
+            temperature: Float(temperatureStart),
+            temperatureFallbackCount: Int(fallbackCount),
+            sampleLength: Int(sampleLength),
+            usePrefillPrompt: enablePromptPrefill,
+            usePrefillCache: enableCachePrefill,
+            skipSpecialTokens: !enableSpecialCharacters,
+            withoutTimestamps: !enableTimestamps,
+            wordTimestamps: enableTimestamps,
             firstTokenLogProbThreshold: -1.5,
             chunkingStrategy: ChunkingStrategy.none
         )
@@ -817,7 +720,7 @@ class ContentViewModel: ObservableObject {
                 self.transcriptionState.currentDecodingLoops += 1
             }
             let currentTokens = progress.tokens
-            let checkWindow = Int(self.settings.compressionCheckWindow)
+            let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
                 let checkTokens: [Int] = Array(currentTokens.suffix(checkWindow))
                 let compressionRatio = compressionRatio(of: checkTokens)
@@ -872,10 +775,10 @@ class ContentViewModel: ObservableObject {
                             .info(
                                 "[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\""
                             )
-                        if commonPrefix.count >= Int(self.settings.tokenConfirmationsNeeded) {
+                        if commonPrefix.count >= Int(self.tokenConfirmationsNeeded) {
                             self.transcriptionState
                                 .lastAgreedWords = Array(commonPrefix
-                                    .suffix(Int(self.settings.tokenConfirmationsNeeded)))
+                                    .suffix(Int(self.tokenConfirmationsNeeded)))
                             self.transcriptionState.lastAgreedSeconds = self.transcriptionState
                                 .lastAgreedWords.first!.start
                             Logging
@@ -885,7 +788,7 @@ class ContentViewModel: ObservableObject {
                             self.transcriptionState.confirmedWords
                                 .append(contentsOf: commonPrefix
                                     .prefix(commonPrefix
-                                        .count - Int(self.settings.tokenConfirmationsNeeded)))
+                                        .count - Int(self.tokenConfirmationsNeeded)))
                             let currentWords = self.transcriptionState.confirmedWords
                                 .map { $0.word }.joined()
                             Logging

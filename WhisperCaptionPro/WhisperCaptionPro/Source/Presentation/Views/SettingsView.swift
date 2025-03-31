@@ -19,7 +19,17 @@ struct SettingsView: View {
                     "Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected."
                 )
                 Spacer()
-                Toggle("", isOn: $viewModel.settings.enableTimestamps)
+                Toggle("", isOn: $viewModel.enableTimestamps)
+            }
+            .padding(.horizontal)
+            
+            HStack {
+                Text("Word Timestamps")
+                InfoButton(
+                    "Toggling this will enable/disable word-level timestamps in the transcription output. \nWhen enabled, each transcription segment is split into individual words with precise start and end times calculated using dynamic alignment. \nDisabling this option will result in only segment-level timestamps."
+                )
+                Spacer()
+                Toggle("", isOn: $viewModel.enableWordTimestamp)
             }
             .padding(.horizontal)
 
@@ -29,7 +39,7 @@ struct SettingsView: View {
                     "Toggling this will include/exclude special characters in the transcription text."
                 )
                 Spacer()
-                Toggle("", isOn: $viewModel.settings.enableSpecialCharacters)
+                Toggle("", isOn: $viewModel.enableSpecialCharacters)
             }
             .padding(.horizontal)
 
@@ -39,7 +49,7 @@ struct SettingsView: View {
                     "Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging."
                 )
                 Spacer()
-                Toggle("", isOn: $viewModel.settings.enableDecoderPreview)
+                Toggle("", isOn: $viewModel.enableDecoderPreview)
             }
             .padding(.horizontal)
 
@@ -49,7 +59,7 @@ struct SettingsView: View {
                     "When Prompt Prefill is on, it forces the task, language, and timestamp tokens in the decoding loop. Toggle it off if you'd like the model to generate those tokens itself."
                 )
                 Spacer()
-                Toggle("", isOn: $viewModel.settings.enablePromptPrefill)
+                Toggle("", isOn: $viewModel.enablePromptPrefill)
             }
             .padding(.horizontal)
 
@@ -59,7 +69,7 @@ struct SettingsView: View {
                     "When Cache Prefill is on, the decoder will try to use a lookup table of pre-computed KV caches instead of computing them during the decoding loop, which can speed up inference."
                 )
                 Spacer()
-                Toggle("", isOn: $viewModel.settings.enableCachePrefill)
+                Toggle("", isOn: $viewModel.enableCachePrefill)
             }
             .padding(.horizontal)
 
@@ -70,7 +80,7 @@ struct SettingsView: View {
                         "Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions)."
                     )
                     Spacer()
-                    Picker("", selection: $viewModel.settings.chunkingStrategy) {
+                    Picker("", selection: $viewModel.chunkingStrategy) {
                         Text("None").tag(ChunkingStrategy.none)
                         Text("VAD").tag(ChunkingStrategy.vad)
                     }
@@ -78,8 +88,8 @@ struct SettingsView: View {
                 }
                 HStack {
                     Text("Workers:")
-                    Slider(value: $viewModel.settings.concurrentWorkerCount, in: 0 ... 32, step: 1)
-                    Text(viewModel.settings.concurrentWorkerCount.formatted(.number))
+                    Slider(value: $viewModel.concurrentWorkerCount, in: 0 ... 32, step: 1)
+                    Text(viewModel.concurrentWorkerCount.formatted(.number))
                     InfoButton(
                         "Number of concurrent transcription workers. Higher values may increase memory usage but can improve speed."
                     )
@@ -91,8 +101,8 @@ struct SettingsView: View {
             VStack {
                 Text("Starting Temperature")
                 HStack {
-                    Slider(value: $viewModel.settings.temperatureStart, in: 0 ... 1, step: 0.1)
-                    Text(viewModel.settings.temperatureStart.formatted(.number))
+                    Slider(value: $viewModel.temperatureStart, in: 0 ... 1, step: 0.1)
+                    Text(viewModel.temperatureStart.formatted(.number))
                     InfoButton(
                         "Controls the initial randomness of token selection in the decoding loop."
                     )
@@ -103,8 +113,8 @@ struct SettingsView: View {
             VStack {
                 Text("Max Fallback Count")
                 HStack {
-                    Slider(value: $viewModel.settings.fallbackCount, in: 0 ... 5, step: 1)
-                    Text(viewModel.settings.fallbackCount.formatted(.number))
+                    Slider(value: $viewModel.fallbackCount, in: 0 ... 5, step: 1)
+                    Text(viewModel.fallbackCount.formatted(.number))
                         .frame(width: 30)
                     InfoButton("Number of fallback attempts for token selection.")
                 }
@@ -115,11 +125,11 @@ struct SettingsView: View {
                 Text("Compression Check Tokens")
                 HStack {
                     Slider(
-                        value: $viewModel.settings.compressionCheckWindow,
+                        value: $viewModel.compressionCheckWindow,
                         in: 0 ... 100,
                         step: 5
                     )
-                    Text(viewModel.settings.compressionCheckWindow.formatted(.number))
+                    Text(viewModel.compressionCheckWindow.formatted(.number))
                         .frame(width: 30)
                     InfoButton(
                         "Number of tokens used to check for repetitive patterns via compression."
@@ -132,7 +142,7 @@ struct SettingsView: View {
                 Text("Max Tokens Per Loop")
                 HStack {
                     Slider(
-                        value: $viewModel.settings.sampleLength,
+                        value: $viewModel.sampleLength,
                         in: 0 ... Double(min(
                             viewModel.whisperKit?.textDecoder.kvCacheMaxSequenceLength ?? Constants
                                 .maxTokenContext,
@@ -140,7 +150,7 @@ struct SettingsView: View {
                         )),
                         step: 10
                     )
-                    Text(viewModel.settings.sampleLength.formatted(.number))
+                    Text(viewModel.sampleLength.formatted(.number))
                         .frame(width: 30)
                     InfoButton("Maximum tokens generated per decoding loop.")
                 }
@@ -150,8 +160,8 @@ struct SettingsView: View {
             VStack {
                 Text("Silence Threshold")
                 HStack {
-                    Slider(value: $viewModel.settings.silenceThreshold, in: 0 ... 1, step: 0.05)
-                    Text(viewModel.settings.silenceThreshold.formatted(.number))
+                    Slider(value: $viewModel.silenceThreshold, in: 0 ... 1, step: 0.05)
+                    Text(viewModel.silenceThreshold.formatted(.number))
                         .frame(width: 30)
                     InfoButton("Relative silence threshold for audio segmentation.")
                 }
@@ -161,8 +171,8 @@ struct SettingsView: View {
             VStack {
                 Text("Realtime Delay Interval")
                 HStack {
-                    Slider(value: $viewModel.settings.realtimeDelayInterval, in: 0 ... 30, step: 1)
-                    Text(viewModel.settings.realtimeDelayInterval.formatted(.number))
+                    Slider(value: $viewModel.realtimeDelayInterval, in: 0 ... 30, step: 1)
+                    Text(viewModel.realtimeDelayInterval.formatted(.number))
                         .frame(width: 30)
                     InfoButton("Delay between successive streaming transcription loops.")
                 }
@@ -174,7 +184,7 @@ struct SettingsView: View {
                     Text("Eager Streaming Mode")
                     InfoButton("Updates transcription more frequently but may be less accurate.")
                     Spacer()
-                    Toggle("", isOn: $viewModel.settings.enableEagerDecoding)
+                    Toggle("", isOn: $viewModel.enableEagerDecoding)
                 }
                 .padding(.horizontal)
                 .padding(.top)
@@ -183,11 +193,11 @@ struct SettingsView: View {
                     Text("Token Confirmations")
                     HStack {
                         Slider(
-                            value: $viewModel.settings.tokenConfirmationsNeeded,
+                            value: $viewModel.tokenConfirmationsNeeded,
                             in: 1 ... 10,
                             step: 1
                         )
-                        Text(viewModel.settings.tokenConfirmationsNeeded.formatted(.number))
+                        Text(viewModel.tokenConfirmationsNeeded.formatted(.number))
                             .frame(width: 30)
                         InfoButton("Number of consecutive tokens required for confirmation.")
                     }

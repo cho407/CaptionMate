@@ -32,7 +32,7 @@ struct ContentView: View {
                     }
                 }
                 .onChange(of: viewModel.uiState.selectedCategoryId) { newValue, _ in
-                    viewModel.settings.selectedTab = viewModel.menu
+                    viewModel.selectedTab = viewModel.menu
                         .first(where: { $0.id == newValue })?
                         .name ?? "Transcribe"
                 }
@@ -95,11 +95,11 @@ struct ContentView: View {
         .onAppear {
             #if os(macOS)
                 viewModel.uiState.selectedCategoryId = viewModel.menu
-                    .first(where: { $0.name == viewModel.settings.selectedTab })?.id
+                    .first(where: { $0.name == viewModel.selectedTab })?.id
             #else
                 if UIDevice.current.userInterfaceIdiom == .pad {
                     viewModel.uiState.selectedCategoryId = viewModel.menu
-                        .first(where: { $0.name == viewModel.settings.selectedTab })?.id
+                        .first(where: { $0.name == viewModel.selectedTab })?.id
                 }
             #endif
             viewModel.fetchModels()

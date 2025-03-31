@@ -29,13 +29,13 @@ struct ComputeUnitsView: View {
                         )
                     Text("Audio Encoder")
                     Spacer()
-                    Picker("", selection: $viewModel.settings.encoderComputeUnits) {
+                    Picker("", selection: $viewModel.encoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
-                    .onChange(of: viewModel.settings.encoderComputeUnits) { _, _ in
-                        viewModel.loadModel(viewModel.settings.selectedModel)
+                    .onChange(of: viewModel.encoderComputeUnits) { _, _ in
+                        viewModel.loadModel(viewModel.selectedModel)
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
@@ -54,13 +54,13 @@ struct ComputeUnitsView: View {
                         )
                     Text("Text Decoder")
                     Spacer()
-                    Picker("", selection: $viewModel.settings.decoderComputeUnits) {
+                    Picker("", selection: $viewModel.decoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
                         Text("GPU").tag(MLComputeUnits.cpuAndGPU)
                         Text("Neural Engine").tag(MLComputeUnits.cpuAndNeuralEngine)
                     }
-                    .onChange(of: viewModel.settings.decoderComputeUnits) { _, _ in
-                        viewModel.loadModel(viewModel.settings.selectedModel)
+                    .onChange(of: viewModel.decoderComputeUnits) { _, _ in
+                        viewModel.loadModel(viewModel.selectedModel)
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
