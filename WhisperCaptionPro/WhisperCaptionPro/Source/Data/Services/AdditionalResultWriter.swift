@@ -84,6 +84,9 @@ open class WriteFCPXML: ResultWriting {
             formatName = "FFVideoFormat1080p\(Int(frameRate))"
         }
         
+        // 타임라인 길이 계산
+        let timelineDuration = calculateTimelineDuration(segments: result.segments)
+        
         // 파이썬 템플릿을 기반으로 한 FCPXML 구조
         var xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>
@@ -96,28 +99,40 @@ open class WriteFCPXML: ResultWriting {
             <library>
                 <event name="WhisperCaptionPro">
                     <project name="\(file)">
-                        <sequence format="r1" duration="30s" tcStart="0s" tcFormat="NDF">
+                        <sequence format="r1" duration="\(timelineDuration)" tcStart="0s" tcFormat="NDF">
                             <spine>
         """
         
-        // 각 세그먼트마다 타이틀 요소 생성
-        // 각 세그먼트마다 타이틀 요소 생성
-        for (counter, segment) in result.segments.enumerated() {
+        // 내용 있는 세그먼트만 필터링하고 시작 시간 기준으로 정렬
+        let validSegments = result.segments.filter { !$0.text.isEmpty }
+        let sortedSegments = validSegments.sorted(by: { $0.start < $1.start })
+        
+        // 타임라인 처리 로직 변경
+        // 0초부터 시작하는 타임라인을 가정하고, 첫 세그먼트 시작 전에 갭 추가
+        var currentTime: Float = 0.0
+        
+        for (counter, segment) in sortedSegments.enumerated() {
+            // 세그먼트 시작 시간이 현재 시간보다 나중이면 갭 추가
+            if segment.start > currentTime {
+                let gapStart = convertToTimecode(seconds: currentTime, frameRate: frameRate)
+                let gapDuration = convertToTimecode(seconds: segment.start - currentTime, frameRate: frameRate)
+                
+                xmlContent += """
+                
+                                <gap offset="\(gapStart)" duration="\(gapDuration)" start="\(gapStart)"/>
+                """
+            }
+            
             // 시작 시간 및 지속 시간 계산
             let startOffset = convertToTimecode(seconds: segment.start, frameRate: frameRate)
-            let startTime = startOffset
-            let duration = convertToTimecode(seconds: segment.end - segment.start, frameRate: frameRate)
-            
-            // 텍스트 내용 - 앞뒤 공백 제거는 ViewModel에서 이미 처리됨
-            if segment.text.isEmpty {
-                continue
-            }
+            let segmentDuration = segment.end - segment.start
+            let duration = convertToTimecode(seconds: segmentDuration, frameRate: frameRate)
             
             // 고유한 텍스트 스타일 ID (세그먼트 번호 기반)
             let textStyleId = "ts\(counter + 1)"
-          
+            
             if let wordTimings = segment.words, !wordTimings.isEmpty {
-                // 유효한 단어만 필터링 - ViewModel에서 이미 처리됨
+                // 유효한 단어만 필터링
                 let validWords = wordTimings.filter { !$0.word.isEmpty }
                 
                 // 유효한 단어가 없으면 세그먼트 자체도 건너뜀
@@ -125,39 +140,31 @@ open class WriteFCPXML: ResultWriting {
                     continue
                 }
                 
-                // 각 단어마다 고유한 textStyleId를 생성
+                // 단어별 타이틀 생성 (세그먼트 내 단어만 처리)
+                var lastWordEnd: Float = segment.start
+                
                 for (wordIndex, wordTiming) in validWords.enumerated() {
+                    // 단어 시작 시간이 이전 단어 종료 시간보다 나중이면 갭 추가
+                    if wordTiming.start > lastWordEnd {
+                        let wordGapStart = convertToTimecode(seconds: lastWordEnd, frameRate: frameRate)
+                        let wordGapDuration = convertToTimecode(seconds: wordTiming.start - lastWordEnd, frameRate: frameRate)
+                        
+                        xmlContent += """
+                        
+                                        <gap offset="\(wordGapStart)" duration="\(wordGapDuration)" start="\(wordGapStart)"/>
+                        """
+                    }
+                    
                     // 고유한 텍스트 스타일 ID (세그먼트 번호 + 단어 번호 기반)
                     let wordStyleId = "ts\(counter + 1)_\(wordIndex + 1)"
                     
-                    // 단어별 시작 시간과 종료 시간 계산 (세그먼트 기준 시간으로 조정)
+                    // 단어별 타이밍 계산
                     let wordStart = convertToTimecode(seconds: wordTiming.start, frameRate: frameRate)
                     let wordDuration = convertToTimecode(seconds: wordTiming.end - wordTiming.start, frameRate: frameRate)
                     
                     xmlContent += """
                     
-                                        <title name="Title \(counter + 1)_\(wordIndex + 1)" offset="\(wordStart)" ref="r2" duration="\(wordDuration)" start="\(wordStart)">
-                                            <param name="Position" key="9999/10199/10201/1/100/101" value="0 -418.279"/>
-                                            <param name="Alignment" key="9999/10199/10201/2/354/1002961760/401" value="1 (Center)"/>
-                                            <param name="Alignment" key="9999/10199/10201/2/373" value="0 (Left) 2 (Bottom)"/>
-                                            <param name="Out Sequencing" key="9999/10199/10201/4/10233/201/202" value="0 (To)"/>
-                                            <param name="Wrap Mode" key="9999/10199/10201/5/10203/21/25/5" value="1 (Repeat)"/>
-                                            <param name="Color" key="9999/10199/10201/5/10203/30/32" value="0 0 0"/>
-                                            <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
-                                            <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
-                                            <text>
-                                                <text-style ref="\(wordStyleId)">\(wordTiming.word)</text-style>
-                                            </text>
-                                            <text-style-def id="\(wordStyleId)">
-                                                <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>
-                                            </text-style-def>
-                                        </title>
-                    """
-                }
-            } else {
-                xmlContent += """
-                
-                                    <title name="Title \(counter + 1)" offset="\(startOffset)" ref="r2" duration="\(duration)" start="\(startTime)">
+                                    <title name="Title \(counter + 1)_\(wordIndex + 1)" offset="\(wordStart)" ref="r2" duration="\(wordDuration)" start="\(wordStart)">
                                         <param name="Position" key="9999/10199/10201/1/100/101" value="0 -418.279"/>
                                         <param name="Alignment" key="9999/10199/10201/2/354/1002961760/401" value="1 (Center)"/>
                                         <param name="Alignment" key="9999/10199/10201/2/373" value="0 (Left) 2 (Bottom)"/>
@@ -167,14 +174,53 @@ open class WriteFCPXML: ResultWriting {
                                         <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
                                         <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
                                         <text>
-                                            <text-style ref="\(textStyleId)">\(segment.text)</text-style>
+                                            <text-style ref="\(wordStyleId)">\(wordTiming.word)</text-style>
                                         </text>
-                                        <text-style-def id="\(textStyleId)">
+                                        <text-style-def id="\(wordStyleId)">
                                             <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>
                                         </text-style-def>
                                     </title>
+                    """
+                    
+                    // 현재 단어의 종료 시간 업데이트
+                    lastWordEnd = wordTiming.end
+                }
+                
+                // 단어별 종료 시간이 세그먼트 종료 시간보다 이전이면 갭 추가
+                if lastWordEnd < segment.end {
+                    let endGapStart = convertToTimecode(seconds: lastWordEnd, frameRate: frameRate)
+                    let endGapDuration = convertToTimecode(seconds: segment.end - lastWordEnd, frameRate: frameRate)
+                    
+                    xmlContent += """
+                    
+                                    <gap offset="\(endGapStart)" duration="\(endGapDuration)" start="\(endGapStart)"/>
+                    """
+                }
+            } else {
+                // 단어 분할 없는 세그먼트는 전체를 하나의 타이틀로 생성
+                xmlContent += """
+                
+                                <title name="Title \(counter + 1)" offset="\(startOffset)" ref="r2" duration="\(duration)" start="\(startOffset)">
+                                    <param name="Position" key="9999/10199/10201/1/100/101" value="0 -418.279"/>
+                                    <param name="Alignment" key="9999/10199/10201/2/354/1002961760/401" value="1 (Center)"/>
+                                    <param name="Alignment" key="9999/10199/10201/2/373" value="0 (Left) 2 (Bottom)"/>
+                                    <param name="Out Sequencing" key="9999/10199/10201/4/10233/201/202" value="0 (To)"/>
+                                    <param name="Wrap Mode" key="9999/10199/10201/5/10203/21/25/5" value="1 (Repeat)"/>
+                                    <param name="Color" key="9999/10199/10201/5/10203/30/32" value="0 0 0"/>
+                                    <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
+                                    <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
+                                    <text>
+                                        <text-style ref="\(textStyleId)">\(segment.text)</text-style>
+                                    </text>
+                                    <text-style-def id="\(textStyleId)">
+                                        <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>
+                                    </text-style-def>
+                                </title>
                 """
             }
+            
+            // 현재 시간을 세그먼트 종료 시간으로 업데이트
+            currentTime = segment.end
         }
 
         xmlContent += """
@@ -193,6 +239,16 @@ open class WriteFCPXML: ResultWriting {
         } catch {
             return .failure(error)
         }
+    }
+    
+    // 타임라인 전체 길이 계산
+    private func calculateTimelineDuration(segments: [TranscriptionSegment]) -> String {
+        guard let lastSegment = segments.max(by: { $0.end < $1.end }) else {
+            return convertToTimecode(seconds: 60.0, frameRate: frameRate) // 기본 1분
+        }
+        
+        // 마지막 세그먼트 종료 시간 + 5초
+        return convertToTimecode(seconds: lastSegment.end + 5.0, frameRate: frameRate)
     }
     
     // 초를 FCPXML 타임코드 형식으로 변환

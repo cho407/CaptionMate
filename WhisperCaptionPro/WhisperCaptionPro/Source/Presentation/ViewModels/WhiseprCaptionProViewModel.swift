@@ -869,6 +869,18 @@ class ContentViewModel: ObservableObject {
             }
         }
         
+        // 시작 시간으로 세그먼트 정렬
+        cleanSegments.sort { $0.start < $1.start }
+        
+        // 세그먼트 간 시간 겹침 처리
+        for i in 0..<cleanSegments.count-1 {
+            // 이전 세그먼트의 끝 시간이 다음 세그먼트의 시작 시간보다 뒤에 있으면 조정
+            if cleanSegments[i].end > cleanSegments[i+1].start {
+                // 다음 세그먼트 시작 시간에 맞춰 이전 세그먼트 끝 시간 조정
+                cleanSegments[i].end = cleanSegments[i+1].start
+            }
+        }
+        
         // 깨끗한 세그먼트로 결과 업데이트
         result.segments = cleanSegments
         
