@@ -2,12 +2,35 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>이 앱은 음성 녹음을 위해 마이크 접근 권한이 필요합니다.</string>
-	<key>NSPrivacyAccessedAPITypes</key>
-	<dict>
-		<key>NSPrivacyAccessedAPIType</key>
-		<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
-	</dict>
+    <key>NSPrivacyAccessedAPITypes</key>
+    <dict>
+        <key>NSPrivacyAccessedAPIType</key>
+        <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+    </dict>
+    
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key>
+            <string>public.fcpxml</string>
+            <key>UTTypeDescription</key>
+            <string>Final Cut Pro XML</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.xml</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>fcpxml</string>
+                </array>
+                <key>public.mime-type</key>
+                <array>
+                    <string>application/xml</string>
+                </array>
+            </dict>
+        </dict>
+    </array>
 </dict>
 </plist>

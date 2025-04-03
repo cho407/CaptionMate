@@ -22,7 +22,7 @@ struct BasicSettingsView: View {
                 .pickerStyle(SegmentedPickerStyle())
             }
             .padding(.horizontal)
-            // TODO: - 자동 언어 감지 관련해서 모델별 UI 로직 조금더 세세하게 고려
+            
             HStack {
                 Toggle("Auto Language", isOn: $viewModel.isAutoLanguageEnable)
                     .toggleStyle(.checkbox)

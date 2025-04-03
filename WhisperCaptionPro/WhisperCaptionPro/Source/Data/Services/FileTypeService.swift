@@ -7,21 +7,35 @@
 
 import UniformTypeIdentifiers
 
-enum SubtitleFileType: String, CaseIterable {
+public enum SubtitleFileType: String, CaseIterable {
+    case json
     case srt
     case vtt
-    case json
+    case fcpxml
+    case xml
+    case scc
+    case ass
 
-    var utType: UTType {
+    public var utType: UTType {
         switch self {
-        case .srt: return UTType(filenameExtension: "srt")!
-        case .vtt: return UTType(filenameExtension: "vtt")!
-        case .json: return UTType.json
+        case .json:
+            return UTType.json
+        case .srt:
+            return UTType(filenameExtension: "srt") ?? .plainText
+        case .vtt:
+            return UTType(filenameExtension: "vtt") ?? .plainText
+        case .fcpxml:
+            return UTType.fcpxml
+        case .xml:
+            return UTType.xml
+        case .scc:
+            return UTType(filenameExtension: "scc") ?? .plainText
+        case .ass:
+            return UTType(filenameExtension: "ass") ?? .plainText
         }
     }
-
-    /// UTType을 기반으로 SubtitleFileType을 생성하는 정적 메소드
-    static func from(utType: UTType) -> SubtitleFileType? {
+    
+    public static func from(utType: UTType) -> SubtitleFileType? {
         return self.allCases.first { $0.utType.identifier == utType.identifier }
     }
 }

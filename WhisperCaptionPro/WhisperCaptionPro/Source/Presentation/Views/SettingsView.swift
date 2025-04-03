@@ -11,6 +11,15 @@ import WhisperKit
 struct SettingsView: View {
     @ObservedObject var viewModel: ContentViewModel
 
+    private var numberFormatter: NumberFormatter {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 0
+        formatter.minimum = 1
+        return formatter
+    }
+    
     var body: some View {
         List {
             HStack {
@@ -72,7 +81,19 @@ struct SettingsView: View {
                 Toggle("", isOn: $viewModel.enableCachePrefill)
             }
             .padding(.horizontal)
-
+            
+            HStack {
+                Text("Frame Rate (fps)")
+                InfoButton(
+                    "Enter frame rate"
+                )
+                TextField("Enter frame rate", value: $viewModel.frameRate, formatter: numberFormatter)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .frame(width: 100)
+                
+            }
+            .padding(.horizontal)
+            
             VStack {
                 HStack {
                     Text("Chunking Strategy")

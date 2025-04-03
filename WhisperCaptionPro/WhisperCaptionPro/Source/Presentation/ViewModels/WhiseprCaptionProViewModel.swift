@@ -27,15 +27,15 @@ class ContentViewModel: ObservableObject {
     // 자막 파일 타입
     @Published var transcriptionResult: TranscriptionResult? // 전사 결과
     @Published var isExporting: Bool = false
-
+    
     // MARK: - 메뉴 (Menu Items)
-
+    
     struct MenuItem: Identifiable, Hashable {
         var id = UUID()
         var name: String
         var image: String
     }
-
+    
     let menu: [MenuItem] = [
         MenuItem(name: "Transcribe", image: "book.pages"),
         MenuItem(name: "Stream", image: "waveform.badge.mic"),
@@ -68,16 +68,17 @@ class ContentViewModel: ObservableObject {
     @AppStorage("decoderComputeUnits") var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false
-
+    @AppStorage("frameRate") var frameRate: Double = 30.0
+    
     // MARK: - Methods
-
+    
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
     func resetState() {
         uiState.transcribeTask?.cancel()
         audioState.isRecording = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
-
+        
         transcriptionState.currentText = ""
         transcriptionState.currentChunks = [:]
         transcriptionState.pipelineStart = Double.greatestFiniteMagnitude
@@ -96,7 +97,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.bufferSeconds = 0
         transcriptionState.confirmedSegments = []
         transcriptionState.unconfirmedSegments = []
-
+        
         transcriptionState.eagerResults = []
         transcriptionState.prevResult = nil
         transcriptionState.lastAgreedSeconds = 0.0
@@ -107,7 +108,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.hypothesisWords = []
         transcriptionState.hypothesisText = ""
     }
-
+    
     /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
     func getComputeOptions() -> ModelComputeOptions {
         return ModelComputeOptions(
@@ -115,7 +116,7 @@ class ContentViewModel: ObservableObject {
             textDecoderCompute: decoderComputeUnits
         )
     }
-
+    
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
         modelManagementState.availableModels = [selectedModel]
@@ -128,7 +129,7 @@ class ContentViewModel: ObservableObject {
                     let downloadedModels = try FileManager.default
                         .contentsOfDirectory(atPath: modelPath)
                     for model in downloadedModels
-                        where !modelManagementState.localModels.contains(model) {
+                    where !modelManagementState.localModels.contains(model) {
                         modelManagementState.localModels.append(model)
                     }
                 } catch {
@@ -139,13 +140,13 @@ class ContentViewModel: ObservableObject {
         modelManagementState.localModels = WhisperKit
             .formatModelFiles(modelManagementState.localModels)
         for model in modelManagementState.localModels
-            where !modelManagementState.availableModels.contains(model) {
+        where !modelManagementState.availableModels.contains(model) {
             modelManagementState.availableModels.append(model)
         }
-
+        
         print("Found locally: \(modelManagementState.localModels)")
         print("Previously selected model: \(selectedModel)")
-
+        
         Task {
             let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
             await MainActor.run {
@@ -162,7 +163,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 모델 로딩 (로컬/원격 모델 다운로드 및 초기화)
     func loadModel(_ model: String, redownload: Bool = false) {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
@@ -173,7 +174,7 @@ class ContentViewModel: ObservableObject {
             - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
-
+        
         whisperKit = nil
         Task {
             let config = WhisperKitConfig(computeOptions: getComputeOptions(),
@@ -184,7 +185,7 @@ class ContentViewModel: ObservableObject {
                                           download: false)
             whisperKit = try await WhisperKit(config)
             guard let whisperKit = whisperKit else { return }
-
+            
             var folder: URL?
             if modelManagementState.localModels.contains(model) && !redownload {
                 folder = URL(fileURLWithPath: modelManagementState.localModelPath)
@@ -203,13 +204,13 @@ class ContentViewModel: ObservableObject {
                     }
                 )
             }
-
+            
             await MainActor.run {
                 modelManagementState.loadingProgressValue = modelManagementState
                     .specializationProgressRatio
                 modelManagementState.modelState = .downloaded
             }
-
+            
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
                 await MainActor.run {
@@ -217,11 +218,11 @@ class ContentViewModel: ObservableObject {
                         .specializationProgressRatio
                     modelManagementState.modelState = .prewarming
                 }
-
+                
                 let progressBarTask = Task {
                     await updateProgressBar(targetProgress: 0.9, maxTime: 240)
                 }
-
+                
                 do {
                     try await whisperKit.prewarmModels()
                     progressBarTask.cancel()
@@ -236,16 +237,16 @@ class ContentViewModel: ObservableObject {
                         return
                     }
                 }
-
+                
                 await MainActor.run {
                     modelManagementState.loadingProgressValue = modelManagementState
                         .specializationProgressRatio + 0.9 *
-                        (1 - modelManagementState.specializationProgressRatio)
+                    (1 - modelManagementState.specializationProgressRatio)
                     modelManagementState.modelState = .loading
                 }
-
+                
                 try await whisperKit.loadModels()
-
+                
                 await MainActor.run {
                     if !modelManagementState.localModels.contains(model) {
                         modelManagementState.localModels.append(model)
@@ -258,7 +259,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 모델 삭제
     func deleteModel() {
         if modelManagementState.localModels.contains(selectedModel) {
@@ -276,25 +277,25 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 진행률 업데이트
     func updateProgressBar(targetProgress: Float, maxTime: TimeInterval) async {
         let initialProgress = modelManagementState.loadingProgressValue
         let decayConstant = -log(1 - targetProgress) / Float(maxTime)
         let startTime = Date()
-
+        
         while true {
             let elapsedTime = Date().timeIntervalSince(startTime)
             let decayFactor = exp(-decayConstant * Float(elapsedTime))
             let progressIncrement = (1 - initialProgress) * (1 - decayFactor)
             let currentProgress = initialProgress + progressIncrement
-
+            
             await MainActor.run {
                 modelManagementState.loadingProgressValue = currentProgress
             }
-
+            
             if currentProgress >= targetProgress { break }
-
+            
             do {
                 try await Task.sleep(nanoseconds: 100_000_000)
             } catch {
@@ -302,12 +303,12 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 파일 선택 (UI 관련)
     func selectFile() {
         uiState.isFilePickerPresented = true
     }
-
+    
     /// 파일 선택 결과 처리
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
@@ -321,6 +322,7 @@ class ContentViewModel: ObservableObject {
                     let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
                     try audioFileData.write(to: localFileURL)
                     print("File saved to temporary directory: \(localFileURL)")
+                    audioState.audioFileName = selectedFileURL.deletingPathExtension().lastPathComponent
                     transcribeFile(path: selectedFileURL.path)
                 } catch {
                     print("File selection error: \(error.localizedDescription)")
@@ -330,7 +332,7 @@ class ContentViewModel: ObservableObject {
             print("File selection error: \(error.localizedDescription)")
         }
     }
-
+    
     /// 파일 전사 시작
     func transcribeFile(path: String) {
         resetState()
@@ -345,7 +347,7 @@ class ContentViewModel: ObservableObject {
             audioState.isTranscribing = false
         }
     }
-
+    
     /// 녹음/전사 토글
     func toggleRecording(shouldLoop: Bool) {
         audioState.isRecording.toggle()
@@ -356,7 +358,7 @@ class ContentViewModel: ObservableObject {
             stopRecording(shouldLoop)
         }
     }
-
+    
     /// 녹음 시작
     func startRecording(_ loop: Bool) {
         if let audioProcessor = whisperKit?.audioProcessor {
@@ -366,17 +368,17 @@ class ContentViewModel: ObservableObject {
                     return
                 }
                 var deviceId: DeviceID?
-                #if os(macOS)
-                    if selectedAudioInput != "No Audio Input",
-                       let devices = audioState.audioDevices,
-                       let device = devices
-                       .first(where: { $0.name == selectedAudioInput }) {
-                        deviceId = device.id
-                    }
-                    if deviceId == nil {
-                        throw WhisperError.microphoneUnavailable()
-                    }
-                #endif
+#if os(macOS)
+                if selectedAudioInput != "No Audio Input",
+                   let devices = audioState.audioDevices,
+                   let device = devices
+                    .first(where: { $0.name == selectedAudioInput }) {
+                    deviceId = device.id
+                }
+                if deviceId == nil {
+                    throw WhisperError.microphoneUnavailable()
+                }
+#endif
                 try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
                     DispatchQueue.main.async {
                         // 전사 상태 업데이트
@@ -393,7 +395,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 녹음 중지
     func stopRecording(_ loop: Bool) {
         audioState.isRecording = false
@@ -415,7 +417,7 @@ class ContentViewModel: ObservableObject {
         }
         finalizeText()
     }
-
+    
     /// 전사 텍스트 최종 확정
     func finalizeText() {
         Task {
@@ -432,7 +434,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 오디오 파일 전사 진행
     func transcribeCurrentFile(path: String) async throws {
         Logging.debug("Loading audio file: \(path)")
@@ -443,9 +445,9 @@ class ContentViewModel: ObservableObject {
             }
         }.value
         Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
-
+        
         let transcription = try await transcribeAudioSamples(audioFileSamples)
-
+        
         await MainActor.run {
             transcriptionState.currentText = ""
             transcriptionResult = transcription
@@ -463,7 +465,7 @@ class ContentViewModel: ObservableObject {
             transcriptionState.confirmedSegments = segments
         }
     }
-
+    
     /// 오디오 샘플 전사
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
@@ -475,7 +477,7 @@ class ContentViewModel: ObservableObject {
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
         // 언어 자동 감지 기능을 위한 분기처리
         var options: DecodingOptions
-
+        
         options = DecodingOptions(
             verbose: true,
             task: task,
@@ -494,7 +496,7 @@ class ContentViewModel: ObservableObject {
             chunkingStrategy: chunkingStrategy
         )
         
-
+        
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
@@ -526,7 +528,7 @@ class ContentViewModel: ObservableObject {
                 self.transcriptionState.currentFallbacks = fallbacks
                 self.transcriptionState.currentDecodingLoops += 1
             }
-
+            
             let currentTokens = progress.tokens
             let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
@@ -543,7 +545,7 @@ class ContentViewModel: ObservableObject {
             }
             return nil
         }
-
+        
         let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
@@ -552,14 +554,14 @@ class ContentViewModel: ObservableObject {
         let mergedResults = mergeTranscriptionResults(transcriptionResults)
         return mergedResults
     }
-
+    
     /// 실시간 전사 루프
     func realtimeLoop() {
         uiState.transcriptionTask = Task {
             while audioState.isRecording && audioState.isTranscribing {
                 do {
                     try await transcribeCurrentBuffer(delayInterval: Float(
-                            realtimeDelayInterval))
+                        realtimeDelayInterval))
                 } catch {
                     print("Error: \(error.localizedDescription)")
                     break
@@ -567,13 +569,13 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// 실시간 전사 중지
     func stopRealtimeTranscription() {
         audioState.isTranscribing = false
         uiState.transcriptionTask?.cancel()
     }
-
+    
     /// 현재 버퍼 전사
     func transcribeCurrentBuffer(delayInterval: Float = 1.0) async throws {
         guard let whisperKit = whisperKit else { return }
@@ -604,7 +606,7 @@ class ContentViewModel: ObservableObject {
             }
         }
         transcriptionState.lastBufferSize = currentBuffer.count
-
+        
         if selectedTask == "transcribe" && enableEagerDecoding {
             let transcription = try await transcribeEagerMode(Array(currentBuffer))
             await MainActor.run {
@@ -620,10 +622,10 @@ class ContentViewModel: ObservableObject {
                 transcriptionState.totalInferenceTime = transcription?.timings.fullPipeline ?? 0
                 transcriptionState
                     .effectiveRealTimeFactor = Double(transcriptionState.totalInferenceTime) /
-                    totalAudio
+                totalAudio
                 transcriptionState
                     .effectiveSpeedFactor = totalAudio /
-                    Double(transcriptionState.totalInferenceTime)
+                Double(transcriptionState.totalInferenceTime)
             }
         } else {
             let transcription = try await transcribeAudioSamples(Array(currentBuffer))
@@ -641,11 +643,11 @@ class ContentViewModel: ObservableObject {
                 transcriptionState.totalInferenceTime += transcription?.timings.fullPipeline ?? 0
                 transcriptionState
                     .effectiveRealTimeFactor = Double(transcriptionState.totalInferenceTime) /
-                    totalAudio
+                totalAudio
                 transcriptionState
                     .effectiveSpeedFactor = totalAudio /
-                    Double(transcriptionState.totalInferenceTime)
-
+                Double(transcriptionState.totalInferenceTime)
+                
                 if segments.count > transcriptionState.confirmedSegments.count {
                     let numberOfSegmentsToConfirm = segments.count - transcriptionState
                         .confirmedSegments.count
@@ -654,7 +656,7 @@ class ContentViewModel: ObservableObject {
                         .suffix(transcriptionState.confirmedSegments.count))
                     if let lastConfirmedSegment = confirmedSegmentsArray.last,
                        lastConfirmedSegment.end > transcriptionState
-                       .lastConfirmedSegmentEndSeconds {
+                        .lastConfirmedSegmentEndSeconds {
                         transcriptionState.lastConfirmedSegmentEndSeconds = lastConfirmedSegment.end
                         print(
                             "Last confirmed segment end: \(transcriptionState.lastConfirmedSegmentEndSeconds)"
@@ -672,14 +674,14 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
+    
     /// Eager mode 전사
     func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
         guard whisperKit.textDecoder.supportsWordTimestamps else {
             transcriptionState
                 .confirmedText =
-                "Eager mode requires word timestamps, which are not supported by the current model: \(selectedModel)."
+            "Eager mode requires word timestamps, which are not supported by the current model: \(selectedModel)."
             return nil
         }
         let languageCode = Constants.languages[
@@ -704,7 +706,7 @@ class ContentViewModel: ObservableObject {
             firstTokenLogProbThreshold: -1.5,
             chunkingStrategy: ChunkingStrategy.none
         )
-
+        
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
@@ -735,7 +737,7 @@ class ContentViewModel: ObservableObject {
             }
             return nil
         }
-
+        
         Logging
             .info(
                 "[EagerMode] \(transcriptionState.lastAgreedSeconds)-\(Double(samples.count) / 16000.0) seconds"
@@ -809,7 +811,7 @@ class ContentViewModel: ObservableObject {
                     self.transcriptionState.eagerResults.append(transcription)
                 }
             }
-
+            
             await MainActor.run {
                 let finalWords = self.transcriptionState.confirmedWords.map { $0.word }.joined()
                 self.transcriptionState.confirmedText = finalWords
@@ -824,7 +826,7 @@ class ContentViewModel: ObservableObject {
             Logging.error("[EagerMode] Error: \(error)")
             finalizeText()
         }
-
+        
         let mergedResult = mergeTranscriptionResults(
             transcriptionState.eagerResults,
             confirmedWords: transcriptionState.confirmedWords
@@ -833,13 +835,46 @@ class ContentViewModel: ObservableObject {
     }
     
     /// 파일 export 하는 함수
+    // MARK: - Export Service 호출 (ViewModel 내)
     func exportTranscription() async {
-        guard let result = transcriptionResult else {
+        guard var result = transcriptionResult else {
             print("No transcription result available.")
             return
         }
-        // 파일 내보내기 실행
+        
+        // 세그먼트와 단어 처리 - 참조가 아닌 구조체를 직접 변경하여 복사본 생성
+        var cleanSegments: [TranscriptionSegment] = []
+        
+        for segment in result.segments {
+            var cleanSegment = segment
+            // 세그먼트 텍스트 앞뒤 공백 제거
+            cleanSegment.text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // 단어 단위 타임스탬프가 있는 경우 각 단어도 처리
+            if let words = segment.words {
+                var cleanWords: [WordTiming] = []
+                for word in words {
+                    var cleanWord = word
+                    cleanWord.word = word.word.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !cleanWord.word.isEmpty {
+                        cleanWords.append(cleanWord)
+                    }
+                }
+                cleanSegment.words = cleanWords.isEmpty ? nil : cleanWords
+            }
+            
+            // 빈 텍스트가 아닌 경우, 또는 유효한 단어가 있는 경우만 추가
+            if !cleanSegment.text.isEmpty || (cleanSegment.words?.isEmpty == false) {
+                cleanSegments.append(cleanSegment)
+            }
+        }
+        
+        // 깨끗한 세그먼트로 결과 업데이트
+        result.segments = cleanSegments
+        
+        // ExportService의 writer 분기 처리를 사용하여 파일 내보내기
         await ExportService.exportTranscriptionResult(result: result,
-                                                      defaultFileName: "Subtitle")
+                                                      defaultFileName: audioState.audioFileName,
+                                                      frameRate: frameRate)
     }
 }

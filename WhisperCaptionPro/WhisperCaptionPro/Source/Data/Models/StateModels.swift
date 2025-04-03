@@ -75,9 +75,8 @@ struct ModelManagementState {
 struct AudioState {
     var isRecording: Bool = false
     var isTranscribing: Bool = false
-    #if os(macOS)
-        var audioDevices: [AudioDevice]?
-    #endif
+    var audioDevices: [AudioDevice]?
+    var audioFileName: String = "Subtitle"
 }
 
 // MARK: - UIState Models
