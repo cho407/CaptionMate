@@ -14,38 +14,41 @@ import WhisperKit
 
 /// 주어진 초를 프레임 레이트를 반영한 타임코드 (HH:MM:SS:FF) 문자열로 변환 (FCPXML, SCC 등에서 사용)
 func timecodeString(from seconds: Float, frameRate: Double) -> String {
-    // 부동소수점 정밀도를 위해 Double로 변환
-    let secondsDouble = Double(seconds)
-    // SRT와 같은 높은 정밀도로 프레임 계산
-    let totalFrames = Int(round(secondsDouble * frameRate))
-    let hours = totalFrames / Int(frameRate * 3600)
-    let minutes = (totalFrames % Int(frameRate * 3600)) / Int(frameRate * 60)
-    let secondsValue = (totalFrames % Int(frameRate * 60)) / Int(frameRate)
-    let frames = totalFrames % Int(frameRate)
+    let sec = Double(seconds)
+    // 초 * frameRate를 계산하고 floor 함수를 이용해 내림 처리함.
+    let totalFrames = Int(floor(sec * frameRate))
+    let framesPerHour = Int(frameRate * 3600)
+    let framesPerMinute = Int(frameRate * 60)
+    
+    let hours = totalFrames / framesPerHour
+    let remainderAfterHours = totalFrames % framesPerHour
+    let minutes = remainderAfterHours / framesPerMinute
+    let remainderAfterMinutes = remainderAfterHours % framesPerMinute
+    let secondsValue = remainderAfterMinutes / Int(frameRate)
+    let frames = remainderAfterMinutes % Int(frameRate)
+    
     return String(format: "%02d:%02d:%02d:%02d", hours, minutes, secondsValue, frames)
 }
 
 /// ASS 포맷용 타임코드 문자열 (H:MM:SS.cs)
 func assTimecodeString(from seconds: Float) -> String {
-    // 부동소수점 정밀도를 위해 Double로 변환
-    let secondsDouble = Double(seconds)
-    // SRT와 동일한 방식으로 정밀도 유지
-    let totalCentiseconds = Int(round(secondsDouble * 100))
-    let hours = totalCentiseconds / 360000
-    let minutes = (totalCentiseconds % 360000) / 6000
-    let secondsValue = (totalCentiseconds % 6000) / 100
-    let centiseconds = totalCentiseconds % 100
+    let sec = Double(seconds)
+    // 초를 센티초로 변환하고 내림 처리
+    let totalCs = Int(floor(sec * 100.0))
+    let hours = totalCs / 360000
+    let minutes = (totalCs % 360000) / 6000
+    let secondsValue = (totalCs % 6000) / 100
+    let centiseconds = totalCs % 100
     return String(format: "%d:%02d:%02d.%02d", hours, minutes, secondsValue, centiseconds)
 }
 
 /// XML용 타임스탬프 문자열 (HH:MM:SS.mmm)
 func xmlTimeString(from seconds: Float) -> String {
-    // 부동소수점 정밀도를 위해 Double로 변환
-    let secondsDouble = Double(seconds)
-    let hrs = Int(secondsDouble / 3600)
-    let mins = Int((secondsDouble.truncatingRemainder(dividingBy: 3600)) / 60)
-    // 소수점 3자리(밀리초)까지 정확하게 유지
-    let secs = secondsDouble.truncatingRemainder(dividingBy: 60)
+    let sec = Double(seconds)
+    let hrs = Int(floor(sec / 3600))
+    let mins = Int(floor((sec.truncatingRemainder(dividingBy: 3600)) / 60))
+    let secs = sec.truncatingRemainder(dividingBy: 60)
+    // 소수점 3자리(밀리초)까지 표현. (오차를 줄이기 위해 floor 대신 truncatingRemainder 사용)
     return String(format: "%02d:%02d:%06.3f", hrs, mins, secs)
 }
 
@@ -58,6 +61,29 @@ open class WriteFCPXML: ResultWriting {
     public init(outputDir: String, frameRate: Double) {
         self.outputDir = outputDir
         self.frameRate = frameRate
+    }
+
+    /// 초를 FCPXML 타임코드 형식으로 변환
+    private func convertToFCPXMLTime(seconds: Float) -> String {
+        let secondsDouble = Double(seconds)
+        if secondsDouble == Double(Int(secondsDouble)) {
+            return "\(Int(secondsDouble))s"
+        }
+        if abs(frameRate - 29.97) < 0.01 {
+            let multiplier = 30000
+            let denominator = 1001
+            let frames = Int(floor(secondsDouble * Double(multiplier) / Double(denominator)))
+            if frames % denominator == 0 {
+                return "\(frames / denominator)s"
+            }
+            return "\(frames)/\(denominator)s"
+        }
+        let denominator = Int(frameRate)
+        let frames = Int(floor(secondsDouble * Double(denominator)))
+        if frames % denominator == 0 {
+            return "\(frames / denominator)s"
+        }
+        return "\(frames)/\(denominator)s"
     }
 
     public func write(result: TranscriptionResult, to file: String, options: [String: Any]? = nil) -> Result<String, Error> {
@@ -77,7 +103,7 @@ open class WriteFCPXML: ResultWriting {
             frameDurationString = "1/\(Int(frameRate))s"
         }
         
-        // 비디오 포맷 이름
+        // 비디오 포맷 이름 결정
         let formatName: String
         if abs(frameRate - 29.97) < 0.01 {
             formatName = "FFVideoFormat1080p2997"
@@ -93,10 +119,18 @@ open class WriteFCPXML: ResultWriting {
             formatName = "FFVideoFormat1080p\(Int(frameRate))"
         }
         
-        // 타임라인 길이 계산
-        let timelineDuration = calculateTimelineDuration(segments: result.segments)
+        // 유효한 세그먼트만 필터링 (앞뒤 공백 제거) 및 시작 시간 기준으로 정렬
+        let validSegments = result.segments.filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let sortedSegments = validSegments.sorted { $0.start < $1.start }
         
-        // 파이썬 템플릿을 기반으로 한 FCPXML 구조
+        // XML 템플릿의 타임라인 전체 길이 계산 (마지막 세그먼트 끝에 여유 추가)
+        let lastSegmentEnd = sortedSegments.last?.end ?? 60.0
+        let timelineDuration = convertToFCPXMLTime(seconds: lastSegmentEnd + 5.0)
+        
+        // 프로젝트 시작 시간은 0초로 고정
+        let tcStartString = "0s"
+        
+        // FCPXML 템플릿 구성 시작
         var xmlContent = """
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE fcpxml>
@@ -108,93 +142,52 @@ open class WriteFCPXML: ResultWriting {
             <library>
                 <event name="WhisperCaptionPro">
                     <project name="\(file)">
-                        <sequence format="r1" duration="\(timelineDuration)" tcStart="0s" tcFormat="NDF">
+                        <sequence format="r1" duration="\(timelineDuration)" tcStart="\(tcStartString)" tcFormat="NDF">
                             <spine>
         """
         
-        // 내용 있는 세그먼트만 필터링하고 시작 시간 기준으로 정렬
-        let validSegments = result.segments.filter { !$0.text.isEmpty }
-        let sortedSegments = validSegments.sorted(by: { $0.start < $1.start })
+        var counter = 1
         
-        // 타임라인 처리 로직 변경
-        // 0초부터 시작하는 타임라인을 가정하고, 첫 세그먼트 시작 전에 갭 추가
-        var currentTime: Float = 0.0
+        // 만약 첫 번째 세그먼트의 시작이 0초가 아니라면, gap clip을 삽입 (빈 텍스트 대신 <gap> 요소 사용)
+        if let firstSegment = sortedSegments.first, firstSegment.start > 0 {
+            let gapDuration = firstSegment.start - 0
+            let gapDurationStr = convertToFCPXMLTime(seconds: gapDuration)
+            let gapOffset = "0s"  // 시작은 0초
+            xmlContent += """
+            
+                                <gap offset="\(gapOffset)" duration="\(gapDurationStr)" start="\(gapOffset)"/>
+            """
+        }
         
-        for (counter, segment) in sortedSegments.enumerated() {
-            // 세그먼트 시작 시간이 현재 시간보다 나중이면 갭 추가
-            if segment.start > currentTime {
-                let gapStart = convertToTimecode(seconds: currentTime, frameRate: frameRate)
-                let gapDuration = convertToTimecode(seconds: segment.start - currentTime, frameRate: frameRate)
-                
-                xmlContent += """
-                
-                                <gap offset="\(gapStart)" duration="\(gapDuration)" start="\(gapStart)"/>
-                """
+        // 각 세그먼트를 순회하며 타이틀 또는 단어 단위 타이틀 생성
+        for segment in sortedSegments {
+            let segmentDuration = segment.end - segment.start
+            if segmentDuration < 0.1 {
+                continue
             }
             
-            // 시작 시간 및 지속 시간 계산
-            let startOffset = convertToTimecode(seconds: segment.start, frameRate: frameRate)
-            let segmentDuration = segment.end - segment.start
-            let duration = convertToTimecode(seconds: segmentDuration, frameRate: frameRate)
+            let startOffset = convertToFCPXMLTime(seconds: segment.start)
+            let duration = convertToFCPXMLTime(seconds: segmentDuration)
             
-            // 고유한 텍스트 스타일 ID (세그먼트 번호 기반)
-            let textStyleId = "ts\(counter + 1)"
-            
-            if let wordTimings = segment.words, !wordTimings.isEmpty {
-                // 유효한 단어만 필터링
-                let validWords = wordTimings.filter { !$0.word.isEmpty }
-                
-                // 유효한 단어가 없으면 세그먼트 자체도 건너뜀
-                if validWords.isEmpty {
-                    continue
-                }
-                
-                // 단어별 타이틀 생성 (세그먼트 내 단어만 처리)
-                var lastWordEnd: Float = segment.start
-                
-                // 단어 시작 시간 기준으로 정렬 (타임라인 순서 보장)
+            // 단어 단위 분기
+            if let wordTimings = segment.words,
+               !wordTimings.isEmpty {
+                let validWords = wordTimings.filter { !$0.word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+                if validWords.isEmpty { continue }
                 let sortedWords = validWords.sorted { $0.start < $1.start }
-                
-                for (wordIndex, wordTiming) in sortedWords.enumerated() {
-                    // 단어 타이밍을 세그먼트 범위 내로 제한
-                    let wordStart = max(wordTiming.start, segment.start)
-                    let wordEnd = min(wordTiming.end, segment.end)
+                for (index, wordTiming) in sortedWords.enumerated() {
+                    let wordDuration = wordTiming.end - wordTiming.start
+                    if wordDuration < 0.01 { continue }
                     
-                    // 최소 지속 시간 보장 (1프레임 이상)
-                    let minDuration = 1.0 / Float(frameRate)
-                    var duration = wordEnd - wordStart
+                    let wordStart = index == 0 ? segment.start : wordTiming.start
                     
-                    // 지속 시간이 너무 짧으면 건너뜀 (0.01초 미만)
-                    if duration < 0.01 {
-                        continue
-                    }
-                    
-                    // 최소 지속 시간 보장
-                    if duration < minDuration {
-                        duration = minDuration
-                    }
-                    
-                    // 단어 간 충분한 간격이 있는 경우에만 갭 추가 (1프레임 이상)
-                    if wordStart > lastWordEnd + minDuration {
-                        let gapStart = convertToTimecode(seconds: lastWordEnd, frameRate: frameRate)
-                        let gapDuration = convertToTimecode(seconds: wordStart - lastWordEnd, frameRate: frameRate)
-                        
-                        xmlContent += """
-                        
-                                        <gap offset="\(gapStart)" duration="\(gapDuration)" start="\(gapStart)"/>
-                        """
-                    }
-                    
-                    // 단어별 고유 ID
-                    let wordStyleId = "ts\(counter + 1)_\(wordIndex + 1)"
-                    
-                    // 정밀한 타임코드 변환
-                    let wordStartTC = convertToTimecode(seconds: wordStart, frameRate: frameRate)
-                    let wordDurationTC = convertToTimecode(seconds: duration, frameRate: frameRate)
+                    let wordStartOffset = convertToFCPXMLTime(seconds: wordStart)
+                    let wordDurationStr = convertToFCPXMLTime(seconds: wordTiming.end - wordTiming.start)
+                    let wordTextStyleId = "ts\(counter)"
                     
                     xmlContent += """
                     
-                                    <title name="Title \(counter + 1)_\(wordIndex + 1)" offset="\(wordStartTC)" ref="r2" duration="\(wordDurationTC)" start="\(wordStartTC)">
+                                    <title name="Title\(counter)" offset="\(wordStartOffset)" ref="r2" duration="\(wordDurationStr)" start="\(wordStartOffset)">
                                         <param name="Position" key="9999/10199/10201/1/100/101" value="0 -418.279"/>
                                         <param name="Alignment" key="9999/10199/10201/2/354/1002961760/401" value="1 (Center)"/>
                                         <param name="Alignment" key="9999/10199/10201/2/373" value="0 (Left) 2 (Bottom)"/>
@@ -204,40 +197,20 @@ open class WriteFCPXML: ResultWriting {
                                         <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
                                         <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
                                         <text>
-                                            <text-style ref="\(wordStyleId)">\(wordTiming.word)</text-style>
+                                            <text-style ref="\(wordTextStyleId)">\(wordTiming.word)</text-style>
                                         </text>
-                                        <text-style-def id="\(wordStyleId)">
+                                        <text-style-def id="\(wordTextStyleId)">
                                             <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>
                                         </text-style-def>
                                     </title>
                     """
-                    
-                    // 현재 단어의 종료 시간 업데이트
-                    lastWordEnd = wordStart + duration
-                }
-                
-                // 마지막 단어 이후에 충분한 간격이 있는 경우에만 갭 추가 (최소 1프레임)
-                let minGap = 1.0 / Float(frameRate)
-                if segment.end > lastWordEnd + minGap {
-                    let endGapStart = convertToTimecode(seconds: lastWordEnd, frameRate: frameRate)
-                    let endGapDuration = convertToTimecode(seconds: segment.end - lastWordEnd, frameRate: frameRate)
-                    
-                    xmlContent += """
-                    
-                                    <gap offset="\(endGapStart)" duration="\(endGapDuration)" start="\(endGapStart)"/>
-                    """
+                    counter += 1
                 }
             } else {
-                // 단어 분할 없는 세그먼트는 전체를 하나의 타이틀로 생성
-                // 최소 지속 시간 보장 (0.1초 미만은 처리하지 않음)
-                let segmentDuration = segment.end - segment.start
-                if segmentDuration < 0.1 {
-                    continue
-                }
-                
+                let textStyleId = "ts\(counter)"
                 xmlContent += """
                 
-                                <title name="Title \(counter + 1)" offset="\(startOffset)" ref="r2" duration="\(duration)" start="\(startOffset)">
+                                <title name="Title\(counter)" offset="\(startOffset)" ref="r2" duration="\(duration)" start="\(startOffset)">
                                     <param name="Position" key="9999/10199/10201/1/100/101" value="0 -418.279"/>
                                     <param name="Alignment" key="9999/10199/10201/2/354/1002961760/401" value="1 (Center)"/>
                                     <param name="Alignment" key="9999/10199/10201/2/373" value="0 (Left) 2 (Bottom)"/>
@@ -254,12 +227,10 @@ open class WriteFCPXML: ResultWriting {
                                     </text-style-def>
                                 </title>
                 """
+                counter += 1
             }
-            
-            // 현재 시간을 세그먼트 종료 시간으로 업데이트
-            currentTime = segment.end
         }
-
+        
         xmlContent += """
                             </spine>
                         </sequence>
@@ -276,52 +247,6 @@ open class WriteFCPXML: ResultWriting {
         } catch {
             return .failure(error)
         }
-    }
-    
-    // 타임라인 전체 길이 계산
-    private func calculateTimelineDuration(segments: [TranscriptionSegment]) -> String {
-        guard let lastSegment = segments.max(by: { $0.end < $1.end }) else {
-            return convertToTimecode(seconds: 60.0, frameRate: frameRate) // 기본 1분
-        }
-        
-        // 마지막 세그먼트 종료 시간 + 5초
-        return convertToTimecode(seconds: lastSegment.end + 5.0, frameRate: frameRate)
-    }
-    
-    // 초를 FCPXML 타임코드 형식으로 변환
-    private func convertToTimecode(seconds: Float, frameRate: Double) -> String {
-        // 부동소수점 변환
-        let secondsDouble = Double(seconds)
-        
-        // 정수 초 표현은 그대로 유지
-        if secondsDouble == Double(Int(secondsDouble)) {
-            return "\(Int(secondsDouble))s"
-        }
-        
-        // 프레임 레이트에 따른 정확한 프레임 수 계산
-        // 정확한 프레임 경계에 맞추기 위해 반올림 대신 내림 사용
-        let frames = Int(floor(secondsDouble * frameRate))
-        
-        // NTSC (29.97fps) 특수 처리
-        if abs(frameRate - 29.97) < 0.01 {
-            // 정확한 NTSC 타임코드를 위해 30000/1001 사용
-            let ntscFrames = Int(floor(secondsDouble * 30000 / 1001))
-            return "\(ntscFrames)/\(Int(frameRate))s"
-        }
-        
-        // 일반 프레임 레이트: 항상 프레임 단위로 정확히 나누어떨어지는 값 사용
-        return "\(frames)/\(Int(frameRate))s"
-    }
-    
-    // 최대공약수 계산 함수
-    private func gcd(_ a: Int, _ b: Int) -> Int {
-        var a = a, b = b
-        while b != 0 {
-            let temp = b
-            b = a % b
-            a = temp
-        }
-        return abs(a)  // 절대값 사용 (음수 처리)
     }
 }
 
@@ -382,7 +307,7 @@ open class WriteASS: ResultWriting {
                 // 단어 시작 시간 기준으로 정렬
                 let sortedWords = validWords.sorted { $0.start < $1.start }
                 
-                for wordTiming in sortedWords {
+                for (index, wordTiming) in sortedWords.enumerated() {
                     // 너무 짧은 단어는 건너뜀 (0.01초 미만)
                     let duration = wordTiming.end - wordTiming.start
                     if duration < 0.01 {
@@ -395,9 +320,12 @@ open class WriteASS: ResultWriting {
                         .replacingOccurrences(of: "{", with: "\\{")
                         .replacingOccurrences(of: "}", with: "\\}")
                     
-                    // 단어별 시간 정보 사용 (세그먼트 시간 대신)
-                    let wordStartTime = assTimecodeString(from: wordTiming.start)
-                    let wordEndTime = assTimecodeString(from: wordTiming.end)
+                    // 첫 단어는 세그먼트 시작 시간 사용, 나머지는 원래 시간 사용
+                    let wordStart = index == 0 ? segment.start : wordTiming.start
+                    let wordEnd = index == 0 ? segment.start + duration : wordTiming.end
+                    
+                    let wordStartTime = assTimecodeString(from: wordStart)
+                    let wordEndTime = assTimecodeString(from: wordEnd)
                     
                     assContent += "\nDialogue: 0,\(wordStartTime),\(wordEndTime),Default,,0,0,0,,\(escapedWord)"
                 }
@@ -461,7 +389,7 @@ open class WriteSCC: ResultWriting {
                 // 단어 시작 시간 기준으로 정렬
                 let sortedWords = validWords.sorted { $0.start < $1.start }
                 
-                for wordTiming in sortedWords {
+                for (index, wordTiming) in sortedWords.enumerated() {
                     // 너무 짧은 단어는 건너뜀 (0.01초 미만)
                     let duration = wordTiming.end - wordTiming.start
                     if duration < 0.01 {
@@ -473,9 +401,12 @@ open class WriteSCC: ResultWriting {
                         .replacingOccurrences(of: "\n", with: " ")
                         .replacingOccurrences(of: "\"", with: "''")
                     
-                    // 단어별 시간 정보 사용 (세그먼트 시간 대신)
-                    let wordStartTC = timecodeString(from: wordTiming.start, frameRate: frameRate)
-                    let wordEndTC = timecodeString(from: wordTiming.end, frameRate: frameRate)
+                    // 첫 단어는 세그먼트 시작 시간 사용, 나머지는 원래 시간 사용
+                    let wordStart = index == 0 ? segment.start : wordTiming.start
+                    let wordEnd = index == 0 ? segment.start + duration : wordTiming.end
+                    
+                    let wordStartTC = timecodeString(from: wordStart, frameRate: frameRate)
+                    let wordEndTC = timecodeString(from: wordEnd, frameRate: frameRate)
                     
                     sccContent += "\(wordStartTC) --> \(wordEndTC)\n\(processedWord)\n\n"
                 }
@@ -539,7 +470,7 @@ open class WriteXML: ResultWriting {
                 // 단어 시작 시간 기준으로 정렬
                 let sortedWords = validWords.sorted { $0.start < $1.start }
                 
-                for wordTiming in sortedWords {
+                for (index, wordTiming) in sortedWords.enumerated() {
                     // 너무 짧은 단어는 건너뜀 (0.01초 미만)
                     let duration = wordTiming.end - wordTiming.start
                     if duration < 0.01 {
@@ -554,9 +485,12 @@ open class WriteXML: ResultWriting {
                         .replacingOccurrences(of: "\"", with: "&quot;")
                         .replacingOccurrences(of: "'", with: "&apos;")
                     
-                    // 단어별 시간 정보 사용 (세그먼트 시간 대신)
-                    let wordStartTime = xmlTimeString(from: wordTiming.start)
-                    let wordEndTime = xmlTimeString(from: wordTiming.end)
+                    // 첫 단어는 세그먼트 시작 시간 사용, 나머지는 원래 시간 사용
+                    let wordStart = index == 0 ? segment.start : wordTiming.start
+                    let wordEnd = index == 0 ? segment.start + duration : wordTiming.end
+                    
+                    let wordStartTime = xmlTimeString(from: wordStart)
+                    let wordEndTime = xmlTimeString(from: wordEnd)
                     
                     xmlContent += "\n    <subtitle start=\"\(wordStartTime)\" end=\"\(wordEndTime)\">\(escapedWord)</subtitle>"
                 }

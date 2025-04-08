@@ -53,12 +53,8 @@ struct ExportService {
             writer = WriteXML(outputDir: outputDir)
         }
         
-        // 옵션전달
-        let exportOptions: [String: Any] = [:]
-        
-        // 선택된 writer를 사용해 전사 결과를 해당 파일 형식으로 내보냄
         if let writer = writer {
-            let exportResult = writer.write(result: result, to: baseFileName, options: exportOptions)
+            let exportResult = writer.write(result: result, to: baseFileName, options: nil)
             switch exportResult {
             case .success(let path):
                 print("Export succeeded: \(path)")
