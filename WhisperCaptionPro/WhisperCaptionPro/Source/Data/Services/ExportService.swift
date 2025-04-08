@@ -37,20 +37,14 @@ struct ExportService {
         // 선택된 파일 형식에 따라 적절한 writer 생성
         var writer: ResultWriting?
         switch selectedFileType {
-        case .json:
-            writer = WriteJSON(outputDir: outputDir)
         case .srt:
             writer = WriteSRT(outputDir: outputDir)
-        case .vtt:
-            writer = WriteVTT(outputDir: outputDir)
         case .fcpxml:
             writer = WriteFCPXML(outputDir: outputDir, frameRate: frameRate)
-        case .ass:
-            writer = WriteASS(outputDir: outputDir, frameRate: frameRate)
-        case .scc:
-            writer = WriteSCC(outputDir: outputDir, frameRate: frameRate)
-        case .xml:
-            writer = WriteXML(outputDir: outputDir)
+        case .vtt:
+            writer = WriteVTT(outputDir: outputDir)
+        case .json:
+            writer = WriteJSON(outputDir: outputDir)
         }
         
         if let writer = writer {

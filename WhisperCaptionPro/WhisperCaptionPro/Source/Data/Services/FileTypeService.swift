@@ -8,30 +8,22 @@
 import UniformTypeIdentifiers
 
 public enum SubtitleFileType: String, CaseIterable {
-    case json
     case srt
-    case vtt
     case fcpxml
-    case xml
-    case scc
-    case ass
+    case vtt
+    case json
 
     public var utType: UTType {
         switch self {
-        case .json:
-            return UTType.json
         case .srt:
             return UTType(filenameExtension: "srt") ?? .plainText
-        case .vtt:
-            return UTType(filenameExtension: "vtt") ?? .plainText
         case .fcpxml:
             return UTType.fcpxml
-        case .xml:
-            return UTType.xml
-        case .scc:
-            return UTType(filenameExtension: "scc") ?? .plainText
-        case .ass:
-            return UTType(filenameExtension: "ass") ?? .plainText
+        case .vtt:
+            return UTType(filenameExtension: "vtt") ?? .plainText
+        case .json:
+            return UTType.json
+
         }
     }
     
