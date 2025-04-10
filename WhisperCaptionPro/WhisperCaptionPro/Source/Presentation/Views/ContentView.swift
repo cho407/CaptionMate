@@ -23,23 +23,6 @@ struct ContentView: View {
                         .modelManagementState.modelState != .unloaded)
                     .padding(.bottom)
 
-                List(viewModel.menu, selection: $viewModel.uiState.selectedCategoryId) { item in
-                    HStack {
-                        Image(systemName: item.image)
-                        Text(item.name)
-                            .font(.title3)
-                            .bold()
-                    }
-                }
-                .onChange(of: viewModel.uiState.selectedCategoryId) { newValue, _ in
-                    viewModel.selectedTab = viewModel.menu
-                        .first(where: { $0.id == newValue })?
-                        .name ?? "Transcribe"
-                }
-                .disabled(viewModel.modelManagementState.modelState != .loaded)
-                .foregroundColor(viewModel.modelManagementState
-                    .modelState != .loaded ? .secondary : .primary)
-
                 Spacer()
 
                 // 앱 및 디바이스 정보
@@ -49,13 +32,8 @@ struct ContentView: View {
                     let build = Bundle.main
                         .infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
                     Text("App Version: \(version) (\(build))")
-                    #if os(iOS)
-                        Text("Device Model: \(WhisperKit.deviceName())")
-                        Text("OS Version: \(UIDevice.current.systemVersion)")
-                    #elseif os(macOS)
-                        Text("Device Model: \(WhisperKit.deviceName())")
-                        Text("OS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
-                    #endif
+                    Text("Device Model: \(WhisperKit.deviceName())")
+                    Text("OS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
                 }
                 .font(.caption.monospaced())
                 .foregroundColor(.secondary)
@@ -67,16 +45,10 @@ struct ContentView: View {
             Spacer()
         } detail: {
             VStack {
-                #if os(iOS)
-                    ModelSelectorView(viewModel: viewModel)
-                        .padding()
+                VStack(alignment: .leading) {
                     TranscriptionView(viewModel: viewModel)
-                #elseif os(macOS)
-                    VStack(alignment: .leading) {
-                        TranscriptionView(viewModel: viewModel)
-                    }
-                    .padding()
-                #endif
+                }
+                .padding()
                 ControlsView(viewModel: viewModel)
             }
             .toolbar {
@@ -93,15 +65,6 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            #if os(macOS)
-                viewModel.uiState.selectedCategoryId = viewModel.menu
-                    .first(where: { $0.name == viewModel.selectedTab })?.id
-            #else
-                if UIDevice.current.userInterfaceIdiom == .pad {
-                    viewModel.uiState.selectedCategoryId = viewModel.menu
-                        .first(where: { $0.name == viewModel.selectedTab })?.id
-                }
-            #endif
             viewModel.fetchModels()
         }
     }
@@ -109,7 +72,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-    #if os(macOS)
         .frame(width: 800, height: 500)
-    #endif
 }

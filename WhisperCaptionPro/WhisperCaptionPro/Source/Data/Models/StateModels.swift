@@ -73,9 +73,7 @@ struct ModelManagementState {
 
 /// 오디오 관련 상태
 struct AudioState {
-    var isRecording: Bool = false
     var isTranscribing: Bool = false
-    var audioDevices: [AudioDevice]?
     var audioFileName: String = "Subtitle"
 }
 
@@ -88,6 +86,5 @@ struct UIState {
     var showComputeUnits: Bool = true
     var showAdvancedOptions: Bool = false
     var transcriptionTask: Task<Void, Never>? = nil
-    var selectedCategoryId: UUID? = nil
     var transcribeTask: Task<Void, Never>? = nil
 }

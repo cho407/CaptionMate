@@ -28,23 +28,10 @@ class ContentViewModel: ObservableObject {
     @Published var transcriptionResult: TranscriptionResult? // 전사 결과
     @Published var isExporting: Bool = false
     
-    // MARK: - 메뉴 (Menu Items)
-    
-    struct MenuItem: Identifiable, Hashable {
-        var id = UUID()
-        var name: String
-        var image: String
-    }
-    
-    let menu: [MenuItem] = [
-        MenuItem(name: "Transcribe", image: "book.pages"),
-        MenuItem(name: "Stream", image: "waveform.badge.mic"),
-    ]
     // TODO: - userDefault로 획일화, decoding option 수정
     // MARK: - AppStorage
     @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") var selectedModel: String = WhisperKit.recommendedModels().default
-    @AppStorage("selectedTab") var selectedTab: String = "Transcribe"
     @AppStorage("selectedTask") var selectedTask: String = "transcribe"
     @AppStorage("selectedLanguage") var selectedLanguage: String = "english"
     @AppStorage("repoName") var repoName: String = "argmaxinc/whisperkit-coreml"
@@ -75,7 +62,6 @@ class ContentViewModel: ObservableObject {
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
     func resetState() {
         uiState.transcribeTask?.cancel()
-        audioState.isRecording = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
         
@@ -348,76 +334,6 @@ class ContentViewModel: ObservableObject {
         }
     }
     
-    /// 녹음/전사 토글
-    func toggleRecording(shouldLoop: Bool) {
-        audioState.isRecording.toggle()
-        if audioState.isRecording {
-            resetState()
-            startRecording(shouldLoop)
-        } else {
-            stopRecording(shouldLoop)
-        }
-    }
-    
-    /// 녹음 시작
-    func startRecording(_ loop: Bool) {
-        if let audioProcessor = whisperKit?.audioProcessor {
-            Task(priority: .userInitiated) {
-                guard await AudioProcessor.requestRecordPermission() else {
-                    print("Microphone access was not granted.")
-                    return
-                }
-                var deviceId: DeviceID?
-#if os(macOS)
-                if selectedAudioInput != "No Audio Input",
-                   let devices = audioState.audioDevices,
-                   let device = devices
-                    .first(where: { $0.name == selectedAudioInput }) {
-                    deviceId = device.id
-                }
-                if deviceId == nil {
-                    throw WhisperError.microphoneUnavailable()
-                }
-#endif
-                try? audioProcessor.startRecordingLive(inputDeviceID: deviceId) { _ in
-                    DispatchQueue.main.async {
-                        // 전사 상태 업데이트
-                        self.transcriptionState.bufferEnergy = self.whisperKit?.audioProcessor
-                            .relativeEnergy ?? []
-                        self.transcriptionState
-                            .bufferSeconds = Double(self.whisperKit?.audioProcessor.audioSamples
-                                .count ?? 0) / Double(WhisperKit.sampleRate)
-                    }
-                }
-                audioState.isRecording = true
-                audioState.isTranscribing = true
-                if loop { realtimeLoop() }
-            }
-        }
-    }
-    
-    /// 녹음 중지
-    func stopRecording(_ loop: Bool) {
-        audioState.isRecording = false
-        stopRealtimeTranscription()
-        if let audioProcessor = whisperKit?.audioProcessor {
-            audioProcessor.stopRecording()
-        }
-        if !loop {
-            uiState.transcribeTask = Task {
-                audioState.isTranscribing = true
-                do {
-                    try await transcribeCurrentBuffer()
-                } catch {
-                    print("Error: \(error.localizedDescription)")
-                }
-                finalizeText()
-                audioState.isTranscribing = false
-            }
-        }
-        finalizeText()
-    }
-    
     /// 전사 텍스트 최종 확정
     func finalizeText() {
         Task {
@@ -477,7 +393,7 @@ class ContentViewModel: ObservableObject {
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
         // 언어 자동 감지 기능을 위한 분기처리
         var options: DecodingOptions
-        
+
         options = DecodingOptions(
             verbose: true,
             task: task,
@@ -555,287 +471,9 @@ class ContentViewModel: ObservableObject {
         return mergedResults
     }
     
-    /// 실시간 전사 루프
-    func realtimeLoop() {
-        uiState.transcriptionTask = Task {
-            while audioState.isRecording && audioState.isTranscribing {
-                do {
-                    try await transcribeCurrentBuffer(delayInterval: Float(
-                        realtimeDelayInterval))
-                } catch {
-                    print("Error: \(error.localizedDescription)")
-                    break
-                }
-            }
-        }
-    }
-    
-    /// 실시간 전사 중지
-    func stopRealtimeTranscription() {
-        audioState.isTranscribing = false
-        uiState.transcriptionTask?.cancel()
-    }
-    
-    /// 현재 버퍼 전사
-    func transcribeCurrentBuffer(delayInterval: Float = 1.0) async throws {
-        guard let whisperKit = whisperKit else { return }
-        let currentBuffer = whisperKit.audioProcessor.audioSamples
-        let nextBufferSize = currentBuffer.count - transcriptionState.lastBufferSize
-        let nextBufferSeconds = Float(nextBufferSize) / Float(WhisperKit.sampleRate)
-        guard nextBufferSeconds > delayInterval else {
-            await MainActor.run {
-                if transcriptionState.currentText
-                    .isEmpty { transcriptionState.currentText = "Waiting for speech..." }
-            }
-            try await Task.sleep(nanoseconds: 100_000_000)
-            return
-        }
-        if useVAD {
-            let voiceDetected = AudioProcessor.isVoiceDetected(
-                in: whisperKit.audioProcessor.relativeEnergy,
-                nextBufferInSeconds: nextBufferSeconds,
-                silenceThreshold: Float(silenceThreshold)
-            )
-            guard voiceDetected else {
-                await MainActor.run {
-                    if transcriptionState.currentText
-                        .isEmpty { transcriptionState.currentText = "Waiting for speech..." }
-                }
-                try await Task.sleep(nanoseconds: 100_000_000)
-                return
-            }
-        }
-        transcriptionState.lastBufferSize = currentBuffer.count
-        
-        if selectedTask == "transcribe" && enableEagerDecoding {
-            let transcription = try await transcribeEagerMode(Array(currentBuffer))
-            await MainActor.run {
-                transcriptionState.currentText = ""
-                transcriptionState.tokensPerSecond = transcription?.timings.tokensPerSecond ?? 0
-                transcriptionState.firstTokenTime = transcription?.timings.firstTokenTime ?? 0
-                transcriptionState.modelLoadingTime = transcription?.timings.modelLoading ?? 0
-                transcriptionState.pipelineStart = transcription?.timings.pipelineStart ?? 0
-                transcriptionState.currentLag = transcription?.timings.decodingLoop ?? 0
-                transcriptionState
-                    .currentEncodingLoops = Int(transcription?.timings.totalEncodingRuns ?? 0)
-                let totalAudio = Double(currentBuffer.count) / Double(WhisperKit.sampleRate)
-                transcriptionState.totalInferenceTime = transcription?.timings.fullPipeline ?? 0
-                transcriptionState
-                    .effectiveRealTimeFactor = Double(transcriptionState.totalInferenceTime) /
-                totalAudio
-                transcriptionState
-                    .effectiveSpeedFactor = totalAudio /
-                Double(transcriptionState.totalInferenceTime)
-            }
-        } else {
-            let transcription = try await transcribeAudioSamples(Array(currentBuffer))
-            await MainActor.run {
-                transcriptionState.currentText = ""
-                guard let segments = transcription?.segments else { return }
-                transcriptionState.tokensPerSecond = transcription?.timings.tokensPerSecond ?? 0
-                transcriptionState.firstTokenTime = transcription?.timings.firstTokenTime ?? 0
-                transcriptionState.modelLoadingTime = transcription?.timings.modelLoading ?? 0
-                transcriptionState.pipelineStart = transcription?.timings.pipelineStart ?? 0
-                transcriptionState.currentLag = transcription?.timings.decodingLoop ?? 0
-                transcriptionState
-                    .currentEncodingLoops += Int(transcription?.timings.totalEncodingRuns ?? 0)
-                let totalAudio = Double(currentBuffer.count) / Double(WhisperKit.sampleRate)
-                transcriptionState.totalInferenceTime += transcription?.timings.fullPipeline ?? 0
-                transcriptionState
-                    .effectiveRealTimeFactor = Double(transcriptionState.totalInferenceTime) /
-                totalAudio
-                transcriptionState
-                    .effectiveSpeedFactor = totalAudio /
-                Double(transcriptionState.totalInferenceTime)
-                
-                if segments.count > transcriptionState.confirmedSegments.count {
-                    let numberOfSegmentsToConfirm = segments.count - transcriptionState
-                        .confirmedSegments.count
-                    let confirmedSegmentsArray = Array(segments.prefix(numberOfSegmentsToConfirm))
-                    let remainingSegments = Array(segments
-                        .suffix(transcriptionState.confirmedSegments.count))
-                    if let lastConfirmedSegment = confirmedSegmentsArray.last,
-                       lastConfirmedSegment.end > transcriptionState
-                        .lastConfirmedSegmentEndSeconds {
-                        transcriptionState.lastConfirmedSegmentEndSeconds = lastConfirmedSegment.end
-                        print(
-                            "Last confirmed segment end: \(transcriptionState.lastConfirmedSegmentEndSeconds)"
-                        )
-                        for segment in confirmedSegmentsArray {
-                            if !transcriptionState.confirmedSegments.contains(segment: segment) {
-                                transcriptionState.confirmedSegments.append(segment)
-                            }
-                        }
-                    }
-                    transcriptionState.unconfirmedSegments = remainingSegments
-                } else {
-                    transcriptionState.unconfirmedSegments = segments
-                }
-            }
-        }
-    }
-    
-    /// Eager mode 전사
-    func transcribeEagerMode(_ samples: [Float]) async throws -> TranscriptionResult? {
-        guard let whisperKit = whisperKit else { return nil }
-        guard whisperKit.textDecoder.supportsWordTimestamps else {
-            transcriptionState
-                .confirmedText =
-            "Eager mode requires word timestamps, which are not supported by the current model: \(selectedModel)."
-            return nil
-        }
-        let languageCode = Constants.languages[
-            selectedLanguage,
-            default: Constants.defaultLanguageCode
-        ]
-        let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
-        print(selectedLanguage)
-        print(languageCode)
-        let options = DecodingOptions(
-            verbose: true,
-            task: task,
-            language: languageCode,
-            temperature: Float(temperatureStart),
-            temperatureFallbackCount: Int(fallbackCount),
-            sampleLength: Int(sampleLength),
-            usePrefillPrompt: enablePromptPrefill,
-            usePrefillCache: enableCachePrefill,
-            skipSpecialTokens: !enableSpecialCharacters,
-            withoutTimestamps: !enableTimestamps,
-            wordTimestamps: enableTimestamps,
-            firstTokenLogProbThreshold: -1.5,
-            chunkingStrategy: ChunkingStrategy.none
-        )
-        
-        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
-            DispatchQueue.main.async {
-                let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                if progress.text.count < self.transcriptionState.currentText.count {
-                    if fallbacks == self.transcriptionState.currentFallbacks {
-                        // no additional action
-                    } else {
-                        print("Fallback occured: \(fallbacks)")
-                    }
-                }
-                self.transcriptionState.currentText = progress.text
-                self.transcriptionState.currentFallbacks = fallbacks
-                self.transcriptionState.currentDecodingLoops += 1
-            }
-            let currentTokens = progress.tokens
-            let checkWindow = Int(self.compressionCheckWindow)
-            if currentTokens.count > checkWindow {
-                let checkTokens: [Int] = Array(currentTokens.suffix(checkWindow))
-                let compressionRatio = compressionRatio(of: checkTokens)
-                if compressionRatio > options.compressionRatioThreshold! {
-                    Logging.debug("Early stopping due to compression threshold")
-                    return false
-                }
-            }
-            if progress.avgLogprob! < options.logProbThreshold! {
-                Logging.debug("Early stopping due to logprob threshold")
-                return false
-            }
-            return nil
-        }
-        
-        Logging
-            .info(
-                "[EagerMode] \(transcriptionState.lastAgreedSeconds)-\(Double(samples.count) / 16000.0) seconds"
-            )
-        let streamingAudio = samples
-        var streamOptions = options
-        streamOptions.clipTimestamps = [transcriptionState.lastAgreedSeconds]
-        let lastAgreedTokens = transcriptionState.lastAgreedWords.flatMap { $0.tokens }
-        streamOptions.prefixTokens = lastAgreedTokens
-        do {
-            let transcription: TranscriptionResult? = try await whisperKit.transcribe(
-                audioArray: streamingAudio,
-                decodeOptions: streamOptions,
-                callback: decodingCallback
-            ).first
-            await MainActor.run {
-                var skipAppend = false
-                if let result = transcription {
-                    self.transcriptionState.hypothesisWords = result.allWords
-                        .filter { $0.start >= self.transcriptionState.lastAgreedSeconds }
-                    if let prevResult = self.transcriptionState.prevResult {
-                        self.transcriptionState.prevWords = prevResult.allWords
-                            .filter { $0.start >= self.transcriptionState.lastAgreedSeconds }
-                        let commonPrefix = findLongestCommonPrefix(
-                            self.transcriptionState.prevWords,
-                            self.transcriptionState.hypothesisWords
-                        )
-                        Logging
-                            .info(
-                                "[EagerMode] Prev \"\((self.transcriptionState.prevWords.map { $0.word }).joined())\""
-                            )
-                        Logging
-                            .info(
-                                "[EagerMode] Next \"\((self.transcriptionState.hypothesisWords.map { $0.word }).joined())\""
-                            )
-                        Logging
-                            .info(
-                                "[EagerMode] Found common prefix \"\((commonPrefix.map { $0.word }).joined())\""
-                            )
-                        if commonPrefix.count >= Int(self.tokenConfirmationsNeeded) {
-                            self.transcriptionState
-                                .lastAgreedWords = Array(commonPrefix
-                                    .suffix(Int(self.tokenConfirmationsNeeded)))
-                            self.transcriptionState.lastAgreedSeconds = self.transcriptionState
-                                .lastAgreedWords.first!.start
-                            Logging
-                                .info(
-                                    "[EagerMode] Found new last agreed word \"\(self.transcriptionState.lastAgreedWords.first!.word)\" at \(self.transcriptionState.lastAgreedSeconds) seconds"
-                                )
-                            self.transcriptionState.confirmedWords
-                                .append(contentsOf: commonPrefix
-                                    .prefix(commonPrefix
-                                        .count - Int(self.tokenConfirmationsNeeded)))
-                            let currentWords = self.transcriptionState.confirmedWords
-                                .map { $0.word }.joined()
-                            Logging
-                                .info(
-                                    "[EagerMode] Current:  \(self.transcriptionState.lastAgreedSeconds) -> \(Double(samples.count) / 16000.0) \(currentWords)"
-                                )
-                        } else {
-                            Logging
-                                .info(
-                                    "[EagerMode] Using same last agreed time \(self.transcriptionState.lastAgreedSeconds)"
-                                )
-                            skipAppend = true
-                        }
-                    }
-                    self.transcriptionState.prevResult = result
-                }
-                if !skipAppend {
-                    self.transcriptionState.eagerResults.append(transcription)
-                }
-            }
-            
-            await MainActor.run {
-                let finalWords = self.transcriptionState.confirmedWords.map { $0.word }.joined()
-                self.transcriptionState.confirmedText = finalWords
-                let lastHypothesis = self.transcriptionState
-                    .lastAgreedWords + findLongestDifferentSuffix(
-                        self.transcriptionState.prevWords,
-                        self.transcriptionState.hypothesisWords
-                    )
-                self.transcriptionState.hypothesisText = lastHypothesis.map { $0.word }.joined()
-            }
-        } catch {
-            Logging.error("[EagerMode] Error: \(error)")
-            finalizeText()
-        }
-        
-        let mergedResult = mergeTranscriptionResults(
-            transcriptionState.eagerResults,
-            confirmedWords: transcriptionState.confirmedWords
-        )
-        return mergedResult
-    }
+    // MARK: - Export Service 호출 (ViewModel 내)
     
     /// 파일 export 하는 함수
-    // MARK: - Export Service 호출 (ViewModel 내)
     func exportTranscription() async {
         guard var result = transcriptionResult else {
             print("No transcription result available.")

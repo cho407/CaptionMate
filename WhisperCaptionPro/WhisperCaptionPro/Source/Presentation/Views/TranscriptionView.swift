@@ -42,74 +42,42 @@ struct TranscriptionView: View {
 
             ScrollView {
                 VStack(alignment: .leading) {
-                    if viewModel.enableEagerDecoding && viewModel
-                        .selectedTab == "Stream" {
-                        let startSeconds = viewModel.transcriptionState.eagerResults.first??
-                            .segments.first?.start ?? 0
-                        let endSeconds = viewModel.transcriptionState
-                            .lastAgreedSeconds > 0 ? viewModel
-                            .transcriptionState.lastAgreedSeconds : viewModel.transcriptionState
-                            .eagerResults.last??.segments.last?
-                            .end ?? 0
-                        let timestampText = (viewModel.enableTimestamps && viewModel
-                            .transcriptionState.eagerResults
-                            .first != nil) ?
-                            TimeInterval(startSeconds)
-                            .formatTimeRange(to: TimeInterval(endSeconds)) :
-                            ""
-                        Text(
-                            "\(timestampText) \(Text(viewModel.transcriptionState.confirmedText).fontWeight(.bold))\(Text(viewModel.transcriptionState.hypothesisText).fontWeight(.bold).foregroundColor(.gray))"
-                        )
-                        .font(.headline)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                        if viewModel.enableDecoderPreview {
-                            Text("\(viewModel.transcriptionState.currentText)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.top)
-                        }
-                    } else {
-                        ForEach(Array(viewModel.transcriptionState.confirmedSegments.enumerated()),
-                                id: \.element) { _, segment in
-                            let timestampText = viewModel
-                                .enableTimestamps ?
-                                TimeInterval(segment.start)
-                                .formatTimeRange(to: TimeInterval(segment.end)) :
-                                ""
-                            Text(timestampText + segment.text)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .tint(.green)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        ForEach(
-                            Array(viewModel.transcriptionState.unconfirmedSegments.enumerated()),
-                            id: \.element
-                        ) { _, segment in
-                            let timestampText = viewModel
-                                .enableTimestamps ?
-                                TimeInterval(segment.start)
-                                .formatTimeRange(to: TimeInterval(segment.end)) :
-                                ""
-                            Text(timestampText + segment.text)
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .foregroundColor(.gray)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        if viewModel.enableDecoderPreview {
-                            Text("\(viewModel.transcriptionState.currentText)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                    ForEach(Array(viewModel.transcriptionState.confirmedSegments.enumerated()),
+                            id: \.element) { _, segment in
+                        let timestampText = viewModel
+                            .enableTimestamps ?
+                        TimeInterval(segment.start)
+                            .formatTimeRange(to: TimeInterval(segment.end)) :
+                        ""
+                        Text(timestampText + segment.text)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .tint(.green)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    ForEach(
+                        Array(viewModel.transcriptionState.unconfirmedSegments.enumerated()),
+                        id: \.element
+                    ) { _, segment in
+                        let timestampText = viewModel
+                            .enableTimestamps ?
+                        TimeInterval(segment.start)
+                            .formatTimeRange(to: TimeInterval(segment.end)) :
+                        ""
+                        Text(timestampText + segment.text)
+                            .font(.headline)
+                            .fontWeight(.bold)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if viewModel.enableDecoderPreview {
+                        Text("\(viewModel.transcriptionState.currentText)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
             }
@@ -119,7 +87,6 @@ struct TranscriptionView: View {
             .padding()
 
             if let whisperKit = viewModel.whisperKit,
-               viewModel.selectedTab != "Stream",
                viewModel.audioState.isTranscribing,
                let task = viewModel.uiState.transcribeTask,
                !task.isCancelled,
