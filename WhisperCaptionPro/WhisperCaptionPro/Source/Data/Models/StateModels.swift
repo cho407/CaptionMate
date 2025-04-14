@@ -13,11 +13,10 @@ import WhisperKit
 
 // MARK: - Transcription Models
 
-/// 전사(Transcription) 관련 상태
 struct TranscriptionState {
     var currentText: String = ""
     var currentChunks: [Int: (chunkText: [String], fallbacks: Int)] = [:]
-
+    
     // 전사 결과 관련
     var tokensPerSecond: TimeInterval = 0
     var firstTokenTime: TimeInterval = 0
@@ -38,7 +37,7 @@ struct TranscriptionState {
     var effectiveRealTimeFactor: TimeInterval = 0
     var effectiveSpeedFactor: TimeInterval = 0
     var totalInferenceTime: TimeInterval = 0
-
+    
     // Eager mode 관련
     var eagerResults: [TranscriptionResult?] = []
     var prevResult: TranscriptionResult? = nil
@@ -51,35 +50,34 @@ struct TranscriptionState {
     var hypothesisText: String = ""
 }
 
-// MARK: - ModelManagement Models
-
-/// 모델 관리 관련 상태
 struct ModelManagementState {
     var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
-    var appStartTime: Date = .init()
+    var appStartTime: Date = Date()
     var modelState: ModelState = .unloaded
     var localModels: [String] = []
     var localModelPath: String = ""
     var availableModels: [String] = []
     var availableLanguages: [String] = []
     var disabledModels: [String] = WhisperKit.recommendedModels().disabled
-
-    // 다운로드/로딩 진행률 등
+    
+    // 다운로드/로딩 진행률
     var loadingProgressValue: Float = 0.0
     var specializationProgressRatio: Float = 0.7
 }
 
-// MARK: - Audio Models
-
-/// 오디오 관련 상태
 struct AudioState {
     var isTranscribing: Bool = false
     var audioFileName: String = "Subtitle"
+    var waveformSamples: [Float] = []
+    
+    /// 파일 임포트 후 선택된 파일의 URL (미리듣기, 삭제, 파형 표시 등에 사용)
+    var importedAudioURL: URL?
+    var isPlaying: Bool = false
+    var currentPlaybackTime: Double = 0.0
+    var totalDuration: Double = 0.0
+    var playbackTimer: Timer?
 }
 
-// MARK: - UIState Models
-
-/// UI 관련 상태
 struct UIState {
     var isFilePickerPresented: Bool = false
     var columnVisibility: NavigationSplitViewVisibility = .all
@@ -87,4 +85,5 @@ struct UIState {
     var showAdvancedOptions: Bool = false
     var transcriptionTask: Task<Void, Never>? = nil
     var transcribeTask: Task<Void, Never>? = nil
+    var isTranscribingView: Bool = false
 }

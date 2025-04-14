@@ -13,7 +13,7 @@ struct ControlsView: View {
     var body: some View {
         VStack {
             BasicSettingsView(viewModel: viewModel)
-            
+                        
             VStack {
                 HStack {
                     Button {
@@ -64,6 +64,21 @@ struct ControlsView: View {
                     .disabled(viewModel.modelManagementState.modelState != .loaded)
                     .frame(minWidth: 0, maxWidth: .infinity)
                     .padding()
+                    
+                    // 전사 시작 버튼
+                    Button {
+                        if let url = viewModel.audioState.importedAudioURL {
+                            viewModel.transcribeFile(path: url.path)
+                        }
+                        viewModel.uiState.isTranscribingView = true
+                    } label: {
+                        Text("전사 시작")
+                            .font(.headline)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .cornerRadius(8)
+                    }
+                    .disabled(viewModel.audioState.isTranscribing)
                 }
             }
         }

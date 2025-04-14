@@ -45,10 +45,13 @@ struct ContentView: View {
             Spacer()
         } detail: {
             VStack {
-                VStack(alignment: .leading) {
-                    TranscriptionView(viewModel: viewModel)
+                if viewModel.uiState.isTranscribingView{
+                    VStack(alignment: .leading) {
+                        TranscriptionView(viewModel: viewModel)
+                    }
+                }else{
+                    AudioControlView(contentViewModel: viewModel)
                 }
-                .padding()
                 ControlsView(viewModel: viewModel)
             }
             .toolbar {
@@ -59,8 +62,6 @@ struct ContentView: View {
                         }
                   
                     }
-                    
-                    
                 }
             }
         }

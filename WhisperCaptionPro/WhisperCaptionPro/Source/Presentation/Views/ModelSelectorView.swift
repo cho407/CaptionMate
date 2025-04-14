@@ -10,7 +10,9 @@ import WhisperKit
 
 struct ModelSelectorView: View {
     @ObservedObject var viewModel: ContentViewModel
-
+    
+    let filterWords: [String] = ["distil","MB", "2024"]
+    
     var body: some View {
         VStack {
             HStack {
@@ -29,8 +31,13 @@ struct ModelSelectorView: View {
                 Spacer()
 
                 if !viewModel.modelManagementState.availableModels.isEmpty {
+                    let filteredModels = viewModel.modelManagementState.availableModels.filter { model in
+                        !filterWords.contains { filter in
+                            model.lowercased().contains(filter.lowercased())
+                        }
+                    }
                     Picker("", selection: $viewModel.selectedModel) {
-                        ForEach(viewModel.modelManagementState.availableModels,
+                        ForEach(filteredModels,
                                 id: \.self) { model in
                             HStack {
                                 let modelIcon = viewModel.modelManagementState.localModels
@@ -64,7 +71,6 @@ struct ModelSelectorView: View {
                     .modelManagementState.localModels
                     .contains(viewModel.selectedModel))
 
-                #if os(macOS)
                     Button {
                         let folderURL = viewModel.whisperKit?
                             .modelFolder ??
@@ -81,16 +87,11 @@ struct ModelSelectorView: View {
                         Image(systemName: "folder")
                     }
                     .buttonStyle(BorderlessButtonStyle())
-                #endif
 
                 Button {
                     if let url =
                         URL(string: "https://huggingface.co/\(viewModel.repoName)") {
-                        #if os(macOS)
-                            NSWorkspace.shared.open(url)
-                        #else
-                            UIApplication.shared.open(url)
-                        #endif
+                        NSWorkspace.shared.open(url)
                     }
                 } label: {
                     Image(systemName: "link.circle")
