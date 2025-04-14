@@ -49,7 +49,7 @@ struct ContentView: View {
                     VStack(alignment: .leading) {
                         TranscriptionView(viewModel: viewModel)
                     }
-                }else{
+                } else {
                     AudioControlView(contentViewModel: viewModel)
                 }
                 ControlsView(viewModel: viewModel)
@@ -60,13 +60,56 @@ struct ContentView: View {
                         Task {
                             await viewModel.exportTranscription()
                         }
-                  
                     }
                 }
             }
         }
         .onAppear {
             viewModel.fetchModels()
+        }
+        // 재생/일시정지 (스페이스바)
+        .onKeyPress(.space) { 
+            if viewModel.audioState.importedAudioURL != nil {
+                if viewModel.audioState.isPlaying {
+                    viewModel.pauseImportedAudio()
+                } else {
+                    viewModel.playImportedAudio()
+                }
+                return .handled
+            }
+            return .ignored
+        }
+        // 뒤로 이동 (왼쪽 화살표)
+        .onKeyPress(.leftArrow) { 
+            if viewModel.audioState.importedAudioURL != nil {
+                viewModel.skipBackward()
+                return .handled
+            }
+            return .ignored
+        }
+        // 앞으로 이동 (오른쪽 화살표)
+        .onKeyPress(.rightArrow) { 
+            if viewModel.audioState.importedAudioURL != nil {
+                viewModel.skipForward()
+                return .handled
+            }
+            return .ignored
+        }
+        // 속도 증가 (위쪽 화살표)
+        .onKeyPress(.upArrow) { 
+            if viewModel.audioState.importedAudioURL != nil {
+                viewModel.changePlaybackRate(faster: true)
+                return .handled
+            }
+            return .ignored
+        }
+        // 속도 감소 (아래쪽 화살표)
+        .onKeyPress(.downArrow) { 
+            if viewModel.audioState.importedAudioURL != nil {
+                viewModel.changePlaybackRate(faster: false)
+                return .handled
+            }
+            return .ignored
         }
     }
 }

@@ -31,6 +31,10 @@ class ContentViewModel: ObservableObject {
     @Published var isExporting: Bool = false
     
     var audioPlayer: AVAudioPlayer?
+    
+    // 재생 속도 상태 추가
+    let playbackRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
+    @Published var currentPlaybackRateIndex: Int = 2 // 기본값 1.0 (인덱스 2)
 
     // MARK: - AppStorage (사용자 설정, UserDefaults 기반)
     @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
@@ -68,7 +72,7 @@ class ContentViewModel: ObservableObject {
         uiState.isTranscribingView = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
-        
+
         transcriptionState.currentText = ""
         transcriptionState.currentChunks = [:]
         transcriptionState.pipelineStart = Double.greatestFiniteMagnitude
@@ -87,7 +91,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.bufferSeconds = 0
         transcriptionState.confirmedSegments = []
         transcriptionState.unconfirmedSegments = []
-        
+
         transcriptionState.eagerResults = []
         transcriptionState.prevResult = nil
         transcriptionState.lastAgreedSeconds = 0.0
@@ -98,7 +102,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.hypothesisWords = []
         transcriptionState.hypothesisText = ""
     }
-    
+
     /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
     func getComputeOptions() -> ModelComputeOptions {
         return ModelComputeOptions(
@@ -108,7 +112,7 @@ class ContentViewModel: ObservableObject {
     }
     
     // MARK: - Model Management
-    
+
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
         modelManagementState.availableModels = []
@@ -130,10 +134,10 @@ class ContentViewModel: ObservableObject {
         for model in modelManagementState.localModels where !modelManagementState.availableModels.contains(model) {
             modelManagementState.availableModels.append(model)
         }
-        
+
         print("Found locally: \(modelManagementState.localModels)")
         print("Previously selected model: \(selectedModel)")
-        
+
         Task {
             let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
             await MainActor.run {
@@ -150,7 +154,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// 모델 로딩 (로컬/원격 모델 다운로드 및 초기화)
     func loadModel(_ model: String, redownload: Bool = false) {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
@@ -161,7 +165,7 @@ class ContentViewModel: ObservableObject {
             - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
-        
+
         whisperKit = nil
         Task {
             let config = WhisperKitConfig(computeOptions: getComputeOptions(),
@@ -172,7 +176,7 @@ class ContentViewModel: ObservableObject {
                                           download: false)
             whisperKit = try await WhisperKit(config)
             guard let whisperKit = whisperKit else { return }
-            
+
             var folder: URL?
             if modelManagementState.localModels.contains(model) && !redownload {
                 folder = URL(fileURLWithPath: modelManagementState.localModelPath)
@@ -189,23 +193,23 @@ class ContentViewModel: ObservableObject {
                     }
                 )
             }
-            
+
             await MainActor.run {
                 modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
                 modelManagementState.modelState = .downloaded
             }
-            
+
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
                 await MainActor.run {
                     modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
                     modelManagementState.modelState = .prewarming
                 }
-                
+
                 let progressBarTask = Task {
                     await updateProgressBar(targetProgress: 0.9, maxTime: 240)
                 }
-                
+
                 do {
                     try await whisperKit.prewarmModels()
                     progressBarTask.cancel()
@@ -220,18 +224,18 @@ class ContentViewModel: ObservableObject {
                         return
                     }
                 }
-                
+
                 await MainActor.run {
                     modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio + 0.9 * (1 - modelManagementState.specializationProgressRatio)
                     modelManagementState.modelState = whisperKit.modelState
                 }
                 
                 do {
-                    try await whisperKit.loadModels()
+                try await whisperKit.loadModels()
                 } catch {
                     print("Error loading models: \(error)")
                 }
-                
+
                 await MainActor.run {
                     if !modelManagementState.localModels.contains(model) {
                         modelManagementState.localModels.append(model)
@@ -244,7 +248,7 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// 모델 삭제
     func deleteModel() {
         if modelManagementState.localModels.contains(selectedModel) {
@@ -261,25 +265,25 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-    
+
     /// 진행률 업데이트
     func updateProgressBar(targetProgress: Float, maxTime: TimeInterval) async {
         let initialProgress = modelManagementState.loadingProgressValue
         let decayConstant = -log(1 - targetProgress) / Float(maxTime)
         let startTime = Date()
-        
+
         while true {
             let elapsedTime = Date().timeIntervalSince(startTime)
             let decayFactor = exp(-decayConstant * Float(elapsedTime))
             let progressIncrement = (1 - initialProgress) * (1 - decayFactor)
             let currentProgress = initialProgress + progressIncrement
-            
+
             await MainActor.run {
                 modelManagementState.loadingProgressValue = currentProgress
             }
-            
+
             if currentProgress >= targetProgress { break }
-            
+
             do {
                 try await Task.sleep(nanoseconds: 100_000_000)
             } catch {
@@ -289,12 +293,12 @@ class ContentViewModel: ObservableObject {
     }
     
     // MARK: - 파일 선택 및 처리
-    
+
     /// 파일 선택 (UI 관련)
     func selectFile() {
         uiState.isFilePickerPresented = true
     }
-    
+
     /// 파일 선택 결과 처리 (파일 임포트 후 URL 저장 및 전사 호출)
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
@@ -328,7 +332,7 @@ class ContentViewModel: ObservableObject {
             print("File selection error: \(error.localizedDescription)")
         }
     }
-    
+
     /// 파일 전사 시작 (선택된 파일 URL로 전사 실행)
     func transcribeFile(path: String) {
         resetState()
@@ -343,7 +347,7 @@ class ContentViewModel: ObservableObject {
             audioState.isTranscribing = false
         }
     }
-    
+
     /// 오디오 파일 전사 진행
     func transcribeCurrentFile(path: String) async throws {
         Logging.debug("Loading audio file: \(path)")
@@ -354,9 +358,9 @@ class ContentViewModel: ObservableObject {
             }
         }.value
         Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
-        
+
         let transcription = try await transcribeAudioSamples(audioFileSamples)
-        
+
         await MainActor.run {
             transcriptionState.currentText = ""
             transcriptionResult = transcription
@@ -373,17 +377,17 @@ class ContentViewModel: ObservableObject {
             transcriptionState.confirmedSegments = segments
         }
     }
-    
+
     /// 오디오 샘플 전사
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
         let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
-        
+
         let options = DecodingOptions(
-            verbose: true,
-            task: task,
+                verbose: true,
+                task: task,
             language: isAutoLanguageEnable ? nil : languageCode, // 자동 언어 감지 옵션
             temperature: Float(temperatureStart),
             temperatureFallbackCount: Int(fallbackCount),
@@ -394,11 +398,11 @@ class ContentViewModel: ObservableObject {
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
             wordTimestamps: enableWordTimestamp,
-            clipTimestamps: seekClip,
+                clipTimestamps: seekClip,
             concurrentWorkerCount: Int(concurrentWorkerCount),
             chunkingStrategy: chunkingStrategy
         )
-        
+
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
@@ -427,7 +431,7 @@ class ContentViewModel: ObservableObject {
                 self.transcriptionState.currentFallbacks = fallbacks
                 self.transcriptionState.currentDecodingLoops += 1
             }
-            
+
             let currentTokens = progress.tokens
             let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
@@ -444,7 +448,7 @@ class ContentViewModel: ObservableObject {
             }
             return nil
         }
-        
+
         let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
@@ -453,17 +457,23 @@ class ContentViewModel: ObservableObject {
         let mergedResults = mergeTranscriptionResults(transcriptionResults)
         return mergedResults
     }
-    
+
     // MARK: - Audio Preview & Deletion
     
     /// 오디오 미리듣기 (AVAudioPlayer를 활용)
     func playImportedAudio() {
         guard let url = audioState.importedAudioURL else { return }
         do {
-            // 항상 새로운 오디오 플레이어 생성
-            audioPlayer = try AVAudioPlayer(contentsOf: url)
-            audioPlayer?.prepareToPlay()
-            audioState.totalDuration = audioPlayer?.duration ?? 0.0
+            // 플레이어가 없거나 새로운 파일을 재생할 때만 새로 생성
+            if audioPlayer == nil {
+                audioPlayer = try AVAudioPlayer(contentsOf: url)
+                audioPlayer?.prepareToPlay()
+                audioState.totalDuration = audioPlayer?.duration ?? 0.0
+            }
+            
+            // 재생 속도 설정
+            audioPlayer?.enableRate = true
+            audioPlayer?.rate = playbackRates[currentPlaybackRateIndex]
             
             audioPlayer?.play()
             audioState.isPlaying = true
@@ -481,12 +491,81 @@ class ContentViewModel: ObservableObject {
                     // 재생이 끝났는지 확인
                     if !player.isPlaying && self.audioState.isPlaying {
                         self.audioState.isPlaying = false
-                        self.audioState.currentPlaybackTime = 0.0
+                        // 재생이 끝났을 때만 처음 위치로 리셋
+                        if player.currentTime >= player.duration - 0.1 {
+                            self.audioState.currentPlaybackTime = 0.0
+                            player.currentTime = 0.0
+                        }
                     }
                 }
             }
         } catch {
             print("Error playing audio: \(error.localizedDescription)")
+        }
+    }
+    
+    /// 선택된 배속으로 재생
+    func changePlaybackRate(faster: Bool) {
+        if faster {
+            currentPlaybackRateIndex = min(currentPlaybackRateIndex + 1, playbackRates.count - 1)
+        } else {
+            currentPlaybackRateIndex = max(currentPlaybackRateIndex - 1, 0)
+        }
+        
+        // 현재 재생 중이면 속도 변경
+        if let player = audioPlayer, audioState.isPlaying {
+            player.enableRate = true
+            player.rate = playbackRates[currentPlaybackRateIndex]
+        }
+    }
+    
+    /// 현재 재생 속도 텍스트 반환
+    func currentPlaybackRateText() -> String {
+        let rate = playbackRates[currentPlaybackRateIndex]
+        return String(format: "%.2fx", rate)
+    }
+    
+    /// 앞으로 이동 (5초)
+    func skipForward() {
+        guard let player = audioPlayer else { return }
+        let newTime = min(player.duration, player.currentTime + 5.0)
+        player.currentTime = newTime
+        audioState.currentPlaybackTime = newTime
+    }
+    
+    /// 뒤로 이동 (5초)
+    func skipBackward() {
+        guard let player = audioPlayer else { return }
+        let newTime = max(0, player.currentTime - 5.0)
+        player.currentTime = newTime
+        audioState.currentPlaybackTime = newTime
+    }
+    
+    /// 키보드 단축키 처리 (스페이스바: 재생/일시정지, 화살표: 앞/뒤로 이동)
+    func handleKeyboardShortcut(keyCode: Int) {
+        // 스페이스바 (재생/일시정지)
+        if keyCode == 49 {
+            if audioState.isPlaying {
+                pauseImportedAudio()
+            } else {
+                playImportedAudio()
+            }
+        }
+        // 왼쪽 화살표 (뒤로 이동)
+        else if keyCode == 123 {
+            skipBackward()
+        }
+        // 오른쪽 화살표 (앞으로 이동)
+        else if keyCode == 124 {
+            skipForward()
+        }
+        // 위쪽 화살표 (속도 증가)
+        else if keyCode == 126 {
+            changePlaybackRate(faster: true)
+        }
+        // 아래쪽 화살표 (속도 감소)
+        else if keyCode == 125 {
+            changePlaybackRate(faster: false)
         }
     }
     
