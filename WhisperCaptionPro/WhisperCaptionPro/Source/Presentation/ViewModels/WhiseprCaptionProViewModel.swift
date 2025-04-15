@@ -305,30 +305,62 @@ class ContentViewModel: ObservableObject {
         case let .success(urls):
             guard let selectedFileURL = urls.first else { return }
             if selectedFileURL.startAccessingSecurityScopedResource() {
-                do {
-                    // 기존 오디오 플레이어 정리
-                    stopImportedAudio()
-                    audioPlayer = nil
-                    
+                // 비동기 처리를 위한 Task 생성
+                Task {
+                    await processSelectedFile(selectedFileURL)
+                }
+            }
+        case let .failure(error):
+            print("File selection error: \(error.localizedDescription)")
+        }
+    }
+    
+    /// 선택된 파일 처리 (비동기 작업)
+    @MainActor
+    private func processSelectedFile(_ selectedFileURL: URL) async {
+        do {
+            // 기존 오디오 플레이어 정리
+            stopImportedAudio()
+            audioPlayer = nil
+            
                     let audioFileData = try Data(contentsOf: selectedFileURL)
                     let uniqueFileName = UUID().uuidString + "." + selectedFileURL.pathExtension
                     let tempDirectoryURL = FileManager.default.temporaryDirectory
                     let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
                     try audioFileData.write(to: localFileURL)
                     print("File saved to temporary directory: \(localFileURL)")
-                    audioState.audioFileName = selectedFileURL.deletingPathExtension().lastPathComponent
-                    // 파일을 임포트한 후 바로 전사하지 않고 URL만 저장 (전사 버튼 호출 시 전사)
-                    audioState.importedAudioURL = selectedFileURL
-                    
-                    // 파일 임포트 후 자동으로 파형 생성
-                    Task {
-                        await processWaveform()
-                    }
-                } catch {
-                    print("File selection error: \(error.localizedDescription)")
+            audioState.audioFileName = selectedFileURL.deletingPathExtension().lastPathComponent
+            
+            // 파일을 임포트한 후 바로 총 재생 시간을 확인하고 업데이트
+            do {
+                let audioAsset = AVURLAsset(url: selectedFileURL)
+                let duration = try await audioAsset.load(.duration)
+                let durationInSeconds = CMTimeGetSeconds(duration)
+                
+                // 재생 시간 업데이트 (재생 시작 전에 미리 설정)
+                audioState.totalDuration = durationInSeconds
+                audioState.currentPlaybackTime = 0.0
+                print("오디오 파일 재생 시간: \(durationInSeconds)초")
+                
+                // 미리 AVAudioPlayer 생성하여 정보 준비
+                let player = try AVAudioPlayer(contentsOf: selectedFileURL)
+                audioPlayer = player
+                audioPlayer?.prepareToPlay() // 버퍼링 미리 수행
+                
+                // 정확한 재생 시간 재확인
+                if audioState.totalDuration == 0 {
+                    audioState.totalDuration = player.duration
                 }
+                } catch {
+                print("오디오 파일 정보 읽기 오류: \(error.localizedDescription)")
             }
-        case let .failure(error):
+            
+            // 파일 URL 저장
+            audioState.importedAudioURL = selectedFileURL
+            
+            // 파일 임포트 후 백그라운드에서 파형 생성
+            await processWaveform()
+        } catch {
             print("File selection error: \(error.localizedDescription)")
         }
     }
@@ -468,7 +500,11 @@ class ContentViewModel: ObservableObject {
             if audioPlayer == nil {
                 audioPlayer = try AVAudioPlayer(contentsOf: url)
                 audioPlayer?.prepareToPlay()
-                audioState.totalDuration = audioPlayer?.duration ?? 0.0
+                
+                // 총 재생 시간 업데이트 (이미 설정되어 있으면 변경하지 않음)
+                if audioState.totalDuration == 0 {
+                    audioState.totalDuration = audioPlayer?.duration ?? 0.0
+                }
             }
             
             // 재생 속도 설정
@@ -609,14 +645,39 @@ class ContentViewModel: ObservableObject {
     func processWaveform() async {
         guard let url = audioState.importedAudioURL else { return }
         do {
+            // 현재 파형 샘플이 비어있지 않으면 초기화 (새 파일용)
+            if !audioState.waveformSamples.isEmpty {
+            await MainActor.run {
+                    audioState.waveformSamples = []
+                }
+            }
+            
+            // 오디오 파일 정보 업데이트 (임포트 직후에도 실행)
+            if audioState.totalDuration == 0 {
+                let audioAsset = AVURLAsset(url: url)
+                let duration = try await audioAsset.load(.duration)
+                let durationInSeconds = CMTimeGetSeconds(duration)
+                
+                await MainActor.run {
+                    audioState.totalDuration = durationInSeconds
+                }
+            }
+            
+            // 오디오 샘플 로드 및 파형 계산
             let samples = try await Task {
                 try autoreleasepool {
                     try AudioProcessor.loadAudioAsFloatArray(fromPath: url.path)
                 }
             }.value
+            
+            // 파형 계산 및 상태 업데이트
             let waveformSamples = computeWaveform(from: samples)
             await MainActor.run {
+                // 모든 정보 업데이트 (동시에 한 번에 갱신)
                 audioState.waveformSamples = waveformSamples
+                
+                // 디버그 로그
+                print("파형 업데이트 완료: \(waveformSamples.count) 샘플, 총 시간: \(audioState.totalDuration)초")
             }
         } catch {
             print("Error processing waveform: \(error.localizedDescription)")

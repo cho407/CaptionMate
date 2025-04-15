@@ -52,14 +52,10 @@ struct AudioControlView: View {
                         VStack(spacing: 0) {
                             // 재생 진행 상태 표시 (파형 + 시간 표시)
                             ZStack(alignment: .top) {
-                                // 배경
-                                Rectangle()
-                                    .fill(Color(red: 0.98, green: 0.98, blue: 0.98))
-                                    .frame(height: 120) // 파형 높이 증가
-                                
                                 VStack(spacing: 0) {
                                     // 파형 영역 (시간 표시 없음)
                                     WaveFormView(
+                                        viewModel: contentViewModel,
                                         samples: contentViewModel.audioState.waveformSamples,
                                         currentTime: contentViewModel.audioState.currentPlaybackTime,
                                         totalDuration: contentViewModel.audioState.totalDuration,
@@ -67,9 +63,7 @@ struct AudioControlView: View {
                                             contentViewModel.seekToPosition(position)
                                         }
                                     )
-                                    .frame(height: 100) // 파형 높이 증가
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
+
                                     
                                     // 트랜스포트 컨트롤 바 (라이트 모드 스타일)
                                     HStack(spacing: 0) {
@@ -120,9 +114,9 @@ struct AudioControlView: View {
                                         .keyboardShortcut(.space, modifiers: [])
                                         
                                         // 시간 표시 (HH:MM:SS.ss / HH:MM:SS.ss 형식)
-                                        Text("\(formatTimeDetailed(contentViewModel.audioState.currentPlaybackTime)) / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))")
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundColor(.primary)
+                                        Text("**\(formatTimeDetailed(contentViewModel.audioState.currentPlaybackTime))** / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))")
+                                            .font(.system(size: 20, design: .monospaced))
+                                            .foregroundColor(.secondary)
                                             .frame(minWidth: 150)
                                             .padding(.horizontal, 8)
                                         
@@ -223,10 +217,6 @@ struct AudioControlView: View {
                     .background(Color(red: 0.95, green: 0.95, blue: 0.97))
                 }
                 .background(Color.white)
-                .cornerRadius(8)
-                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
             }
         }
     }
