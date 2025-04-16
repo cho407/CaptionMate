@@ -739,4 +739,71 @@ class ContentViewModel: ObservableObject {
                                                       defaultFileName: audioState.audioFileName,
                                                       frameRate: frameRate)
     }
+    
+    // MARK: - Drag and drop
+    /// 파일 드래그 앤 드롭 메소드
+    func handleDroppedFiles(providers: [NSItemProvider]) {
+        // 첫 번째 파일만 처리
+        guard let provider = providers.first else { return }
+        
+        // 드래그 앤 드롭 상태 해제
+        DispatchQueue.main.async {
+            self.uiState.isTargeted = false
+        }
+        
+        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] (item, error) in
+            guard let self = self else { return }
+            
+            if let urlData = item as? Data,
+               let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                
+                // 메인 스레드에서 파일 처리
+                DispatchQueue.main.async {
+                    // 파일 접근 권한 확보
+                    let shouldStopAccessing = url.startAccessingSecurityScopedResource()
+                    
+                    // 기존 오디오 플레이어 정리
+                    self.stopImportedAudio()
+                    self.audioPlayer = nil
+                    
+                    // 파일 이름 저장
+                    self.audioState.audioFileName = url.deletingPathExtension().lastPathComponent
+                    
+                    // 파일 URL 저장
+                    self.audioState.importedAudioURL = url
+                    
+                    // 비동기 처리를 위한 Task 생성 - 파일 정보 읽기 및 파형 생성
+                    Task { @MainActor in
+                        do {
+                            // 오디오 파일 재생 시간 설정
+                            let audioAsset = AVURLAsset(url: url)
+                            let duration = try await audioAsset.load(.duration)
+                            let durationInSeconds = CMTimeGetSeconds(duration)
+                            
+                            // 재생 시간 업데이트
+                            self.audioState.totalDuration = durationInSeconds
+                            self.audioState.currentPlaybackTime = 0.0
+                            
+                            // 오디오 플레이어 초기화
+                            let player = try AVAudioPlayer(contentsOf: url)
+                            self.audioPlayer = player
+                            self.audioPlayer?.prepareToPlay()
+                            
+                            // 파형 생성 처리
+                            await self.processWaveform()
+                        } catch {
+                            print("오디오 파일 로드 오류: \(error.localizedDescription)")
+                        }
+                    }
+                    
+                    // 파일 접근 권한 해제
+                    if shouldStopAccessing {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+            }
+        } else {
+                print("파일 드랍 처리 실패: \(error?.localizedDescription ?? "Unknown error")")
+            }
+        }
+    }
 }

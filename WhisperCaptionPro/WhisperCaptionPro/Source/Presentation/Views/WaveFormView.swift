@@ -39,7 +39,7 @@ struct WaveFormView: View {
                                 currentTime: currentTime,
                                 totalDuration: max(0.001, totalDuration), // 0으로 나누는 것을 방지하기 위함
                                 secondsPerLine: calculatedLineTime,
-                                availableWidth: geometry.size.width - 16, // 패딩 고려
+                                availableWidth: geometry.size.width - 40, // 32에서 40으로 좌우 여백 더 확보
                                 waveformHeight: waveformHeight,
                                 hoveredLineIndex: $hoveredLineIndex,
                                 hoverLocation: $hoverLocation,
@@ -47,12 +47,12 @@ struct WaveFormView: View {
                                 onSeek: onSeek
                             )
                             .id("line-\(lineIndex)")
-                            .frame(width: geometry.size.width - 16)
+                            .frame(width: geometry.size.width - 40) // 32에서 40으로 변경
                             .padding(.vertical, verticalPadding) // 각 줄에 상하 패딩 추가
                         }
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, verticalPadding) // 전체 컨텐츠에도 상하 패딩 추가
+                    .padding(.horizontal, 20) // 16에서 20으로 좌우 여백 더 확보
+                    .padding(.vertical, verticalPadding) // 12에서 원래 값인 verticalPadding으로 복구
                     .id("content-\(Int(geometry.size.width))-\(Int(totalDuration))")
                 }
                 .onAppear {
@@ -117,7 +117,7 @@ struct WaveFormView: View {
     
     // 화면 너비에 따른 한 줄당 표시 시간 계산 (최적화된 로직)
     private func updateLineTime(width: CGFloat) {
-        let availableWidth = max(300, width - 16)
+        let availableWidth = max(300, width - 40) // 32에서 40으로 변경하여 일관성 유지
         
         // 픽셀당 시간 계산 (1픽셀당 0.15초가 적절) - 더 세밀한 파형을 위해 조정
         let pixelsPerSecond = 6.0 // 1초당 약 6픽셀
@@ -168,7 +168,7 @@ struct WaveformLineView: View {
     private var isPreviouslyPlayed: Bool { currentTime >= endTime }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) { // 2에서 0으로 원래 값으로 복원
             TimeLabelsView(startTime: startTime, endTime: endTime)
             ZStack(alignment: .leading) {
                 // 배경
@@ -225,10 +225,10 @@ struct WaveformLineView: View {
             }
         }
         .frame(width: availableWidth, height: waveformHeight + 24) // 시간 레이블 공간 추가
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
                     // 드래그 시작 시 처음 한 번만 실행
                     if !isDragging {
                         // 현재 재생 상태 저장
@@ -248,8 +248,8 @@ struct WaveformLineView: View {
                     let ratio = max(0, min(1, value.location.x / availableWidth))
                     let seekTime = startTime + (endTime - startTime) * Double(ratio)
                     onSeek(max(0, min(seekTime, totalDuration)))
-                }
-                .onEnded { value in
+                            }
+                            .onEnded { value in
                     // 정확한 시간 계산
                     let ratio = max(0, min(1, value.location.x / availableWidth))
                     let seekTime = startTime + (endTime - startTime) * Double(ratio)
@@ -356,8 +356,8 @@ struct TimeLabelsView: View {
                 .font(.system(size: 10))
                 .foregroundColor(.gray)
         }
-        .padding(.horizontal, 4)
-        .padding(.bottom, 4) // 레이블과 파형 사이 간격 증가
+        .padding(.horizontal, 4) // 6에서 원래 값인 4로 복원
+        .padding(.bottom, 4) // 8에서 원래 값인 4로 복원
     }
     
     private func formatTime(_ seconds: Double) -> String {

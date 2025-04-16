@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct AudioControlView: View {
     @ObservedObject var contentViewModel: ContentViewModel
@@ -54,16 +55,45 @@ struct AudioControlView: View {
                             ZStack(alignment: .top) {
                                 VStack(spacing: 0) {
                                     // 파형 영역 (시간 표시 없음)
-                                    WaveFormView(
-                                        viewModel: contentViewModel,
-                                        samples: contentViewModel.audioState.waveformSamples,
-                                        currentTime: contentViewModel.audioState.currentPlaybackTime,
-                                        totalDuration: contentViewModel.audioState.totalDuration,
-                                        onSeek: { position in
-                                            contentViewModel.seekToPosition(position)
+                                    ZStack {
+                                        WaveFormView(
+                                            viewModel: contentViewModel,
+                                            samples: contentViewModel.audioState.waveformSamples,
+                                            currentTime: contentViewModel.audioState.currentPlaybackTime,
+                                            totalDuration: contentViewModel.audioState.totalDuration,
+                                            onSeek: { position in
+                                                contentViewModel.seekToPosition(position)
+                                            }
+                                        )
+                                        
+                                        // 드래그 중일 때 파형 위에 오버레이 표시
+                                        if contentViewModel.uiState.isTargeted {
+                                            ZStack {
+                                                // 배경 오버레이
+                                                Rectangle()
+                                                    .fill(Color.bluegray.opacity(0.25))
+                                                    .overlay(
+                                                        Rectangle()
+                                                            .strokeBorder(Color.blue, lineWidth: 1.8)
+                                                    )
+                                                
+                                                // 콘텐츠
+                                                VStack {
+                                                    Image(systemName: "arrow.down.doc.fill")
+                                                        .font(.largeTitle)
+                                                        .foregroundColor(.secondary)
+                                                        .padding(.bottom, 5)
+                                                    
+                                                    Text("새로운 파일로 교체")
+                                                        .font(.headline)
+                                                        .foregroundColor(.secondary)
+                                                    
+                                                }
+                                            }
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                                         }
-                                    )
-
+                                    }
+                                    
                                     
                                     // 트랜스포트 컨트롤 바 (라이트 모드 스타일)
                                     HStack(spacing: 0) {
@@ -83,7 +113,7 @@ struct AudioControlView: View {
                                         
                                         Spacer(minLength: 8)
                                         
-                                        // 느리게 재생 버튼 
+                                        // 느리게 재생 버튼
                                         Button {
                                             contentViewModel.changePlaybackRate(faster: false)
                                         } label: {
@@ -167,14 +197,10 @@ struct AudioControlView: View {
                             }
                         }
                     } else {
-                        ZStack {
-                            Rectangle()
-                                .fill(Color(red: 0.98, green: 0.98, blue: 0.98))
-                                .frame(height: 120)
-                            
+                        VStack(alignment: .center){
+                            Spacer()
                             ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .blue))
-                                .scaleEffect(1.2)
+                            Spacer()
                         }
                     }
                     
@@ -217,7 +243,13 @@ struct AudioControlView: View {
                     .background(Color(red: 0.95, green: 0.95, blue: 0.97))
                 }
                 .background(Color.white)
+            }else{
+                AudioPlaceholderView(isTargeted: contentViewModel.uiState.isTargeted)
             }
+        }
+        .onDrop(of: [UTType.fileURL.identifier], isTargeted: $contentViewModel.uiState.isTargeted) { providers in
+            contentViewModel.handleDroppedFiles(providers: providers)
+            return true
         }
     }
 }
@@ -229,7 +261,7 @@ struct LightModeButtonStyle: ButtonStyle {
             .background(
                 configuration.isPressed ?
                 Color(red: 0.9, green: 0.9, blue: 0.9) :
-                Color.clear
+                    Color.clear
             )
             .cornerRadius(4)
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)

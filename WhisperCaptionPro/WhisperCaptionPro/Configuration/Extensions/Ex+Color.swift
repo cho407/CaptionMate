@@ -59,4 +59,5 @@ extension Color { // 사용법: Color(hex: "#439F47")
     static let floralWhite = Color(hex: "#FFFAF1")
     static let paleWhite = Color(hex: "#f8f8ff")
     static let saleGreen = Color(hex: "#4C9E77")
+    static let bluegray = Color(hex: "#B0C4DE")
 }

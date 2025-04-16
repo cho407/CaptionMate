@@ -86,4 +86,7 @@ struct UIState {
     var transcriptionTask: Task<Void, Never>? = nil
     var transcribeTask: Task<Void, Never>? = nil
     var isTranscribingView: Bool = false
+    
+    /// 파일 드래그 앤 드롭 중인지 여부
+    var isTargeted: Bool = false
 }
