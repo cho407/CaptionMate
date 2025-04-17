@@ -10,7 +10,6 @@ import UniformTypeIdentifiers
 
 struct AudioControlView: View {
     @ObservedObject var contentViewModel: ContentViewModel
-    @State private var isViewActive: Bool = true
     
     // 시간 포맷팅 함수 (소수점 둘째자리까지 포함)
     private func formatTimeDetailed(_ timeInSeconds: Double) -> String {
@@ -43,6 +42,21 @@ struct AudioControlView: View {
                             .foregroundColor(.primary)
                             .lineLimit(1)
                         Spacer()
+                        // 파일 삭제 버튼
+                        Button {
+                            contentViewModel.deleteImportedAudio()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 12))
+                                Text("삭제")
+                                    .font(.system(size: 12))
+                            }
+                            .foregroundColor(.red)
+                            .padding(.vertical, 4)
+                            .padding(.horizontal, 8)
+                        }
+                        .buttonStyle(BorderlessButtonStyle())
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -57,13 +71,7 @@ struct AudioControlView: View {
                                     // 파형 영역 (시간 표시 없음)
                                     ZStack {
                                         WaveFormView(
-                                            viewModel: contentViewModel,
-                                            samples: contentViewModel.audioState.waveformSamples,
-                                            currentTime: contentViewModel.audioState.currentPlaybackTime,
-                                            totalDuration: contentViewModel.audioState.totalDuration,
-                                            onSeek: { position in
-                                                contentViewModel.seekToPosition(position)
-                                            }
+                                            contentViewModel: contentViewModel
                                         )
                                         
                                         // 드래그 중일 때 파형 위에 오버레이 표시
@@ -123,7 +131,7 @@ struct AudioControlView: View {
                                                 .frame(width: 32, height: 32)
                                         }
                                         .buttonStyle(LightModeButtonStyle())
-                                        .keyboardShortcut(.downArrow, modifiers: [])
+                                        .keyboardShortcut(.downArrow, modifiers: .command)
                                         
                                         Spacer(minLength: 8)
                                         
@@ -173,7 +181,7 @@ struct AudioControlView: View {
                                                 .frame(width: 32, height: 32)
                                         }
                                         .buttonStyle(LightModeButtonStyle())
-                                        .keyboardShortcut(.upArrow, modifiers: [])
+                                        .keyboardShortcut(.upArrow, modifiers: .command)
                                         
                                         Spacer(minLength: 8)
                                         
@@ -206,37 +214,58 @@ struct AudioControlView: View {
                     
                     // 추가 정보 표시 영역 (현재 재생 속도)
                     HStack {
+                        // 음량 조절
+                        HStack(spacing: 6) {
+                            // 음소거 토글 버튼
+                            Button {
+                                contentViewModel.toggleMute()
+                            } label: {
+                                Image(systemName: contentViewModel.isMuted ? "speaker.slash.fill" : getVolumeIcon(volume: contentViewModel.audioVolume))
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.gray)
+                                    .frame(width: 20, alignment: .leading)
+                                    .contentTransition(.symbolEffect(.replace))
+                                    .animation(.easeInOut(duration: 0.2), value: contentViewModel.isMuted)
+                                    .animation(.easeInOut(duration: 0.2), value: contentViewModel.audioVolume)
+                            }
+                            .buttonStyle(BorderlessButtonStyle())
+                            .keyboardShortcut("m", modifiers: [])
+                            .keyboardShortcut(KeyEquivalent("ㅡ"), modifiers: [])
+                                
+                            // 볼륨 슬라이더
+                            Slider(
+                                value: Binding(
+                                    get: { 
+                                        contentViewModel.isMuted ? 0 : contentViewModel.audioVolume 
+                                    },
+                                    set: { newVolume in
+                                        contentViewModel.setVolume(newVolume)
+                                    }
+                                ),
+                                in: 0...1,
+                           
+                            )
+                            .frame(width: 100)
+                        }
+                        
+                        Spacer()
+                        
+                        // 단축키 안내 (중앙 정렬)
+                        Text("단축키: 스페이스바(재생/정지), ←/→(이동), ↑/↓(볼륨), ⌘ + ↑/↓(속도)")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                        
+                        Spacer()
+                        
+                        // 재생 속도 표시 (좌측)
                         Text("재생 속도: ")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                         + Text(contentViewModel.currentPlaybackRateText())
                             .font(.system(size: 12, design: .monospaced))
                             .foregroundColor(.primary)
-                        
-                        Spacer()
-                        
-                        // 단축키 안내
-                        Text("단축키: 스페이스바(재생/정지), ←/→(이동), ↑/↓(속도)")
-                            .font(.system(size: 10))
-                            .foregroundColor(.gray)
-                        
-                        Spacer()
-                        
-                        // 파일 삭제 버튼
-                        Button {
-                            contentViewModel.deleteImportedAudio()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 12))
-                                Text("삭제")
-                                    .font(.system(size: 12))
-                            }
-                            .foregroundColor(.red)
-                            .padding(.vertical, 4)
-                            .padding(.horizontal, 8)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
+
                     }
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -250,6 +279,19 @@ struct AudioControlView: View {
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $contentViewModel.uiState.isTargeted) { providers in
             contentViewModel.handleDroppedFiles(providers: providers)
             return true
+        }
+    }
+    
+    // 여기에 볼륨 아이콘 선택 함수 추가
+    private func getVolumeIcon(volume: Double) -> String {
+        if volume <= 0 {
+            return "speaker.slash.fill"
+        } else if volume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if volume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
         }
     }
 }

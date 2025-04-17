@@ -10,6 +10,8 @@ import SwiftUI
 
 @main
 struct WhisperCaptionProApp: App {
+    @StateObject var contentViewModel: ContentViewModel = ContentViewModel()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -25,9 +27,25 @@ struct WhisperCaptionProApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(viewModel: contentViewModel)
                 .frame(minWidth: 1000, minHeight: 700)
         }
         .modelContainer(sharedModelContainer)
+        // MARK: - 상단 툴바
+        .commands {
+            CommandMenu("Shortcuts") {
+                Button("Volume Up") {
+                    contentViewModel.setVolume(min(1.0, contentViewModel.audioVolume + 0.05))
+                }
+                .keyboardShortcut(.upArrow, modifiers: [])
+                .disabled(contentViewModel.audioVolume == 1.0)
+
+                Button("Volume Down") {
+                    contentViewModel.setVolume(max(0.0, contentViewModel.audioVolume - 0.05))
+                }
+                .keyboardShortcut(.downArrow, modifiers: []) // ↓ 키만 눌러도 실행
+                .disabled(contentViewModel.audioVolume == 0.0)
+            }
+        }
     }
 }

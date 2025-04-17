@@ -11,7 +11,7 @@ import SwiftUI
 import WhisperKit
 
 struct ContentView: View {
-    @StateObject var viewModel = ContentViewModel()
+    @ObservedObject var viewModel: ContentViewModel
 
     var body: some View {
         NavigationSplitView(columnVisibility: $viewModel.uiState.columnVisibility) {
@@ -67,46 +67,20 @@ struct ContentView: View {
         .onAppear {
             viewModel.fetchModels()
         }
-        // 재생/일시정지 (스페이스바)
-        .onKeyPress(.space) { 
-            if viewModel.audioState.importedAudioURL != nil {
-                if viewModel.audioState.isPlaying {
-                    viewModel.pauseImportedAudio()
-                } else {
-                    viewModel.playImportedAudio()
-                }
-                return .handled
-            }
-            return .ignored
-        }
-        // 뒤로 이동 (왼쪽 화살표)
-        .onKeyPress(.leftArrow) { 
-            if viewModel.audioState.importedAudioURL != nil {
-                viewModel.skipBackward()
-                return .handled
-            }
-            return .ignored
-        }
-        // 앞으로 이동 (오른쪽 화살표)
-        .onKeyPress(.rightArrow) { 
-            if viewModel.audioState.importedAudioURL != nil {
-                viewModel.skipForward()
-                return .handled
-            }
-            return .ignored
-        }
-        // 속도 증가 (위쪽 화살표)
+        // 볼륨 증가 (위쪽 화살표)
         .onKeyPress(.upArrow) { 
             if viewModel.audioState.importedAudioURL != nil {
-                viewModel.changePlaybackRate(faster: true)
+                let newVolume = min(1.0, viewModel.audioVolume + 0.05)
+                viewModel.setVolume(newVolume)
                 return .handled
             }
             return .ignored
         }
-        // 속도 감소 (아래쪽 화살표)
+        // 볼륨 감소 (아래쪽 화살표)
         .onKeyPress(.downArrow) { 
             if viewModel.audioState.importedAudioURL != nil {
-                viewModel.changePlaybackRate(faster: false)
+                let newVolume = max(0.0, viewModel.audioVolume - 0.05)
+                viewModel.setVolume(newVolume)
                 return .handled
             }
             return .ignored
@@ -115,6 +89,6 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(viewModel: ContentViewModel())
         .frame(width: 800, height: 500)
 }

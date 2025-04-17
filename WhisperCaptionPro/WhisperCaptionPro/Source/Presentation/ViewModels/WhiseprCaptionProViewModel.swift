@@ -30,11 +30,19 @@ class ContentViewModel: ObservableObject {
     /// Export 진행 여부
     @Published var isExporting: Bool = false
     
-    var audioPlayer: AVAudioPlayer?
+    @Published var audioPlayer: AVAudioPlayer?
     
     // 재생 속도 상태 추가
     let playbackRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
-    @Published var currentPlaybackRateIndex: Int = 2 // 기본값 1.0 (인덱스 2)
+    @Published var currentPlaybackRateIndex: Int = 2 // 기본값은 1.0x (인덱스 1)
+    
+    // 볼륨 상태 (AppStorage로 관리)
+    @AppStorage("audioVolume") var audioVolume: Double = 1.0  // 0.0 ~ 1.0
+    @AppStorage("stagingVolume") var stagingVolume: Double = 1.0  // 음소거 전 볼륨 저장용
+    @AppStorage("isMuted") var isMuted: Bool = false  // 음소거 상태
+    
+    // Combine 관련
+    private var playbackTimerCancellable: AnyCancellable?
 
     // MARK: - AppStorage (사용자 설정, UserDefaults 기반)
     @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
@@ -347,6 +355,9 @@ class ContentViewModel: ObservableObject {
                 audioPlayer = player
                 audioPlayer?.prepareToPlay() // 버퍼링 미리 수행
                 
+                // 오디오 파일 분석 - 평균 음량 및 피크값 확인
+                analyzeAudioLevels(player)
+                
                 // 정확한 재생 시간 재확인
                 if audioState.totalDuration == 0 {
                     audioState.totalDuration = player.duration
@@ -360,8 +371,113 @@ class ContentViewModel: ObservableObject {
             
             // 파일 임포트 후 백그라운드에서 파형 생성
             await processWaveform()
-        } catch {
-            print("File selection error: \(error.localizedDescription)")
+            } catch {
+                print("File selection error: \(error.localizedDescription)")
+            }
+    }
+
+    // 오디오 레벨 분석 함수 추가
+    private func analyzeAudioLevels(_ player: AVAudioPlayer) {
+        // 오디오 미터링 활성화
+        player.isMeteringEnabled = true
+        
+        // 전체 파일을 여러 구간으로 나누어 샘플링
+        let sampleCount = 50
+        var totalLevel: Float = 0
+        var peakLevel: Float = -160  // 초기값 (dB 단위)
+        
+        // 오디오 길이 기반 간격 계산
+        let duration = player.duration
+        let interval = duration / Double(sampleCount)
+        
+        // 전체 오디오 구간 분석 (무음 재생)
+        player.volume = 0  // 소리 없이 분석
+        player.play()
+        
+        for i in 0..<sampleCount {
+            // 특정 지점으로 이동
+            player.currentTime = Double(i) * interval
+            
+            // 약간 대기하여 미터가 업데이트되도록 함
+            Thread.sleep(forTimeInterval: 0.01)
+            
+            // 미터 업데이트
+            player.updateMeters()
+            
+            // 평균 및 피크 레벨 (dB 단위) 측정
+            let avgPower = player.averagePower(forChannel: 0)
+            let peakPower = player.peakPower(forChannel: 0)
+            
+            totalLevel += avgPower
+            peakLevel = max(peakLevel, peakPower)
+        }
+        
+        // 분석 후 정지
+        player.stop()
+        player.currentTime = 0
+        
+        // 평균 레벨 계산 (dB 단위)
+        let avgLevel = totalLevel / Float(sampleCount)
+        
+        // dB 값을 LUFS로 변환 (대략적인 추정)
+        // 실제로는 더 복잡한 LUFS 계산이 필요하지만, 단순화된 버전 사용
+        let estimatedLUFS = avgLevel + 10  // 매우 간단한 변환 (실제로는 더 정확한 계산 필요)
+        
+        // 디버그 로그
+        print("오디오 분석 - 평균 레벨: \(avgLevel) dB, 추정 LUFS: \(estimatedLUFS), 피크: \(peakLevel) dB")
+        
+        // 노멀라이제이션을 위해 추가 리스닝을 활성화
+        player.isMeteringEnabled = true
+    }
+
+    /// 정규화된 볼륨 적용 (유튜브 스타일)
+    private func applyNormalizedVolume() {
+        guard let player = audioPlayer else { return }
+        
+        // 음소거 상태인 경우
+        if isMuted {
+            player.volume = 0.0
+            return
+        }
+        
+        // 노멀라이제이션 처리 (-14 LUFS 기준)
+        // 1. 미터링 정보 확인
+        if player.isMeteringEnabled {
+            player.updateMeters()
+            let avgPower = player.averagePower(forChannel: 0)
+            
+            // dB 단위를 LUFS로 변환 (단순화된 추정)
+            let estimatedLUFS = avgPower + 10  // 간단한 변환식
+            
+            // 타겟 LUFS (-14 LUFS)
+            let targetLUFS: Float = -14.0
+            
+            // 정규화 계산 (LUFS 기준)
+            let gainNeeded = targetLUFS - estimatedLUFS
+            
+            // 감쇠만 적용 (유튜브 스타일)
+            // 오디오가 타겟보다 클 경우만 줄이고, 작을 경우는 그대로 둠
+            let normalizationFactor: Float
+            if gainNeeded < 0 {
+                // dB를 선형 스케일로 변환 (감쇠 적용)
+                normalizationFactor = pow(10.0, gainNeeded / 20.0)
+            } else {
+                // 타겟보다 작으므로 그대로 유지
+                normalizationFactor = 1.0
+            }
+            
+            // 최종 볼륨 계산: 정규화 계수 * 사용자 볼륨 설정
+            player.volume = normalizationFactor * Float(audioVolume)
+        } else {
+            // 미터링을 사용할 수 없는 경우 - 기본 노멀라이제이션 적용
+            // -14 LUFS에 해당하는 기준값 (0.0 ~ 1.0 범위로 정규화)
+            let targetNormalizedLevel: Float = 0.7
+            
+            // 기본 정규화 적용 (대략적인 추정)
+            let normalizationFactor = targetNormalizedLevel
+            
+            // 최종 볼륨 계산
+            player.volume = normalizationFactor * Float(audioVolume)
         }
     }
 
@@ -369,14 +485,14 @@ class ContentViewModel: ObservableObject {
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-        uiState.transcribeTask = Task {
-            audioState.isTranscribing = true
-            do {
+            uiState.transcribeTask = Task {
+                audioState.isTranscribing = true
+                do {
                 try await transcribeCurrentFile(path: path)
-            } catch {
+                } catch {
                 print("Transcription error: \(error.localizedDescription)")
-            }
-            audioState.isTranscribing = false
+                }
+                audioState.isTranscribing = false
         }
     }
 
@@ -511,33 +627,44 @@ class ContentViewModel: ObservableObject {
             audioPlayer?.enableRate = true
             audioPlayer?.rate = playbackRates[currentPlaybackRateIndex]
             
+            // 정규화된 볼륨 적용
+            applyNormalizedVolume()
+            
             audioPlayer?.play()
             audioState.isPlaying = true
             
-            // 재생 시간 업데이트를 위한 타이머 설정
-            audioState.playbackTimer?.invalidate()
-            audioState.playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                guard let self = self else { return }
-                
-                // 메인 스레드에서 실행
-                DispatchQueue.main.async {
-                    guard let player = self.audioPlayer else { return }
-                    self.audioState.currentPlaybackTime = player.currentTime
-                    
-                    // 재생이 끝났는지 확인
-                    if !player.isPlaying && self.audioState.isPlaying {
-                        self.audioState.isPlaying = false
-                        // 재생이 끝났을 때만 처음 위치로 리셋
-                        if player.currentTime >= player.duration - 0.1 {
-                            self.audioState.currentPlaybackTime = 0.0
-                            player.currentTime = 0.0
-                        }
-                    }
-                }
-            }
+            // Combine 타이머로 교체하여 업데이트 성능 향상
+            setupPlaybackTimeUpdater()
         } catch {
             print("Error playing audio: \(error.localizedDescription)")
         }
+    }
+    
+    // 재생 시간 업데이트를 위한 Combine 타이머 설정
+    private func setupPlaybackTimeUpdater() {
+        // 이전 타이머 취소
+        audioState.playbackTimer?.invalidate()
+        playbackTimerCancellable?.cancel()
+        
+        // Combine 타이머 설정
+        playbackTimerCancellable = Timer.publish(every: 0.05, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self = self, let player = self.audioPlayer else { return }
+                
+                // 현재 재생 시간 업데이트
+                self.audioState.currentPlaybackTime = player.currentTime
+                
+                // 재생이 끝났는지 확인
+                if !player.isPlaying && self.audioState.isPlaying {
+                    self.audioState.isPlaying = false
+                    // 재생이 끝났을 때만 처음 위치로 리셋
+                    if player.currentTime >= player.duration - 0.1 {
+                        self.audioState.currentPlaybackTime = 0.0
+                        player.currentTime = 0.0
+                    }
+                }
+            }
     }
     
     /// 선택된 배속으로 재생
@@ -595,12 +722,24 @@ class ContentViewModel: ObservableObject {
         else if keyCode == 124 {
             skipForward()
         }
-        // 위쪽 화살표 (속도 증가)
+        // 위쪽 화살표 (볼륨 증가)
         else if keyCode == 126 {
+            // 볼륨 증가 (5% 단위)
+            let newVolume = min(1.0, audioVolume + 0.05)
+            setVolume(newVolume)
+        }
+        // 아래쪽 화살표 (볼륨 감소)
+        else if keyCode == 125 {
+            // 볼륨 감소 (5% 단위)
+            let newVolume = max(0.0, audioVolume - 0.05)
+            setVolume(newVolume)
+        }
+        // Command + 위쪽 화살표 (속도 증가)
+        else if keyCode == 126 && NSEvent.modifierFlags.contains(.command) {
             changePlaybackRate(faster: true)
         }
-        // 아래쪽 화살표 (속도 감소)
-        else if keyCode == 125 {
+        // Command + 아래쪽 화살표 (속도 감소)
+        else if keyCode == 125 && NSEvent.modifierFlags.contains(.command) {
             changePlaybackRate(faster: false)
         }
     }
@@ -608,7 +747,10 @@ class ContentViewModel: ObservableObject {
     func pauseImportedAudio() {
         audioPlayer?.pause()
         audioState.isPlaying = false
+        
+        // 타이머 정리
         audioState.playbackTimer?.invalidate()
+        playbackTimerCancellable?.cancel()
     }
     
     func stopImportedAudio() {
@@ -616,9 +758,13 @@ class ContentViewModel: ObservableObject {
         audioPlayer?.currentTime = 0
         audioState.isPlaying = false
         audioState.currentPlaybackTime = 0.0
+        
+        // 타이머 정리
         audioState.playbackTimer?.invalidate()
+        playbackTimerCancellable?.cancel()
     }
     
+    /// 재생 위치 이동 (특정 시간으로 이동)
     func seekToPosition(_ position: Double) {
         guard let player = audioPlayer else { return }
         player.currentTime = position
@@ -628,6 +774,58 @@ class ContentViewModel: ObservableObject {
         if audioState.isPlaying {
             player.play()
         }
+        
+        // 다음 UI 업데이트 사이클에서 모든 View에 변경 사항 알림
+        objectWillChange.send()
+    }
+    
+    /// 라인 내에서 특정 비율 위치로 이동 (WaveFormView에서 사용)
+    func seekToPositionInLine(lineIndex: Int, secondsPerLine: Double, ratio: Double, totalDuration: Double) {
+        let startTime = Double(lineIndex) * secondsPerLine
+        let endTime = min(startTime + secondsPerLine, totalDuration)
+        let seekTime = startTime + (endTime - startTime) * ratio
+        
+        // 범위 내 안전한 값으로 조정
+        let safePosition = max(0, min(seekTime, totalDuration))
+        
+        // 기존 메소드 호출
+        seekToPosition(safePosition)
+    }
+    
+    /// 볼륨 조절 메서드
+    func setVolume(_ volume: Double) {
+        audioVolume = volume
+        
+        // 볼륨이 0이면 음소거 상태로 변경
+        if volume == 0.0 {
+            isMuted = true
+        } else if isMuted {
+            // 음소거 상태에서 볼륨을 올리면 음소거 해제
+            isMuted = false
+            stagingVolume = volume
+        } else {
+            stagingVolume = volume
+        }
+        
+        // 정규화된 볼륨 적용
+        applyNormalizedVolume()
+    }
+    
+    /// 음소거 토글
+    func toggleMute() {
+        if isMuted {
+            // 음소거 해제 - 이전 볼륨으로 복원
+            isMuted = false
+            audioVolume = stagingVolume > 0.0 ? stagingVolume : 1.0
+        } else {
+            // 음소거 적용 - 현재 볼륨 저장
+            isMuted = true
+            stagingVolume = audioVolume
+            audioVolume = 0.0
+        }
+        
+        // 정규화된 볼륨 적용
+        applyNormalizedVolume()
     }
     
     func deleteImportedAudio() {
@@ -787,6 +985,14 @@ class ContentViewModel: ObservableObject {
                             // 오디오 플레이어 초기화
                             let player = try AVAudioPlayer(contentsOf: url)
                             self.audioPlayer = player
+                            
+                            // 플레이어 볼륨 상태 설정 (muted 상태인 경우 고려)
+                            if self.isMuted {
+                                self.audioPlayer?.volume = 0.0
+                            } else {
+                                self.applyNormalizedVolume()
+                            }
+                            
                             self.audioPlayer?.prepareToPlay()
                             
                             // 파형 생성 처리

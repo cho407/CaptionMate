@@ -9,12 +9,7 @@ import SwiftUI
 
 // 오디오 파형을 시각화하는 뷰
 struct WaveFormView: View {
-    @ObservedObject var viewModel: ContentViewModel
-    
-    let samples: [Float]
-    let currentTime: Double
-    let totalDuration: Double
-    let onSeek: (Double) -> Void
+    @ObservedObject var contentViewModel: ContentViewModel
     
     @State private var hoverLocation: CGFloat? = nil
     @State private var isDragging: Bool = false
@@ -30,30 +25,26 @@ struct WaveFormView: View {
         GeometryReader { geometry in
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
-                    LazyVStack(alignment: .leading, spacing: verticalPadding) { // 줄 간격 추가
-                        ForEach(0..<max(1, Int(ceil(totalDuration / calculatedLineTime))), id: \.self) { lineIndex in
+                    LazyVStack(alignment: .leading, spacing: verticalPadding) {
+                        ForEach(0..<max(1, Int(ceil(contentViewModel.audioState.totalDuration / calculatedLineTime))), id: \.self) { lineIndex in
                             WaveformLineView(
-                                viewModel: viewModel,
+                                contentViewModel: contentViewModel,
                                 lineIndex: lineIndex,
-                                samples: samples,
-                                currentTime: currentTime,
-                                totalDuration: max(0.001, totalDuration), // 0으로 나누는 것을 방지하기 위함
                                 secondsPerLine: calculatedLineTime,
-                                availableWidth: geometry.size.width - 40, // 32에서 40으로 좌우 여백 더 확보
+                                availableWidth: geometry.size.width - 40,
                                 waveformHeight: waveformHeight,
                                 hoveredLineIndex: $hoveredLineIndex,
                                 hoverLocation: $hoverLocation,
-                                isDragging: $isDragging,
-                                onSeek: onSeek
+                                isDragging: $isDragging
                             )
                             .id("line-\(lineIndex)")
-                            .frame(width: geometry.size.width - 40) // 32에서 40으로 변경
-                            .padding(.vertical, verticalPadding) // 각 줄에 상하 패딩 추가
+                            .frame(width: geometry.size.width - 40)
+                            .padding(.vertical, verticalPadding)
                         }
                     }
-                    .padding(.horizontal, 20) // 16에서 20으로 좌우 여백 더 확보
-                    .padding(.vertical, verticalPadding) // 12에서 원래 값인 verticalPadding으로 복구
-                    .id("content-\(Int(geometry.size.width))-\(Int(totalDuration))")
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, verticalPadding)
+                    .id("content-\(Int(geometry.size.width))-\(Int(contentViewModel.audioState.totalDuration))")
                 }
                 .onAppear {
                     // 초기 설정
@@ -61,16 +52,16 @@ struct WaveFormView: View {
                     updateLineTime(width: geometry.size.width)
                     
                     // 오디오가 로드되면 현재 재생 위치로 즉시 스크롤
-                    if totalDuration > 0 {
+                    if contentViewModel.audioState.totalDuration > 0 {
                         DispatchQueue.main.async {
                             scrollToCurrentLine(proxy: proxy)
                             isInitialRender = true
                         }
                     }
                 }
-                .onChange(of: currentTime) { oldValue, newValue in
+                .onChange(of: contentViewModel.audioState.currentPlaybackTime) { oldValue, newValue in
                     // 재생 위치가 바뀌면 해당 라인으로 스크롤
-                    if totalDuration > 0 {
+                    if contentViewModel.audioState.totalDuration > 0 {
                         let oldLineIndex = Int(oldValue / calculatedLineTime)
                         let newLineIndex = Int(newValue / calculatedLineTime)
                         if oldLineIndex != newLineIndex {
@@ -87,13 +78,13 @@ struct WaveFormView: View {
                     updateLineTime(width: newWidth)
                     
                     // 화면 크기 변경 후 스크롤 위치 유지
-                    if oldTime != calculatedLineTime && totalDuration > 0 {
+                    if oldTime != calculatedLineTime && contentViewModel.audioState.totalDuration > 0 {
                         DispatchQueue.main.async {
                             scrollToCurrentLine(proxy: proxy)
                         }
                     }
                 }
-                .onChange(of: totalDuration) { _, newDuration in
+                .onChange(of: contentViewModel.audioState.totalDuration) { _, newDuration in
                     // 오디오 파일이 변경되면 파형 다시 계산
                     if newDuration > 0 {
                         updateLineTime(width: viewWidth)
@@ -102,7 +93,7 @@ struct WaveFormView: View {
                         }
                     }
                 }
-                .onChange(of: samples.count) { oldCount, newCount in
+                .onChange(of: contentViewModel.audioState.waveformSamples.count) { oldCount, newCount in
                     // 샘플 데이터가 변경되면 업데이트
                     if newCount > 0 && oldCount != newCount {
                         DispatchQueue.main.async {
@@ -134,8 +125,8 @@ struct WaveFormView: View {
     
     // 현재 재생 시간에 해당하는 라인으로 스크롤
     private func scrollToCurrentLine(proxy: ScrollViewProxy) {
-        if totalDuration > 0 {
-            let currentLineIndex = Int(currentTime / calculatedLineTime)
+        if contentViewModel.audioState.totalDuration > 0 {
+            let currentLineIndex = Int(contentViewModel.audioState.currentPlaybackTime / calculatedLineTime)
             proxy.scrollTo("line-\(currentLineIndex)", anchor: .top)
         }
     }
@@ -143,12 +134,9 @@ struct WaveFormView: View {
 
 // 한 줄의 파형을 표시하는 뷰
 struct WaveformLineView: View {
-    @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject var contentViewModel: ContentViewModel
     
     let lineIndex: Int
-    let samples: [Float]
-    let currentTime: Double
-    let totalDuration: Double
     let secondsPerLine: Double
     let availableWidth: CGFloat
     let waveformHeight: CGFloat
@@ -156,16 +144,14 @@ struct WaveformLineView: View {
     @Binding var hoveredLineIndex: Int?
     @Binding var hoverLocation: CGFloat?
     @Binding var isDragging: Bool
-    let onSeek: (Double) -> Void
     
     // 드래그 전 재생 상태 저장
     @State private var wasPlayingBeforeDrag: Bool = false
     
     private var startTime: Double { Double(lineIndex) * secondsPerLine }
-    private var endTime: Double { min(startTime + secondsPerLine, totalDuration) }
-    private var isCurrentLine: Bool { currentTime >= startTime && currentTime < endTime }
-    // 모든 이전 줄이 재생 완료되었는지 확인
-    private var isPreviouslyPlayed: Bool { currentTime >= endTime }
+    private var endTime: Double { min(startTime + secondsPerLine, contentViewModel.audioState.totalDuration) }
+    private var isCurrentLine: Bool { contentViewModel.audioState.currentPlaybackTime >= startTime && contentViewModel.audioState.currentPlaybackTime < endTime }
+    private var isPreviouslyPlayed: Bool { contentViewModel.audioState.currentPlaybackTime >= endTime }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) { // 2에서 0으로 원래 값으로 복원
@@ -186,7 +172,7 @@ struct WaveformLineView: View {
                     if isCurrentLine {
                         // 현재 재생 중인 라인: 현재 시간까지 파란색 표시
                         PositionIndicatorView(
-                            currentTime: currentTime,
+                            currentTime: contentViewModel.audioState.currentPlaybackTime,
                             startTime: startTime,
                             endTime: endTime,
                             availableWidth: availableWidth,
@@ -206,7 +192,7 @@ struct WaveformLineView: View {
                 
                 // 재생 위치 표시선 - 현재 재생 중인 라인에만 표시
                 if isCurrentLine {
-                    let positionRatio = min(1.0, max(0.0, (currentTime - startTime) / (endTime - startTime)))
+                    let positionRatio = min(1.0, max(0.0, (contentViewModel.audioState.currentPlaybackTime - startTime) / (endTime - startTime)))
                     Rectangle()
                         .fill(Color.blue)
                         .frame(width: 1, height: waveformHeight)
@@ -232,11 +218,11 @@ struct WaveformLineView: View {
                     // 드래그 시작 시 처음 한 번만 실행
                     if !isDragging {
                         // 현재 재생 상태 저장
-                        wasPlayingBeforeDrag = viewModel.audioState.isPlaying
+                        wasPlayingBeforeDrag = contentViewModel.audioState.isPlaying
                         
                         // 재생 중이면 일시정지
-                        if viewModel.audioState.isPlaying {
-                            viewModel.pauseImportedAudio()
+                        if contentViewModel.audioState.isPlaying {
+                            contentViewModel.pauseImportedAudio()
                         }
                     }
                     
@@ -246,18 +232,30 @@ struct WaveformLineView: View {
                     
                     // 정확한 시간 계산
                     let ratio = max(0, min(1, value.location.x / availableWidth))
-                    let seekTime = startTime + (endTime - startTime) * Double(ratio)
-                    onSeek(max(0, min(seekTime, totalDuration)))
+                    
+                    // ViewModel의 seekToPositionInLine 메소드를 직접 호출
+                    contentViewModel.seekToPositionInLine(
+                        lineIndex: lineIndex,
+                        secondsPerLine: secondsPerLine, 
+                        ratio: Double(ratio),
+                        totalDuration: contentViewModel.audioState.totalDuration
+                    )
                             }
                             .onEnded { value in
                     // 정확한 시간 계산
                     let ratio = max(0, min(1, value.location.x / availableWidth))
-                    let seekTime = startTime + (endTime - startTime) * Double(ratio)
-                    onSeek(max(0, min(seekTime, totalDuration)))
+                    
+                    // ViewModel의 seekToPositionInLine 메소드를 직접 호출
+                    contentViewModel.seekToPositionInLine(
+                        lineIndex: lineIndex,
+                        secondsPerLine: secondsPerLine, 
+                        ratio: Double(ratio),
+                        totalDuration: contentViewModel.audioState.totalDuration
+                    )
                     
                     // 드래그 종료 시 이전 재생 상태로 복원
                     if wasPlayingBeforeDrag {
-                        viewModel.playImportedAudio()
+                        contentViewModel.playImportedAudio()
                     }
                     
                     isDragging = false
@@ -287,22 +285,22 @@ struct WaveformLineView: View {
     
     // 현재 라인에 해당하는 오디오 샘플 계산 (정밀도 향상)
     private func computeLineSamples() -> [Float] {
-        guard !samples.isEmpty, totalDuration > 0 else {
+        guard !contentViewModel.audioState.waveformSamples.isEmpty, contentViewModel.audioState.totalDuration > 0 else {
             // 샘플이 없는 경우 기본 파형 반환
             return Array(repeating: 0.5, count: Int(availableWidth))
         }
         
-        let sampleRate = Double(samples.count) / totalDuration
+        let sampleRate = Double(contentViewModel.audioState.waveformSamples.count) / contentViewModel.audioState.totalDuration
         
         let startSampleIndex = Int(startTime * sampleRate)
         let endSampleIndex = Int(endTime * sampleRate)
         
         // 범위 체크
-        let safeStartIndex = max(0, min(startSampleIndex, samples.count - 1))
-        let safeEndIndex = max(safeStartIndex + 1, min(endSampleIndex, samples.count))
+        let safeStartIndex = max(0, min(startSampleIndex, contentViewModel.audioState.waveformSamples.count - 1))
+        let safeEndIndex = max(safeStartIndex + 1, min(endSampleIndex, contentViewModel.audioState.waveformSamples.count))
         
         // 해당 범위의 샘플 추출
-        let lineSamples = Array(samples[safeStartIndex..<safeEndIndex])
+        let lineSamples = Array(contentViewModel.audioState.waveformSamples[safeStartIndex..<safeEndIndex])
         
         // 샘플 수가 화면 너비보다 많으면 다운샘플링, 적으면 보간
         if lineSamples.count > Int(availableWidth) {
