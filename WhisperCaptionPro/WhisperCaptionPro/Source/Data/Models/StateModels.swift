@@ -73,7 +73,6 @@ struct AudioState {
     /// 파일 임포트 후 선택된 파일의 URL (미리듣기, 삭제, 파형 표시 등에 사용)
     var importedAudioURL: URL?
     var isPlaying: Bool = false
-    var currentPlaybackTime: Double = 0.0
     var totalDuration: Double = 0.0
     var playbackTimer: Timer?
 }

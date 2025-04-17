@@ -67,24 +67,6 @@ struct ContentView: View {
         .onAppear {
             viewModel.fetchModels()
         }
-        // 볼륨 증가 (위쪽 화살표)
-        .onKeyPress(.upArrow) { 
-            if viewModel.audioState.importedAudioURL != nil {
-                let newVolume = min(1.0, viewModel.audioVolume + 0.05)
-                viewModel.setVolume(newVolume)
-                return .handled
-            }
-            return .ignored
-        }
-        // 볼륨 감소 (아래쪽 화살표)
-        .onKeyPress(.downArrow) { 
-            if viewModel.audioState.importedAudioURL != nil {
-                let newVolume = max(0.0, viewModel.audioVolume - 0.05)
-                viewModel.setVolume(newVolume)
-                return .handled
-            }
-            return .ignored
-        }
     }
 }
 

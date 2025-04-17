@@ -152,7 +152,7 @@ struct AudioControlView: View {
                                         .keyboardShortcut(.space, modifiers: [])
                                         
                                         // 시간 표시 (HH:MM:SS.ss / HH:MM:SS.ss 형식)
-                                        Text("**\(formatTimeDetailed(contentViewModel.audioState.currentPlaybackTime))** / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))")
+                                        Text("**\(formatTimeDetailed(contentViewModel.audioPlayer?.currentTime ?? 0))** / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))")
                                             .font(.system(size: 20, design: .monospaced))
                                             .foregroundColor(.secondary)
                                             .frame(minWidth: 150)

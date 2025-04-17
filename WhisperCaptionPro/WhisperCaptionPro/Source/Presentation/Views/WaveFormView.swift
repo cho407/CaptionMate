@@ -59,7 +59,7 @@ struct WaveFormView: View {
                         }
                     }
                 }
-                .onChange(of: contentViewModel.audioState.currentPlaybackTime) { oldValue, newValue in
+                .onChange(of: contentViewModel.audioPlayer?.currentTime ?? 0) { oldValue, newValue in
                     // 재생 위치가 바뀌면 해당 라인으로 스크롤
                     if contentViewModel.audioState.totalDuration > 0 {
                         let oldLineIndex = Int(oldValue / calculatedLineTime)
@@ -126,7 +126,7 @@ struct WaveFormView: View {
     // 현재 재생 시간에 해당하는 라인으로 스크롤
     private func scrollToCurrentLine(proxy: ScrollViewProxy) {
         if contentViewModel.audioState.totalDuration > 0 {
-            let currentLineIndex = Int(contentViewModel.audioState.currentPlaybackTime / calculatedLineTime)
+            let currentLineIndex = Int(contentViewModel.audioPlayer?.currentTime ?? 0 / calculatedLineTime)
             proxy.scrollTo("line-\(currentLineIndex)", anchor: .top)
         }
     }
@@ -150,8 +150,8 @@ struct WaveformLineView: View {
     
     private var startTime: Double { Double(lineIndex) * secondsPerLine }
     private var endTime: Double { min(startTime + secondsPerLine, contentViewModel.audioState.totalDuration) }
-    private var isCurrentLine: Bool { contentViewModel.audioState.currentPlaybackTime >= startTime && contentViewModel.audioState.currentPlaybackTime < endTime }
-    private var isPreviouslyPlayed: Bool { contentViewModel.audioState.currentPlaybackTime >= endTime }
+    private var isCurrentLine: Bool { contentViewModel.audioPlayer?.currentTime ?? 0 >= startTime && contentViewModel.audioPlayer?.currentTime ?? 0 < endTime }
+    private var isPreviouslyPlayed: Bool { contentViewModel.audioPlayer?.currentTime ?? 0 >= endTime }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) { // 2에서 0으로 원래 값으로 복원
@@ -172,7 +172,7 @@ struct WaveformLineView: View {
                     if isCurrentLine {
                         // 현재 재생 중인 라인: 현재 시간까지 파란색 표시
                         PositionIndicatorView(
-                            currentTime: contentViewModel.audioState.currentPlaybackTime,
+                            currentTime: contentViewModel.audioPlayer?.currentTime ?? 0,
                             startTime: startTime,
                             endTime: endTime,
                             availableWidth: availableWidth,
@@ -192,7 +192,7 @@ struct WaveformLineView: View {
                 
                 // 재생 위치 표시선 - 현재 재생 중인 라인에만 표시
                 if isCurrentLine {
-                    let positionRatio = min(1.0, max(0.0, (contentViewModel.audioState.currentPlaybackTime - startTime) / (endTime - startTime)))
+                    let positionRatio = min(1.0, max(0.0, (contentViewModel.audioPlayer?.currentTime ?? 0 - startTime) / (endTime - startTime)))
                     Rectangle()
                         .fill(Color.blue)
                         .frame(width: 1, height: waveformHeight)
