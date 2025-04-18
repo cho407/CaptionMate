@@ -32,11 +32,11 @@ class ContentViewModel: ObservableObject {
     
     @Published var audioPlayer: AVAudioPlayer?
     @Published var normalizedVolumeFactor: Float = 1.0  // 노멀라이제이션 계수 저장용
-    @Published var currentPlayerTime: Double = 0.0  // 플레이어의 현재 시간을 직접 게시
+    @Published var currentPlayerTime: Double = 0.0  // currentTime publish 위한 트리거
     
     // 재생 속도 상태 추가
-    let playbackRates: [Float] = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0]
-    @Published var currentPlaybackRateIndex: Int = 2 // 기본값은 1.0x (인덱스 2)
+    let playbackRates: [Float] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75,2.0]
+    @Published var currentPlaybackRateIndex: Int = 3 // 기본값은 1.0x (인덱스 3)
     
     // 볼륨 상태 (AppStorage로 관리)
     @AppStorage("audioVolume") var audioVolume: Double = 1.0  // 0.0 ~ 1.0
