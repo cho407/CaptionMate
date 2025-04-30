@@ -36,24 +36,43 @@ struct ModelSelectorView: View {
                             model.lowercased().contains(filter.lowercased())
                         }
                     }
-                    Picker("", selection: $viewModel.selectedModel) {
-                        ForEach(filteredModels,
-                                id: \.self) { model in
-                            HStack {
-                                let modelIcon = viewModel.modelManagementState.localModels
-                                    .contains { $0 == model.description } ? "checkmark.circle" :
-                                    "arrow.down.circle.dotted"
-                                Text(
-                                    "\(Image(systemName: modelIcon)) \(model.description.components(separatedBy: "_").dropFirst().joined(separator: " "))"
-                                )
-                                .tag(model.description)
+                    
+                    Menu {
+                        ForEach(filteredModels, id: \.self) { model in
+                            let isLocalModel = viewModel.modelManagementState.localModels.contains(model)
+                            let modelName = model.components(separatedBy: "_").dropFirst().joined(separator: " ")
+                            let modelSymbolName: String = model == viewModel.selectedModel ? "circle.fill" : "checkmark.circle"
+                            
+                            Button(action: {
+                                if isLocalModel {
+                                    viewModel.selectedModel = model
+                                    viewModel.loadModel(model)
+                                } else {
+                                    viewModel.uiState.isModelmanagerViewPresented = true
+                                }
+                            }) {
+                                HStack {
+                                    Text(modelName)
+                                    Spacer()
+                                    Image(systemName: isLocalModel ? modelSymbolName : "arrow.down.circle.dotted")
+                                        .symbolRenderingMode(.palette)
+                                        .foregroundStyle(model == viewModel.selectedModel ? .green : .black)
+                                }
                             }
+                            .disabled(!isLocalModel)
                         }
+                    } label: {
+                        HStack {
+                            let selectedModelName = viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")
+                            Text(selectedModelName)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .cornerRadius(6)
                     }
-                    .pickerStyle(MenuPickerStyle())
-                    .onChange(of: viewModel.selectedModel) { _, _ in
-                        viewModel.modelManagementState.modelState = .unloaded
-                    }
+                    
                 } else {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
@@ -61,61 +80,16 @@ struct ModelSelectorView: View {
                 }
 
                 Button {
-                    viewModel.deleteModel()
+                    viewModel.uiState.isModelmanagerViewPresented.toggle()
                 } label: {
-                    Image(systemName: "trash")
-                }
-                .help("Delete model")
-                .buttonStyle(BorderlessButtonStyle())
-                .disabled(viewModel.modelManagementState.localModels.isEmpty || !viewModel
-                    .modelManagementState.localModels
-                    .contains(viewModel.selectedModel))
-
-                    Button {
-                        let folderURL = viewModel.whisperKit?
-                            .modelFolder ??
-                            (viewModel.modelManagementState.localModels
-                                .contains(viewModel.selectedModel) ?
-                                URL(
-                                    fileURLWithPath: viewModel.modelManagementState.localModelPath
-                                ) :
-                                nil)
-                        if let folder = folderURL {
-                            NSWorkspace.shared.open(folder)
-                        }
-                    } label: {
-                        Image(systemName: "folder")
-                    }
-                    .buttonStyle(BorderlessButtonStyle())
-
-                Button {
-                    if let url =
-                        URL(string: "https://huggingface.co/\(viewModel.repoName)") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } label: {
-                    Image(systemName: "link.circle")
+                    Image(systemName: "gearshape")
                 }
                 .buttonStyle(BorderlessButtonStyle())
+                .help("모델 관리")
             }
 
             if viewModel.modelManagementState.modelState == .unloaded {
                 Divider()
-                Button {
-                    viewModel.resetState()
-                    viewModel.loadModel(viewModel.selectedModel)
-                    viewModel.modelManagementState.modelState = .loading
-                    if !(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) {
-                        viewModel.isAutoLanguageEnable = false
-                    }
-                   
-
-                } label: {
-                    Text("Load Model")
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 40)
-                }
-                .buttonStyle(.borderedProminent)
             } else if viewModel.modelManagementState.loadingProgressValue < 1.0 {
                 VStack {
                     HStack {
@@ -135,12 +109,36 @@ struct ModelSelectorView: View {
                     }
                     if viewModel.modelManagementState.modelState == .prewarming {
                         Text(
-                            "Specializing \(viewModel.selectedModel) for your device...\nThis can take several minutes on first load"
+                            "모델 최적화 중... \(viewModel.selectedModel)\n첫 로드 시 몇 분 정도 소요될 수 있습니다."
                         )
                         .font(.caption)
                         .foregroundColor(.gray)
                     }
                 }
+            }
+        }
+        .onAppear {
+            // 모델 목록 갱신
+            viewModel.fetchModels()
+            
+            // 자동 로드 기능 - 선택된 모델이 로컬에 있으면 자동으로 로드
+            if viewModel.modelManagementState.localModels.isEmpty {
+                // 모델이 없으면 자동으로 모델 관리 화면 표시
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    viewModel.uiState.isModelmanagerViewPresented = true
+                }
+            } else if viewModel.modelManagementState.localModels.contains(viewModel.selectedModel) {
+                // 선택된 모델이 로컬에 있으면 로드
+                viewModel.loadModel(viewModel.selectedModel)
+            } else if !viewModel.modelManagementState.localModels.isEmpty {
+                // 선택된 모델이 로컬에 없지만 다른 모델이 있으면 첫 번째 모델 선택
+                viewModel.selectedModel = viewModel.modelManagementState.localModels[0]
+                viewModel.loadModel(viewModel.selectedModel)
+            }
+        }
+        .onChange(of: viewModel.selectedModel) { _, newModel in
+            if viewModel.modelManagementState.localModels.contains(newModel) {
+                viewModel.loadModel(newModel)
             }
         }
     }

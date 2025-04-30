@@ -63,6 +63,10 @@ struct ContentView: View {
                     }
                 }
             }
+            .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {
+                ModelManagerView(viewModel: viewModel)
+                    .frame(minWidth: 600, minHeight: 500)
+            }
         }
         .onAppear {
             viewModel.fetchModels()

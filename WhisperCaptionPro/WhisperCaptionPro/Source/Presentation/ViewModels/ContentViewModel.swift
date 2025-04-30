@@ -26,7 +26,7 @@ class ContentViewModel: ObservableObject {
     
     /// 전사 결과 (전사 완료 후 업데이트)
     @Published var transcriptionResult: TranscriptionResult?
-
+    
     /// Export 진행 여부
     @Published var isExporting: Bool = false
     
@@ -45,7 +45,7 @@ class ContentViewModel: ObservableObject {
     
     // Combine 관련
     private var playbackTimerCancellable: AnyCancellable?
-
+    
     // MARK: - AppStorage (사용자 설정, UserDefaults 기반)
     @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") var selectedModel: String = WhisperKit.recommendedModels().default
@@ -73,16 +73,16 @@ class ContentViewModel: ObservableObject {
     @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false
     @AppStorage("frameRate") var frameRate: Double = 30.0
-
+    
     // MARK: - Methods
-
+    
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
     func resetState() {
         uiState.transcribeTask?.cancel()
         uiState.isTranscribingView = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
-
+        
         transcriptionState.currentText = ""
         transcriptionState.currentChunks = [:]
         transcriptionState.pipelineStart = Double.greatestFiniteMagnitude
@@ -101,7 +101,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.bufferSeconds = 0
         transcriptionState.confirmedSegments = []
         transcriptionState.unconfirmedSegments = []
-
+        
         transcriptionState.eagerResults = []
         transcriptionState.prevResult = nil
         transcriptionState.lastAgreedSeconds = 0.0
@@ -112,7 +112,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.hypothesisWords = []
         transcriptionState.hypothesisText = ""
     }
-
+    
     /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
     func getComputeOptions() -> ModelComputeOptions {
         return ModelComputeOptions(
@@ -122,49 +122,134 @@ class ContentViewModel: ObservableObject {
     }
     
     // MARK: - Model Management
-
+    
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
+        print("모델 목록 가져오기 시작...")
+        
+        // 상태 초기화
         modelManagementState.availableModels = []
+        modelManagementState.modelSizes = [:] // 모델 크기 정보 초기화
+        
         if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
-            if FileManager.default.fileExists(atPath: modelPath) {
-                modelManagementState.localModelPath = modelPath
+            print("모델 경로 확인: \(modelPath)")
+            
+            // 디렉토리가 없으면 생성
+            if !FileManager.default.fileExists(atPath: modelPath) {
                 do {
-                    let downloadedModels = try FileManager.default.contentsOfDirectory(atPath: modelPath)
-                    for model in downloadedModels where !modelManagementState.localModels.contains(model) {
-                        modelManagementState.localModels.append(model)
-                    }
+                    try FileManager.default.createDirectory(at: URL(fileURLWithPath: modelPath), withIntermediateDirectories: true)
+                    print("모델 디렉토리 생성: \(modelPath)")
                 } catch {
-                    print("Error enumerating files at \(modelPath): \(error.localizedDescription)")
+                    print("모델 디렉토리 생성 실패: \(error.localizedDescription)")
                 }
             }
+            
+            modelManagementState.localModelPath = modelPath
+            
+            do {
+                let downloadedModels = try FileManager.default.contentsOfDirectory(atPath: modelPath)
+                print("로컬 모델 목록: \(downloadedModels)")
+                
+                // 로컬 모델 및 크기 정보 갱신
+                for model in downloadedModels {
+                    let modelFolderURL = URL(fileURLWithPath: modelPath).appendingPathComponent(model)
+                    
+                    // 모델 크기 계산
+                    let totalSize = calculateFolderSize(url: modelFolderURL)
+                    modelManagementState.modelSizes[model] = totalSize
+                    
+                    if !modelManagementState.localModels.contains(model) {
+                        modelManagementState.localModels.append(model)
+                    }
+                }
+            } catch {
+                print("로컬 모델 목록 조회 실패: \(error.localizedDescription)")
+            }
         }
+        
         modelManagementState.localModels = WhisperKit.formatModelFiles(modelManagementState.localModels)
         for model in modelManagementState.localModels where !modelManagementState.availableModels.contains(model) {
             modelManagementState.availableModels.append(model)
         }
-
-        print("Found locally: \(modelManagementState.localModels)")
-        print("Previously selected model: \(selectedModel)")
-
+        
+        print("로컬에서 찾은 모델: \(modelManagementState.localModels)")
+        print("이전에 선택한 모델: \(selectedModel)")
+        
         Task {
-            let remoteModelSupport = await WhisperKit.recommendedRemoteModels()
+            // 원격 모델 목록 가져오기 시도
+            var supportedModels: [String] = []
+            var disabledModels: [String] = []
+            
+            let modelSupport = await WhisperKit.recommendedRemoteModels()
+            supportedModels = modelSupport.supported
+            disabledModels = modelSupport.disabled
+            print("WhisperKit에서 모델 목록 가져옴: \(supportedModels.count)개")
+            
+            // 메인 스레드에서 UI 업데이트
             await MainActor.run {
-                for model in remoteModelSupport.supported {
+                for model in supportedModels {
                     if !modelManagementState.availableModels.contains(model) {
                         modelManagementState.availableModels.append(model)
+                        
+                        // 원격 모델 예상 크기 - 실제 크기를 알 수 없으므로 예상치 설정
+                        if !modelManagementState.modelSizes.keys.contains(model) {
+                            // 모델 이름에 따라 예상 크기 설정 (MB 단위)
+                            let estimatedSize: Int64
+                            if model.contains("large") {
+                                estimatedSize = 3_000_000_000 // 약 3GB
+                            } else if model.contains("medium") {
+                                estimatedSize = 1_500_000_000 // 약 1.5GB
+                            } else if model.contains("small") {
+                                estimatedSize = 500_000_000 // 약 500MB
+                            } else if model.contains("base") {
+                                estimatedSize = 250_000_000 // 약 250MB
+                            } else {
+                                estimatedSize = 150_000_000 // 약 150MB (기본값)
+                            }
+                            modelManagementState.modelSizes[model] = estimatedSize
+                        }
                     }
                 }
-                for model in remoteModelSupport.disabled {
+                
+                for model in disabledModels {
                     if !modelManagementState.disabledModels.contains(model) {
                         modelManagementState.disabledModels.append(model)
                     }
                 }
+                
+                print("업데이트된 사용 가능 모델 수: \(modelManagementState.availableModels.count)")
+                objectWillChange.send() // UI 갱신 강제
             }
         }
     }
-
+    
+    /// 폴더 크기 계산 함수
+    private func calculateFolderSize(url: URL) -> Int64 {
+        let fileManager = FileManager.default
+        var folderSize: Int64 = 0
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            
+            for fileURL in contents {
+                let fileAttributes = try fileURL.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+                
+                if let isDirectory = fileAttributes.isDirectory, isDirectory {
+                    // 하위 폴더면 재귀적으로 계산
+                    folderSize += calculateFolderSize(url: fileURL)
+                } else if let fileSize = fileAttributes.fileSize {
+                    // 파일이면 크기 추가
+                    folderSize += Int64(fileSize)
+                }
+            }
+        } catch {
+            print("Error calculating folder size: \(error)")
+        }
+        
+        return folderSize
+    }
+    
     /// 모델 로딩 (로컬/원격 모델 다운로드 및 초기화)
     func loadModel(_ model: String, redownload: Bool = false) {
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
@@ -175,8 +260,10 @@ class ContentViewModel: ObservableObject {
             - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
-
+        
+        // 이미 로드된 모델이 있으면 해제
         whisperKit = nil
+        
         Task {
             let config = WhisperKitConfig(computeOptions: getComputeOptions(),
                                           verbose: true,
@@ -186,12 +273,15 @@ class ContentViewModel: ObservableObject {
                                           download: false)
             whisperKit = try await WhisperKit(config)
             guard let whisperKit = whisperKit else { return }
-
+            
             var folder: URL?
+            
+            // 이미 다운로드된 모델이고 재다운로드를 요청하지 않은 경우
             if modelManagementState.localModels.contains(model) && !redownload {
                 folder = URL(fileURLWithPath: modelManagementState.localModelPath)
                     .appendingPathComponent(model)
             } else {
+                // 모델 다운로드 진행
                 folder = try await WhisperKit.download(
                     variant: model,
                     from: repoName,
@@ -203,23 +293,23 @@ class ContentViewModel: ObservableObject {
                     }
                 )
             }
-
+            
             await MainActor.run {
                 modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
                 modelManagementState.modelState = .downloaded
             }
-
+            
             if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
                 await MainActor.run {
                     modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
                     modelManagementState.modelState = .prewarming
                 }
-
+                
                 let progressBarTask = Task {
                     await updateProgressBar(targetProgress: 0.9, maxTime: 240)
                 }
-
+                
                 do {
                     try await whisperKit.prewarmModels()
                     progressBarTask.cancel()
@@ -230,25 +320,35 @@ class ContentViewModel: ObservableObject {
                         loadModel(model, redownload: true)
                         return
                     } else {
-                        modelManagementState.modelState = .unloaded
+                        await MainActor.run {
+                            modelManagementState.modelState = .unloaded
+                        }
                         return
                     }
                 }
-
+                
                 await MainActor.run {
                     modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio + 0.9 * (1 - modelManagementState.specializationProgressRatio)
                     modelManagementState.modelState = whisperKit.modelState
                 }
                 
                 do {
-                try await whisperKit.loadModels()
+                    try await whisperKit.loadModels()
                 } catch {
                     print("Error loading models: \(error)")
+                    await MainActor.run {
+                        modelManagementState.modelState = .unloaded
+                    }
+                    return
                 }
-
+                
                 await MainActor.run {
                     if !modelManagementState.localModels.contains(model) {
                         modelManagementState.localModels.append(model)
+                        
+                        // 새로 다운로드된 모델의 크기 계산
+                        let modelSize = calculateFolderSize(url: modelFolder)
+                        modelManagementState.modelSizes[model] = modelSize
                     }
                     modelManagementState.availableLanguages = Constants.languages.map { $0.key }
                         .sorted()
@@ -258,42 +358,174 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-
-    /// 모델 삭제
-    func deleteModel() {
-        if modelManagementState.localModels.contains(selectedModel) {
+    
+    /// 모델 삭제 (선택 모델 또는 직접 지정)
+    func deleteModel(_ model: String) {
+        if modelManagementState.localModels.contains(model) {
             let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)
-                .appendingPathComponent(selectedModel)
+                .appendingPathComponent(model)
             do {
                 try FileManager.default.removeItem(at: modelFolder)
-                if let index = modelManagementState.localModels.firstIndex(of: selectedModel) {
+                if let index = modelManagementState.localModels.firstIndex(of: model) {
                     modelManagementState.localModels.remove(at: index)
                 }
-                modelManagementState.modelState = .unloaded
+                
+                // 선택된 모델이 삭제된 경우 모델 상태 업데이트
+                if selectedModel == model {
+                    modelManagementState.modelState = .unloaded
+                }
+                
+                // 모델 크기 정보 업데이트
+                modelManagementState.modelSizes.removeValue(forKey: model)
+                
+                print("모델 삭제 완료: \(model)")
             } catch {
                 print("Error deleting model: \(error)")
             }
         }
     }
-
+    
+    // MARK: - 모델 다운로드 관리
+    
+    /// 모델 다운로드 시작
+    func downloadModel(_ model: String) {
+        // 이미 다운로드 중이거나 로컬에 있는 모델인지 확인
+        guard !modelManagementState.currentDownloadingModels.contains(model),
+              !modelManagementState.localModels.contains(model) else {
+            return
+        }
+        
+        // 동시 다운로드 수 제한 확인
+        if modelManagementState.currentDownloadingModels.count >= modelManagementState.maxConcurrentDownloads {
+            // 동시 다운로드 제한 초과 - 대기열 처리 로직을 여기에 추가할 수 있음
+            print("최대 동시 다운로드 수 초과: \(model) 다운로드 불가")
+            return
+        }
+        
+        // 다운로드 상태 업데이트
+        modelManagementState.currentDownloadingModels.insert(model)
+        modelManagementState.isDownloading = true
+        modelManagementState.downloadProgress[model] = 0.0
+        modelManagementState.downloadErrors.removeValue(forKey: model)
+        
+        let task = Task {
+            do {
+                // 다운로드 진행 전 크기 업데이트
+                let estimatedSize = modelManagementState.modelSizes[model] ?? 0
+                
+                // 다운로드 시작
+                let modelFolder = try await WhisperKit.download(
+                    variant: model,
+                    from: repoName,
+                    progressCallback: { progress in
+                        // 메인 스레드에서 진행 상황 업데이트
+                        DispatchQueue.main.async {
+                            let progressValue = Float(progress.fractionCompleted)
+                            self.modelManagementState.downloadProgress[model] = progressValue
+                            
+                            // 예상 다운로드된 크기 계산 및 상태 업데이트
+                            _ = Int64(Double(estimatedSize) * Double(progressValue)) // 정보 목적으로만 계산
+                            self.objectWillChange.send() // UI 갱신 알림
+                        }
+                    }
+                )
+                
+                // 다운로드 완료 처리
+                await MainActor.run {
+                    if !self.modelManagementState.localModels.contains(model) {
+                        self.modelManagementState.localModels.append(model)
+                    }
+                    
+                    // 실제 다운로드된 모델의 크기 계산
+                    let actualSize = calculateFolderSize(url: modelFolder)
+                    self.modelManagementState.modelSizes[model] = actualSize
+                    
+                    // 다운로드 상태 업데이트
+                    self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.downloadProgress[model] = 1.0 // 100% 완료
+                    self.modelManagementState.downloadTasks[model] = nil
+                    
+                    // 모든 다운로드가 완료되었는지 확인
+                    if self.modelManagementState.currentDownloadingModels.isEmpty {
+                        self.modelManagementState.isDownloading = false
+                    }
+                    
+                    print("모델 다운로드 완료: \(model), 크기: \(ByteCountFormatter.string(fromByteCount: actualSize, countStyle: .file))")
+                }
+            } catch {
+                print("모델 다운로드 오류 (\(model)): \(error.localizedDescription)")
+                
+                await MainActor.run {
+                    // 오류 상태 업데이트
+                    self.modelManagementState.downloadErrors[model] = error.localizedDescription
+                    self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.downloadProgress[model] = nil
+                    self.modelManagementState.downloadTasks[model] = nil
+                    
+                    // 모든 다운로드가 완료되었는지 확인
+                    if self.modelManagementState.currentDownloadingModels.isEmpty {
+                        self.modelManagementState.isDownloading = false
+                    }
+                }
+            }
+        }
+        
+        // 작업 참조 저장
+        modelManagementState.downloadTasks[model] = task
+    }
+    
+    /// 다운로드 취소
+    func cancelDownload(_ model: String) {
+        guard let task = modelManagementState.downloadTasks[model],
+              modelManagementState.currentDownloadingModels.contains(model) else {
+            return
+        }
+        
+        // 작업 취소
+        task.cancel()
+        
+        // 상태 업데이트
+        modelManagementState.downloadTasks[model] = nil
+        modelManagementState.downloadProgress[model] = nil
+        modelManagementState.currentDownloadingModels.remove(model)
+        
+        // 모든 다운로드가 취소되었는지 확인
+        if modelManagementState.currentDownloadingModels.isEmpty {
+            modelManagementState.isDownloading = false
+        }
+        
+        // 부분적으로 다운로드된 파일 삭제 시도
+        if let modelFolder = URL(string: modelManagementState.localModelPath)?.appendingPathComponent(model),
+           FileManager.default.fileExists(atPath: modelFolder.path) {
+            do {
+                try FileManager.default.removeItem(at: modelFolder)
+                print("취소된 모델의 부분 다운로드 파일 삭제: \(model)")
+            } catch {
+                print("취소된 모델 파일 삭제 실패: \(error.localizedDescription)")
+            }
+        }
+        
+        print("모델 다운로드 취소: \(model)")
+    }
+    
     /// 진행률 업데이트
     func updateProgressBar(targetProgress: Float, maxTime: TimeInterval) async {
         let initialProgress = modelManagementState.loadingProgressValue
         let decayConstant = -log(1 - targetProgress) / Float(maxTime)
         let startTime = Date()
-
+        
         while true {
             let elapsedTime = Date().timeIntervalSince(startTime)
             let decayFactor = exp(-decayConstant * Float(elapsedTime))
             let progressIncrement = (1 - initialProgress) * (1 - decayFactor)
             let currentProgress = initialProgress + progressIncrement
-
+            
             await MainActor.run {
                 modelManagementState.loadingProgressValue = currentProgress
             }
-
+            
             if currentProgress >= targetProgress { break }
-
+            
             do {
                 try await Task.sleep(nanoseconds: 100_000_000)
             } catch {
@@ -303,12 +535,12 @@ class ContentViewModel: ObservableObject {
     }
     
     // MARK: - 파일 선택 및 처리
-
+    
     /// 파일 선택 (UI 관련)
     func selectFile() {
         uiState.isFilePickerPresented = true
     }
-
+    
     /// 파일 선택 결과 처리 (파일 임포트 후 URL 저장 및 전사 호출)
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
@@ -377,7 +609,7 @@ class ContentViewModel: ObservableObject {
             print("File selection error: \(error.localizedDescription)")
         }
     }
-
+    
     // 오디오 레벨 분석 및 노멀라이제이션 계수 계산 함수
     private func calculateNormalizationFactor(_ player: AVAudioPlayer) {
         // 오디오 미터링 활성화
@@ -447,7 +679,7 @@ class ContentViewModel: ObservableObject {
         // 초기 볼륨 적용
         applyVolume()
     }
-
+    
     /// 볼륨 적용 함수 (간소화된 버전)
     private func applyVolume() {
         guard let player = audioPlayer else { return }
@@ -461,22 +693,22 @@ class ContentViewModel: ObservableObject {
         // 노멀라이제이션 계수와 사용자 볼륨 설정을 곱해서 적용
         player.volume = normalizedVolumeFactor * Float(audioVolume)
     }
-
+    
     /// 파일 전사 시작 (선택된 파일 URL로 전사 실행)
     func transcribeFile(path: String) {
         resetState()
         whisperKit?.audioProcessor = AudioProcessor()
-            uiState.transcribeTask = Task {
-                audioState.isTranscribing = true
-                do {
+        uiState.transcribeTask = Task {
+            audioState.isTranscribing = true
+            do {
                 try await transcribeCurrentFile(path: path)
-                } catch {
+            } catch {
                 print("Transcription error: \(error.localizedDescription)")
-                }
-                audioState.isTranscribing = false
+            }
+            audioState.isTranscribing = false
         }
     }
-
+    
     /// 오디오 파일 전사 진행
     func transcribeCurrentFile(path: String) async throws {
         Logging.debug("Loading audio file: \(path)")
@@ -487,9 +719,9 @@ class ContentViewModel: ObservableObject {
             }
         }.value
         Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
-
+        
         let transcription = try await transcribeAudioSamples(audioFileSamples)
-
+        
         await MainActor.run {
             transcriptionState.currentText = ""
             transcriptionResult = transcription
@@ -506,17 +738,17 @@ class ContentViewModel: ObservableObject {
             transcriptionState.confirmedSegments = segments
         }
     }
-
+    
     /// 오디오 샘플 전사
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
         guard let whisperKit = whisperKit else { return nil }
         let languageCode = Constants.languages[selectedLanguage, default: Constants.defaultLanguageCode]
         let task: DecodingTask = selectedTask == "transcribe" ? .transcribe : .translate
         let seekClip: [Float] = [transcriptionState.lastConfirmedSegmentEndSeconds]
-
+        
         let options = DecodingOptions(
-                verbose: true,
-                task: task,
+            verbose: true,
+            task: task,
             language: isAutoLanguageEnable ? nil : languageCode, // 자동 언어 감지 옵션
             temperature: Float(temperatureStart),
             temperatureFallbackCount: Int(fallbackCount),
@@ -527,11 +759,11 @@ class ContentViewModel: ObservableObject {
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
             wordTimestamps: enableWordTimestamp,
-                clipTimestamps: seekClip,
+            clipTimestamps: seekClip,
             concurrentWorkerCount: Int(concurrentWorkerCount),
             chunkingStrategy: chunkingStrategy
         )
-
+        
         let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
             DispatchQueue.main.async {
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
@@ -560,7 +792,7 @@ class ContentViewModel: ObservableObject {
                 self.transcriptionState.currentFallbacks = fallbacks
                 self.transcriptionState.currentDecodingLoops += 1
             }
-
+            
             let currentTokens = progress.tokens
             let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
@@ -577,7 +809,7 @@ class ContentViewModel: ObservableObject {
             }
             return nil
         }
-
+        
         let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
             audioArray: samples,
             decodeOptions: options,
@@ -586,7 +818,7 @@ class ContentViewModel: ObservableObject {
         let mergedResults = mergeTranscriptionResults(transcriptionResults)
         return mergedResults
     }
-
+    
     // MARK: - Audio Preview & Deletion
     
     /// 오디오 미리듣기 (AVAudioPlayer를 활용)
@@ -784,7 +1016,7 @@ class ContentViewModel: ObservableObject {
         do {
             // 현재 파형 샘플이 비어있지 않으면 초기화 (새 파일용)
             if !audioState.waveformSamples.isEmpty {
-            await MainActor.run {
+                await MainActor.run {
                     audioState.waveformSamples = []
                 }
             }

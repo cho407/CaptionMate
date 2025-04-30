@@ -63,6 +63,47 @@ struct ModelManagementState {
     // 다운로드/로딩 진행률
     var loadingProgressValue: Float = 0.0
     var specializationProgressRatio: Float = 0.7
+    var downloadProgress: [String: Float] = [:]
+    var downloadTasks: [String: Task<Void, Never>] = [:]
+    
+    // 모델 크기 정보
+    var modelSizes: [String: Int64] = [:]
+    var totalDownloadSize: Int64 = 0
+    var downloadedSize: Int64 = 0
+    
+    // 다운로드 상태
+    var isDownloading: Bool = false
+    var currentDownloadingModels: Set<String> = []
+    var downloadErrors: [String: String] = [:]
+    
+    // 다운로드 관리
+    var maxConcurrentDownloads: Int = 2
+    
+    // UI 상태
+    var modelFilter: String = ""
+    
+    // 모델 정보 포맷 헬퍼 함수들
+    func formattedModelSize(for model: String) -> String {
+        guard let size = modelSizes[model] else { return "알 수 없음" }
+        return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
+    }
+    
+    func formattedDownloadProgress(for model: String) -> String {
+        guard let progress = downloadProgress[model] else { return "0%" }
+        return String(format: "%.1f%%", progress * 100)
+    }
+    
+    func isDownloading(model: String) -> Bool {
+        return currentDownloadingModels.contains(model)
+    }
+    
+    func canStartDownload(model: String) -> Bool {
+        return !isDownloading(model: model) && !localModels.contains(model) && currentDownloadingModels.count < maxConcurrentDownloads
+    }
+    
+    func displayName(for model: String) -> String {
+        return model.components(separatedBy: "_").dropFirst().joined(separator: " ")
+    }
 }
 
 struct AudioState {
@@ -85,7 +126,6 @@ struct UIState {
     var transcriptionTask: Task<Void, Never>? = nil
     var transcribeTask: Task<Void, Never>? = nil
     var isTranscribingView: Bool = false
-    
-    /// 파일 드래그 앤 드롭 중인지 여부
+    var isModelmanagerViewPresented: Bool = false
     var isTargeted: Bool = false
 }
