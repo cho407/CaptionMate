@@ -44,22 +44,21 @@ struct ModelSelectorView: View {
                             let modelSymbolName: String = model == viewModel.selectedModel ? "circle.fill" : "checkmark.circle"
                             
                             Button(action: {
-                                if isLocalModel {
+                           
                                     viewModel.selectedModel = model
                                     viewModel.loadModel(model)
-                                } else {
-                                    viewModel.uiState.isModelmanagerViewPresented = true
-                                }
+                
                             }) {
                                 HStack {
+                                    let loadingColor: Color = viewModel.modelManagementState.modelState == .loaded ? .green : .red
                                     Text(modelName)
                                     Spacer()
                                     Image(systemName: isLocalModel ? modelSymbolName : "arrow.down.circle.dotted")
                                         .symbolRenderingMode(.palette)
-                                        .foregroundStyle(model == viewModel.selectedModel ? .green : .black)
+                                        .foregroundStyle(model == viewModel.selectedModel ? loadingColor : .black)
                                 }
                             }
-                            .disabled(!isLocalModel)
+                            .disabled(!isLocalModel && model != "openai_whisper-tiny")
                         }
                     } label: {
                         HStack {
@@ -74,15 +73,23 @@ struct ModelSelectorView: View {
                     }
                     
                 } else {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                        .scaleEffect(0.5)
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.5)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .cornerRadius(6)
+
                 }
 
                 Button {
                     viewModel.uiState.isModelmanagerViewPresented.toggle()
                 } label: {
-                    Image(systemName: "gearshape")
+                    Image(systemName: "tray.and.arrow.down.fill")
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 .help("모델 관리")

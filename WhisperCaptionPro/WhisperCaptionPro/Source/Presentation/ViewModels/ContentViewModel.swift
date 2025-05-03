@@ -123,6 +123,41 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - Model Management
     
+    /// 모델 해제 (메모리에서 완전히 해제)
+    func releaseModel() async {
+        print("모델 해제 시작: \(selectedModel)")
+        
+        // 1. 모델 상태 초기화
+        modelManagementState.modelState = .unloaded
+        modelManagementState.loadingProgressValue = 0.0
+        
+        // 2. 전사 관련 상태 초기화
+        transcriptionState.currentText = ""
+        transcriptionState.currentChunks = [:]
+        transcriptionState.confirmedSegments = []
+        transcriptionState.unconfirmedSegments = []
+        transcriptionState.eagerResults = []
+        transcriptionState.prevResult = nil
+        transcriptionState.lastAgreedSeconds = 0.0
+        transcriptionState.prevWords = []
+        transcriptionState.lastAgreedWords = []
+        transcriptionState.confirmedWords = []
+        transcriptionState.confirmedText = ""
+        transcriptionState.hypothesisWords = []
+        transcriptionState.hypothesisText = ""
+        
+        // 3. 백그라운드 작업 취소
+        uiState.transcribeTask?.cancel()
+        uiState.transcriptionTask?.cancel()
+        uiState.isTranscribingView = false
+        
+        // 4. WhisperKit 인스턴스 해제
+        if let kit = whisperKit {
+            await kit.unloadModels()
+            print("모델 해제 완료: \(selectedModel)")
+        }
+    }
+    
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
         print("모델 목록 가져오기 시작...")
@@ -160,7 +195,8 @@ class ContentViewModel: ObservableObject {
                     modelManagementState.modelSizes[model] = totalSize
                     
                     if !modelManagementState.localModels.contains(model) {
-                        modelManagementState.localModels.append(model)
+                        modelManagementState.localModels = downloadedModels
+                        
                     }
                 }
             } catch {

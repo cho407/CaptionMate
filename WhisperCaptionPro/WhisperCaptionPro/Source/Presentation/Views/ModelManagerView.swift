@@ -43,6 +43,7 @@ struct ModelManagerView: View {
                     .bold()
                 Spacer()
                 Button("닫기") {
+                    viewModel.fetchModels()
                     dismiss()
                 }
                 .buttonStyle(.bordered)
@@ -138,12 +139,14 @@ struct ModelManagerView: View {
             if allModels.isEmpty {
                 // 모델이 없는 경우 로딩 표시
                 VStack {
+                    Spacer()
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
                     Text("모델 목록을 불러오는 중...")
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .padding()
+                    Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .onAppear {
@@ -165,7 +168,7 @@ struct ModelManagerView: View {
                                 ForEach(filteredLocalModels, id: \.self) { model in
                                     ModelRowView(model: model, viewModel: viewModel)
                                         .padding(.horizontal)
-                                        .background(Color.gray.opacity(0.1))
+                                        .background(Color.blue.opacity(0.05))
                                         .cornerRadius(8)
                                 }
                             }
@@ -183,7 +186,7 @@ struct ModelManagerView: View {
                                 ForEach(filteredRemoteModels, id: \.self) { model in
                                     ModelRowView(model: model, viewModel: viewModel)
                                         .padding(.horizontal)
-                                        .background(Color.blue.opacity(0.05))
+                                        .background(Color.gray.opacity(0.1))
                                         .cornerRadius(8)
                                 }
                             }
@@ -214,17 +217,29 @@ struct ModelRowView: View {
             // 모델 이름 행
             HStack {
                 VStack(alignment: .leading) {
-                    Text(viewModel.modelManagementState.displayName(for: model))
-                        .font(.headline)
+                    HStack {
+                        if viewModel.selectedModel == model && viewModel.modelManagementState.modelState == .loaded {
+                            Image(systemName: "circle.fill")
+                                .foregroundColor(.green)
+                                .font(.callout)
+                                .symbolEffect(.pulse)
+                        } else if viewModel.modelManagementState.localModels.contains(model) {
+                            Image(systemName: "circle.fill")
+                                .foregroundColor(.ultraBrightGray)
+                                .font(.callout)
+                        }
+                        Text(viewModel.modelManagementState.displayName(for: model))
+                            .font(.headline)
+                    }
                     
                     // 모델 크기 정보
                     Text(viewModel.modelManagementState.formattedModelSize(for: model))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                
+
                 Spacer()
-                
+
                 // 모델 상태에 따른 버튼 표시
                 modelActionButton(model: model)
             }
@@ -278,15 +293,27 @@ struct ModelRowView: View {
     private func modelActionButton(model: String) -> some View {
         if viewModel.modelManagementState.localModels.contains(model) {
             // 로컬에 있는 모델 - 삭제 버튼 표시
-            Button(action: {
-                viewModel.deleteModel(model)
-            }) {
-                Image(systemName: "trash")
-                    .foregroundColor(.red)
+            if (viewModel.selectedModel == model) && (viewModel.modelManagementState.modelState == .loaded) {
+                Button {
+                    Task {
+                        await viewModel.releaseModel()
+                    }
+                } label: {
+                    Text("모델 해제")
+                        .foregroundColor(.red)
+                }
+                .help("모델을 삭제하시려면 해제 해야합니다")
+            } else {
+                Button(action: {
+                    viewModel.deleteModel(model)
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(BorderlessButtonStyle())
+                .help("모델 삭제")
             }
-            .buttonStyle(BorderlessButtonStyle())
-            .disabled(viewModel.selectedModel == model) // 현재 선택된 모델이면 비활성화
-            .help(viewModel.selectedModel == model ? "현재 사용 중인 모델은 삭제할 수 없습니다" : "모델 삭제")
+
         } else if viewModel.modelManagementState.isDownloading(model: model) {
             // 다운로드 중 - 상태 아이콘
             Image(systemName: "arrow.down.circle")
