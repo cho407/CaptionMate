@@ -10,7 +10,7 @@ import Combine
 import CoreML
 import SwiftUI
 import WhisperKit
-import Hub
+
 // MARK: - ContentViewModel
 
 @MainActor
@@ -255,7 +255,7 @@ class ContentViewModel: ObservableObject {
                 }
                 
                 print("업데이트된 사용 가능 모델 수: \(modelManagementState.availableModels.count)")
-                objectWillChange.send() // UI 갱신
+                objectWillChange.send() // UI 갱신 강제
             }
         }
     }
@@ -423,7 +423,7 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - 모델 다운로드 관리
     
-    /// 모델 다운로드 시작 - URLSession과 RESTful API 사용
+    /// 모델 다운로드 시작
     func downloadModel(_ model: String) {
         // 이미 다운로드 중이거나 로컬에 있는 모델인지 확인
         guard !modelManagementState.currentDownloadingModels.contains(model),
@@ -444,147 +444,144 @@ class ContentViewModel: ObservableObject {
         modelManagementState.downloadProgress[model] = 0.0
         modelManagementState.downloadErrors.removeValue(forKey: model)
         
-        // 다운로드 작업 생성
+        // 기존 다운로드 Task가 있다면 취소
+        if let existingTask = modelManagementState.downloadTasks[model] {
+            existingTask.cancel()
+            modelManagementState.downloadTasks[model] = nil
+        }
+        
+        // 이미 부분적으로 다운로드된 폴더가 있다면 삭제
+        let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
+        if FileManager.default.fileExists(atPath: modelFolder.path) {
+            do {
+                try FileManager.default.removeItem(at: modelFolder)
+                print("기존 부분 다운로드 폴더 삭제: \(model)")
+            } catch {
+                print("기존 폴더 삭제 실패: \(error.localizedDescription)")
+            }
+        }
+        
+        // 새 다운로드 작업 생성
         let task = Task {
             do {
-                // 예상 크기 정보 가져오기
+                // 다운로드 진행 전 크기 업데이트
                 let estimatedSize = modelManagementState.modelSizes[model] ?? 0
                 
-                // 1. 모델 파일 목록 가져오기
-                print("모델 파일 목록 검색 시작: \(model)")
-                let fileList = try await getModelFileList(modelName: model)
-                
-                // 2. 모델 폴더 생성
-                guard let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-                    throw NSError(domain: "WhisperCaptionPro", code: 1001, userInfo: [NSLocalizedDescriptionKey: "문서 디렉토리를 찾을 수 없습니다."])
-                }
-                
-                let modelStoragePath = documentsDir.appendingPathComponent(modelManagementState.modelStorage)
-                let modelDir = modelStoragePath.appendingPathComponent(model)
-                
-                // 이미 존재하면 삭제
-                if FileManager.default.fileExists(atPath: modelDir.path) {
-                    try FileManager.default.removeItem(at: modelDir)
-                }
-                
-                // 모델 디렉토리 생성
-                try FileManager.default.createDirectory(at: modelDir, withIntermediateDirectories: true)
-                
-                // 3. 각 파일 다운로드
-                let totalFiles = fileList.count
-                var downloadedFiles = 0
-                var totalBytes: Int64 = 0
-                var downloadedBytes: Int64 = 0
-                
-                // 모든 파일의 크기를 합산
-                for fileInfo in fileList {
-                    totalBytes += fileInfo.size
-                }
-                
-                // 다운로드 작업 진행
-                for (index, fileInfo) in fileList.enumerated() {
-                    if Task.isCancelled {
-                        throw CancellationError()
-                    }
-                    
-                    // 파일 경로 생성
-                    let filePath = modelDir.appendingPathComponent(fileInfo.path)
-                    
-                    // 현재 다운로드 중인 파일 정보 로깅
-                    print("다운로드 중: [\(index+1)/\(fileList.count)] \(fileInfo.path) (\(ByteCountFormatter.string(fromByteCount: fileInfo.size, countStyle: .file)))")
-                    
-                    // 파일 다운로드
-                    try await downloadFile(
-                        url: fileInfo.downloadUrl,
-                        to: filePath,
-                        progressHandler: { bytesDownloaded in
-                            // 현재 파일의 진행률과 전체 진행률 계산
-                            let fileProgressValue = min(1.0, Float(bytesDownloaded) / Float(fileInfo.size))
-                            
-                            // 이전까지 완료된 파일들의 크기 합계 (현재 파일 제외)
-                            let completedFilesBytes = downloadedBytes
-                            
-                            // 현재 진행 중인 파일의 다운로드된 바이트
-                            let currentFileBytes = bytesDownloaded
-                            
-                            // 전체 진행률 계산
-                            let overallProgress = Float(completedFilesBytes + currentFileBytes) / Float(totalBytes)
-                            
-                            // UI 업데이트는 메인 스레드에서, 과도한 업데이트 방지를 위해 0.5% 단위로 업데이트
-                            let roundedProgress = (overallProgress * 200).rounded() / 200 // 0.5% 단위 반올림
-                            
-                            Task { @MainActor in
-                                if self.modelManagementState.downloadProgress[model] != roundedProgress {
-                                    self.modelManagementState.downloadProgress[model] = roundedProgress
-                                    self.objectWillChange.send()
+                // 다운로드 작업 시작 (취소 가능한 작업으로 구성)
+                let downloadTask = Task {
+                    do {
+                        // 다운로드 시작
+                        let modelFolder = try await WhisperKit.download(
+                            variant: model,
+                            from: repoName,
+                            progressCallback: { [weak self] progress in
+                                // 메인 스레드에서 진행 상황 업데이트
+                                guard let self = self else { return }
+                                DispatchQueue.main.async {
+                                    let progressValue = Float(progress.fractionCompleted)
+                                    self.modelManagementState.downloadProgress[model] = progressValue
+                                    
+                                    // 예상 다운로드된 크기 계산 및 상태 업데이트
+                                    _ = Int64(Double(estimatedSize) * Double(progressValue)) // 정보 목적으로만 계산
+                                    self.objectWillChange.send() // UI 갱신 알림
                                 }
                             }
-                        }
-                    )
-                    
-                    // 이 파일 다운로드 완료 - 다운로드된 바이트 누적
-                    downloadedFiles += 1
-                    downloadedBytes += fileInfo.size
-                }
-                
-                // 다운로드 완료 처리
-                await MainActor.run {
-                    if !self.modelManagementState.localModels.contains(model) {
-                        self.modelManagementState.localModels.append(model)
-                    }
-                    
-                    // 실제 다운로드된 모델의 크기 계산
-                    let actualSize = calculateFolderSize(url: modelDir)
-                    self.modelManagementState.modelSizes[model] = actualSize
-                    
-                    // 다운로드 상태 업데이트
-                    self.modelManagementState.currentDownloadingModels.remove(model)
-                    self.modelManagementState.downloadProgress[model] = 1.0 // 100% 완료
-                    self.modelManagementState.downloadTasks[model] = nil
-                    
-                    // 모든 다운로드가 완료되었는지 확인
-                    if self.modelManagementState.currentDownloadingModels.isEmpty {
-                        self.modelManagementState.isDownloading = false
-                    }
-                    
-                    print("모델 다운로드 완료: \(model), 크기: \(ByteCountFormatter.string(fromByteCount: actualSize, countStyle: .file))")
-                }
-            } catch {
-                // 취소든 다른 오류든 모두 여기서 처리
-                print("모델 다운로드 \(error is CancellationError ? "취소" : "오류") (\(model)): \(error.localizedDescription)")
-                
-                await MainActor.run {
-                    // 오류 상태 업데이트 (취소는 오류 메시지로 표시하지 않음)
-                    if !(error is CancellationError) {
-                        self.modelManagementState.downloadErrors[model] = error.localizedDescription
-                    }
-                    
-                    // 상태 업데이트
-                    self.modelManagementState.currentDownloadingModels.remove(model)
-                    self.modelManagementState.downloadProgress[model] = nil
-                    self.modelManagementState.downloadTasks[model] = nil
-                    
-                    // 모든 다운로드가 완료되었는지 확인
-                    if self.modelManagementState.currentDownloadingModels.isEmpty {
-                        self.modelManagementState.isDownloading = false
-                    }
-                    
-                    // 부분 다운로드 파일 정리
-                    if let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-                        let modelDir = documentsDir.appendingPathComponent(self.modelManagementState.modelStorage)
-                                                  .appendingPathComponent(model)
+                        )
                         
-                        if FileManager.default.fileExists(atPath: modelDir.path) {
-                            try? FileManager.default.removeItem(at: modelDir)
-                            print("취소된 모델 파일 삭제: \(model)")
+                        // 작업이 취소되었는지 확인
+                        if Task.isCancelled {
+                            throw CancellationError()
                         }
+                        
+                        // 다운로드 완료 처리
+                        await MainActor.run { [weak self] in
+                            guard let self = self else { return }
+                            
+                            if !self.modelManagementState.localModels.contains(model) {
+                                self.modelManagementState.localModels.append(model)
+                            }
+                            
+                            // 실제 다운로드된 모델의 크기 계산
+                            let actualSize = calculateFolderSize(url: modelFolder)
+                            self.modelManagementState.modelSizes[model] = actualSize
+                            
+                            // 다운로드 상태 업데이트
+                            self.modelManagementState.currentDownloadingModels.remove(model)
+                            self.modelManagementState.downloadProgress[model] = 1.0 // 100% 완료
+                            self.modelManagementState.downloadTasks[model] = nil
+                            
+                            // 모든 다운로드가 완료되었는지 확인
+                            if self.modelManagementState.currentDownloadingModels.isEmpty {
+                                self.modelManagementState.isDownloading = false
+                            }
+                            
+                            print("모델 다운로드 완료: \(model), 크기: \(ByteCountFormatter.string(fromByteCount: actualSize, countStyle: .file))")
+                        }
+                    } catch is CancellationError {
+                        // 취소된 경우 부분 다운로드 파일 정리
+                        await cleanupPartialDownload(model)
+                        print("모델 다운로드 취소됨: \(model)")
+                    } catch {
+                        // 오류 발생 시 (취소가 아닌 경우)
+                        print("모델 다운로드 오류 (\(model)): \(error.localizedDescription)")
+                        
+                        await MainActor.run { [weak self] in
+                            guard let self = self else { return }
+                            // 오류 상태 업데이트
+                            self.modelManagementState.downloadErrors[model] = error.localizedDescription
+                            self.modelManagementState.currentDownloadingModels.remove(model)
+                            self.modelManagementState.downloadProgress[model] = nil
+                            self.modelManagementState.downloadTasks[model] = nil
+                            
+                            // 모든 다운로드가 완료되었는지 확인
+                            if self.modelManagementState.currentDownloadingModels.isEmpty {
+                                self.modelManagementState.isDownloading = false
+                            }
+                        }
+                        
+                        // 오류 발생 시에도 부분 다운로드 파일 정리
+                        await cleanupPartialDownload(model)
                     }
                 }
+                
+                // 최상위 Task에서 다운로드 작업 완료까지 대기
+                try await downloadTask.value
+            } catch {
+                print("모델 다운로드 메인 태스크 오류: \(error.localizedDescription)")
+                await cleanupPartialDownload(model)
             }
         }
         
         // 작업 참조 저장
         modelManagementState.downloadTasks[model] = task
+    }
+    
+    /// 부분 다운로드 파일 정리 헬퍼 메서드
+    private func cleanupPartialDownload(_ model: String) async {
+        await MainActor.run { [weak self] in
+            guard let self = self else { return }
+            
+            // 상태 업데이트
+            self.modelManagementState.downloadProgress[model] = nil
+            self.modelManagementState.currentDownloadingModels.remove(model)
+            self.modelManagementState.downloadTasks[model] = nil
+            
+            // 모든 다운로드가 취소되었는지 확인
+            if self.modelManagementState.currentDownloadingModels.isEmpty {
+                self.modelManagementState.isDownloading = false
+            }
+        }
+        
+        // 부분적으로 다운로드된 파일 삭제
+        let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
+        if FileManager.default.fileExists(atPath: modelFolder.path) {
+            do {
+                try FileManager.default.removeItem(at: modelFolder)
+                print("부분 다운로드 파일 삭제 완료: \(model)")
+            } catch {
+                print("부분 다운로드 파일 삭제 실패: \(error.localizedDescription)")
+            }
+        }
     }
     
     /// 다운로드 취소
@@ -594,32 +591,26 @@ class ContentViewModel: ObservableObject {
             return
         }
         
-        print("모델 다운로드 취소 시작: \(model)")
-        
-        // 취소 중임을 UI에 즉시 반영
-        modelManagementState.downloadProgress[model] = -1.0 // 특수값으로 취소 중 표시
-        objectWillChange.send() // UI 즉시 갱신
+        print("다운로드 취소 요청: \(model)")
         
         // 작업 취소
         task.cancel()
         
-        // UI 및 상태 업데이트 (취소 동작은 별도 스레드에서 실행)
+        // UI 즉시 업데이트
         Task { @MainActor in
-            // 약간의 지연을 두고 상태 업데이트 (취소 작업 완료 대기)
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3초
-            
-            // 상태 업데이트
-            self.modelManagementState.downloadTasks[model] = nil
-            self.modelManagementState.downloadProgress[model] = nil
-            self.modelManagementState.currentDownloadingModels.remove(model)
+            modelManagementState.downloadProgress[model] = nil
+            modelManagementState.currentDownloadingModels.remove(model)
+            modelManagementState.downloadTasks[model] = nil
             
             // 모든 다운로드가 취소되었는지 확인
-            if self.modelManagementState.currentDownloadingModels.isEmpty {
-                self.modelManagementState.isDownloading = false
+            if modelManagementState.currentDownloadingModels.isEmpty {
+                modelManagementState.isDownloading = false
             }
-            
-            print("모델 다운로드 취소 완료: \(model)")
-            self.objectWillChange.send() // UI 갱신
+        }
+        
+        // 부분 다운로드 파일 비동기 정리 시작
+        Task {
+            await cleanupPartialDownload(model)
         }
     }
     
@@ -1294,108 +1285,4 @@ class ContentViewModel: ObservableObject {
             }
         }
     }
-    
-    // MARK: - HuggingFace API 통신 헬퍼 메서드
-    
-    /// 모델 파일 정보 구조체
-    struct ModelFileInfo {
-        let path: String
-        let size: Int64
-        let downloadUrl: URL
-    }
-    
-    /// HuggingFace에서 모델 폴더 내 모든 파일 목록을 재귀적으로 가져오기
-    private func getModelFileList(modelName: String) async throws -> [ModelFileInfo] {
-        return try await fetchFilesRecursively(at: modelName)
-    }
-
-    /// 경로에 있는 파일 및 서브디렉토리를 재귀적으로 조회
-    private func fetchFilesRecursively(at path: String) async throws -> [ModelFileInfo] {
-        print("Fetching files at path: \(path)")
-        let urlString = "https://huggingface.co/api/models/\(repoName)/tree/main/\(path)"
-        guard let url = URL(string: urlString) else {
-            throw NSError(domain: "WhisperCaptionPro", code: 1000, userInfo: [NSLocalizedDescriptionKey: "유효하지 않은 URL: \(urlString)"])
-        }
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.addValue("application/json", forHTTPHeaderField: "Accept")
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw NSError(domain: "WhisperCaptionPro", code: 1002, userInfo: [NSLocalizedDescriptionKey: "API 응답 오류 코드: \((response as? HTTPURLResponse)?.statusCode ?? -1)"])
-        }
-        guard let items = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
-            throw NSError(domain: "WhisperCaptionPro", code: 1003, userInfo: [NSLocalizedDescriptionKey: "API 응답 파싱 실패"])
-        }
-
-        var fileInfos: [ModelFileInfo] = []
-        for item in items {
-            guard let type = item["type"] as? String,
-                  let fullPath = item["path"] as? String else { continue }
-
-            if type == "file" {
-                let size = item["size"] as? Int64 ?? 0
-                let downloadUrlString = "https://huggingface.co/\(repoName)/resolve/main/\(fullPath)"
-                guard let downloadUrl = URL(string: downloadUrlString) else { continue }
-                // 상대 경로 생성: 최상위 디렉터리(모델명) 제거
-                let components = fullPath.split(separator: "/").map(String.init)
-                let relativePath: String
-                if components.count > 1 {
-                    relativePath = components.dropFirst().joined(separator: "/")
-                } else {
-                    relativePath = fullPath
-                }
-                fileInfos.append(ModelFileInfo(path: relativePath, size: size, downloadUrl: downloadUrl))
-                print("파일 발견: \(relativePath)")
-            } else if type == "directory" {
-                // 서브디렉토리가 있으면 재귀 호출
-                let subPath = fullPath
-                let nestedFiles = try await fetchFilesRecursively(at: subPath)
-                fileInfos.append(contentsOf: nestedFiles)
-            }
-        }
-
-        if fileInfos.isEmpty {
-            print("경로 \(path)에서 파일을 찾을 수 없음.")
-        }
-        return fileInfos
-    }
-    
-    /// 단일 파일 다운로드 함수 (최적화된 버전)
-    private func downloadFile(
-        url: URL,
-        to destination: URL,
-        progressHandler: @escaping (Int64) -> Void
-    ) async throws {
-        // URLSession 다운로드 태스크 - 더 효율적인 다운로드 방식
-        let (tempURL, response) = try await URLSession.shared.download(from: url)
-        
-        // 응답 확인
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            throw NSError(domain: "WhisperCaptionPro", code: 1005, userInfo: [NSLocalizedDescriptionKey: "파일 다운로드 응답 오류"])
-        }
-        
-        // 취소 확인
-        try Task.checkCancellation()
-        
-        // 디렉토리가 없으면 생성
-        let directoryURL = destination.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-        
-        // 기존 파일이 있으면 제거
-        if FileManager.default.fileExists(atPath: destination.path) {
-            try FileManager.default.removeItem(at: destination)
-        }
-        
-        // 다운로드된 임시 파일을 최종 위치로 이동
-        try FileManager.default.moveItem(at: tempURL, to: destination)
-        
-        // 파일 크기 확인하여 진행 상황 업데이트
-        let fileAttributes = try FileManager.default.attributesOfItem(atPath: destination.path)
-        if let fileSize = fileAttributes[.size] as? Int64 {
-            progressHandler(fileSize)
-        }
-    }
 }
-
