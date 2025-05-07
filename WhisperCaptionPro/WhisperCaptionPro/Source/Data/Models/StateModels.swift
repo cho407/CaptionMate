@@ -82,6 +82,8 @@ struct ModelManagementState {
     // UI 상태
     var modelFilter: String = ""
     
+    var folder: URL?
+    
     // 모델 정보 포맷 헬퍼 함수들
     func formattedModelSize(for model: String) -> String {
         guard let size = modelSizes[model] else { return "알 수 없음" }

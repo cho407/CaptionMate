@@ -183,7 +183,23 @@ class ContentViewModel: ObservableObject {
             modelManagementState.localModelPath = modelPath
             
             do {
-                let downloadedModels = try FileManager.default.contentsOfDirectory(atPath: modelPath)
+                let allFiles = try FileManager.default.contentsOfDirectory(atPath: modelPath)
+                // .DS_Store 및 기타 시스템 파일 필터링 + 디렉토리만 포함
+                let fileManager = FileManager.default
+                let downloadedModels = allFiles.filter { fileName in
+                    // 숨겨진 파일 제외
+                    if fileName.hasPrefix(".") {
+                        return false
+                    }
+                    
+                    // 디렉토리인지 확인
+                    let fullPath = URL(fileURLWithPath: modelPath).appendingPathComponent(fileName).path
+                    var isDir: ObjCBool = false
+                    if fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) {
+                        return isDir.boolValue
+                    }
+                    return false
+                }
                 print("로컬 모델 목록: \(downloadedModels)")
                 
                 // 로컬 모델 및 크기 정보 갱신
@@ -297,6 +313,9 @@ class ContentViewModel: ObservableObject {
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
         
+        // 로딩 시작 시 진행률 초기화
+        modelManagementState.loadingProgressValue = 0.0
+        
         // 이미 로드된 모델이 있으면 해제
         whisperKit = nil
         
@@ -310,47 +329,60 @@ class ContentViewModel: ObservableObject {
             whisperKit = try await WhisperKit(config)
             guard let whisperKit = whisperKit else { return }
             
-            var folder: URL?
-            
             // 이미 다운로드된 모델이고 재다운로드를 요청하지 않은 경우
             if modelManagementState.localModels.contains(model) && !redownload {
-                folder = URL(fileURLWithPath: modelManagementState.localModelPath)
+                modelManagementState.folder = URL(fileURLWithPath: modelManagementState.localModelPath)
                     .appendingPathComponent(model)
+                print("모델 path: \(modelManagementState.folder)")
+                
+                // 다운로드 단계 건너뛰기 - 진행률 20%로 설정
+                await MainActor.run {
+                    modelManagementState.loadingProgressValue = 0.2
+                    modelManagementState.modelState = .downloaded
+                }
             } else {
-                // 모델 다운로드 진행
-                folder = try await WhisperKit.download(
+                // 모델 다운로드 진행 - 진행률 0~20%
+                await MainActor.run {
+                    modelManagementState.modelState = .downloading
+                }
+                
+                modelManagementState.folder = try await WhisperKit.download(
                     variant: model,
                     from: repoName,
                     progressCallback: { progress in
                         DispatchQueue.main.async {
-                            self.modelManagementState.loadingProgressValue = Float(progress.fractionCompleted) * self.modelManagementState.specializationProgressRatio
-                            self.modelManagementState.modelState = .downloading
+                            // 다운로드는 전체 진행의 0~20%
+                            self.modelManagementState.loadingProgressValue = Float(progress.fractionCompleted) * 0.2
                         }
                     }
                 )
+                
+                await MainActor.run {
+                    modelManagementState.loadingProgressValue = 0.2
+                    modelManagementState.modelState = .downloaded
+                }
             }
             
-            await MainActor.run {
-                modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
-                modelManagementState.modelState = .downloaded
-            }
-            
-            if let modelFolder = folder {
+            if let modelFolder = modelManagementState.folder {
                 whisperKit.modelFolder = modelFolder
                 await MainActor.run {
-                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
-                    modelManagementState.modelState = .prewarming
+                    // 로딩 시작 - 진행률 20% -> 30%로 증가
+                    modelManagementState.loadingProgressValue = 0.3
+                    modelManagementState.modelState = .loading // prewarming 대신 loading 상태 사용
                 }
                 
+                // 커스텀 프로그레스 바 업데이트 - 30%에서 90%까지 부드럽게 증가
                 let progressBarTask = Task {
-                    await updateProgressBar(targetProgress: 0.9, maxTime: 240)
+                    // 시작 진행률: 30%, 목표 진행률: 90%, 최대 소요 시간: 180초
+                    await updateProgressBar(startProgress: 0.3, targetProgress: 0.9, maxTime: 10)
                 }
                 
                 do {
-                    try await whisperKit.prewarmModels()
+                    // prewarmModels() 호출을 제거하고 바로 loadModels() 호출
+                    try await whisperKit.loadModels()
                     progressBarTask.cancel()
                 } catch {
-                    print("Error prewarming models, retrying: \(error.localizedDescription)")
+                    print("Error loading models, retrying: \(error.localizedDescription)")
                     progressBarTask.cancel()
                     if !redownload {
                         loadModel(model, redownload: true)
@@ -364,18 +396,9 @@ class ContentViewModel: ObservableObject {
                 }
                 
                 await MainActor.run {
-                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio + 0.9 * (1 - modelManagementState.specializationProgressRatio)
+                    // 로드 완료 시 진행률 90% 고정
+                    modelManagementState.loadingProgressValue = 0.9
                     modelManagementState.modelState = whisperKit.modelState
-                }
-                
-                do {
-                    try await whisperKit.loadModels()
-                } catch {
-                    print("Error loading models: \(error)")
-                    await MainActor.run {
-                        modelManagementState.modelState = .unloaded
-                    }
-                    return
                 }
                 
                 await MainActor.run {
@@ -388,9 +411,38 @@ class ContentViewModel: ObservableObject {
                     }
                     modelManagementState.availableLanguages = Constants.languages.map { $0.key }
                         .sorted()
+                    
+                    // 최종 완료 시 진행률 100%
                     modelManagementState.loadingProgressValue = 1.0
                     modelManagementState.modelState = whisperKit.modelState
+                    print("모델 로드 완료: \(whisperKit.modelState)")
                 }
+            }
+        }
+    }
+    
+    /// 진행률 업데이트 - 시작 진행률부터 목표 진행률까지 자연스럽게 증가
+    func updateProgressBar(startProgress: Float = 0.0, targetProgress: Float, maxTime: TimeInterval) async {
+        let progressRange = targetProgress - startProgress
+        let decayConstant = -log(1 - 0.95) / Float(maxTime) // 95% 완료에 도달하는 시간 기준
+        let startTime = Date()
+        
+        while true {
+            let elapsedTime = Date().timeIntervalSince(startTime)
+            let decayFactor = exp(-decayConstant * Float(elapsedTime))
+            let progressIncrement = progressRange * (1 - decayFactor)
+            let currentProgress = startProgress + progressIncrement
+            
+            await MainActor.run {
+                modelManagementState.loadingProgressValue = min(currentProgress, targetProgress)
+            }
+            
+            if currentProgress >= targetProgress { break }
+            
+            do {
+                try await Task.sleep(nanoseconds: 100_000_000) // 0.1초 간격으로 업데이트
+            } catch {
+                break
             }
         }
     }
@@ -611,32 +663,6 @@ class ContentViewModel: ObservableObject {
         // 부분 다운로드 파일 비동기 정리 시작
         Task {
             await cleanupPartialDownload(model)
-        }
-    }
-    
-    /// 진행률 업데이트
-    func updateProgressBar(targetProgress: Float, maxTime: TimeInterval) async {
-        let initialProgress = modelManagementState.loadingProgressValue
-        let decayConstant = -log(1 - targetProgress) / Float(maxTime)
-        let startTime = Date()
-        
-        while true {
-            let elapsedTime = Date().timeIntervalSince(startTime)
-            let decayFactor = exp(-decayConstant * Float(elapsedTime))
-            let progressIncrement = (1 - initialProgress) * (1 - decayFactor)
-            let currentProgress = initialProgress + progressIncrement
-            
-            await MainActor.run {
-                modelManagementState.loadingProgressValue = currentProgress
-            }
-            
-            if currentProgress >= targetProgress { break }
-            
-            do {
-                try await Task.sleep(nanoseconds: 100_000_000)
-            } catch {
-                break
-            }
         }
     }
     

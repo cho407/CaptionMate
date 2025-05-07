@@ -266,18 +266,6 @@ struct ModelRowView: View {
                 }
                 .padding(.top, 4)
             }
-            
-            // 오류 발생 시 표시
-            if let errorMessage = viewModel.modelManagementState.downloadErrors[model] {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text("오류: \(errorMessage)")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                }
-                .padding(.top, 2)
-            }
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())

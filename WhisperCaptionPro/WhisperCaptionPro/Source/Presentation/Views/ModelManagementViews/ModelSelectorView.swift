@@ -71,6 +71,7 @@ struct ModelSelectorView: View {
                         .padding(.vertical, 4)
                         .cornerRadius(6)
                     }
+                    .disabled(viewModel.modelManagementState.modelState == .loading)
                     
                 } else {
                     HStack {
@@ -104,22 +105,23 @@ struct ModelSelectorView: View {
                             value: viewModel.modelManagementState.loadingProgressValue,
                             total: 1.0
                         )
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .frame(maxWidth: .infinity)
+                        .progressViewStyle(.linear)
+                        
 
                         Text(String(
                             format: "%.1f%%",
                             viewModel.modelManagementState.loadingProgressValue * 100
                         ))
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(.middleDarkGray)
+                        .monospacedDigit()
+                        
                     }
-                    if viewModel.modelManagementState.modelState == .prewarming {
-                        Text(
-                            "모델 최적화 중... \(viewModel.selectedModel)\n첫 로드 시 몇 분 정도 소요될 수 있습니다."
-                        )
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                    if viewModel.modelManagementState.modelState == .loading {
+                        // 로딩 텍스트와 점 애니메이션만 표시
+                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 로드 중")
+                            .font(.callout)
+                            .foregroundColor(.middleDarkGray)
                     }
                 }
             }
