@@ -8,22 +8,21 @@
 import SwiftUI
 import Combine
 
-// 간단한 로딩 점 애니메이션 뷰
-struct LoadingDotsView: View {
+// 로딩 점 애니메이션을 위한 ViewModifier
+struct LoadingDotsModifier: ViewModifier {
     let text: String
     @State private var dotsCount = 0
+    @State private var timer: AnyCancellable?
+    private let id = UUID() // 각 인스턴스를 구분하기 위한 고유 ID
     
-    // 타이머 참조 보관용
-    @State private var timer: Timer.TimerPublisher = Timer.publish(every: 0.3, on: .main, in: .common)
-    @State private var timerCancellable: Cancellable? = nil
-    
-    var body: some View {
+    func body(content: Content) -> some View {
         HStack(spacing: 0) {
             Text(text)
             
             // 점 애니메이션
             Text(dotString())
                 .frame(width: 30, alignment: .leading)
+                .id("dots-\(id)") // 고유 ID로 식별
         }
         .onAppear {
             startTimer()
@@ -44,20 +43,54 @@ struct LoadingDotsView: View {
         }
     }
     
-    // 타이머 시작
+    // 타이머 시작 - Combine 사용
     private func startTimer() {
+        stopTimer() // 기존 타이머 정리
+        
         timer = Timer.publish(every: 0.3, on: .main, in: .common)
-        timerCancellable = timer.autoconnect().sink { _ in
-            dotsCount = (dotsCount + 1) % 4
-        }
+            .autoconnect()
+            .sink { _ in
+                dotsCount = (dotsCount + 1) % 4
+            }
     }
     
     // 타이머 정지
     private func stopTimer() {
-        timerCancellable?.cancel()
-        timerCancellable = nil
+        timer?.cancel()
+        timer = nil
     }
 }
+
+// 뷰에 로딩 점 애니메이션을 추가하는 확장
+extension View {
+    func withLoadingDots(_ text: String) -> some View {
+        modifier(LoadingDotsModifier(text: text))
+    }
+}
+
+// 기존 LoadingDotsView 유지 (하위 호환성)
+struct LoadingDotsView: View {
+    let text: String
+    
+    var body: some View {
+        EmptyView()
+            .withLoadingDots(text)
+    }
+}
+
+// 더 깔끔한 사용을 위한 String 확장
+extension String {
+    func withLoadingDots() -> some View {
+        EmptyView().withLoadingDots(self)
+    }
+}
+
 #Preview {
-    LoadingDotsView(text: "")
+    VStack(spacing: 20) {
+        LoadingDotsView(text: "기존 방식 로딩 중")
+        
+        Text("").withLoadingDots("새로운 방식 로딩 중")
+        
+        "직접 문자열 로딩 중".withLoadingDots()
+    }
 }

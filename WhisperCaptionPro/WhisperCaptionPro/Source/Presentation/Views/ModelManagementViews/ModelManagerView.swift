@@ -60,6 +60,39 @@ struct ModelManagerView: View {
             }
             .padding(.horizontal)
             
+            // 로컬 모델 / 다운로드 가능 모델 섹션 분리
+            let allModels = viewModel.modelManagementState.availableModels
+            let localModels = allModels.filter { viewModel.modelManagementState.localModels.contains($0) }
+            let remoteModels = allModels.filter { !viewModel.modelManagementState.localModels.contains($0) }
+            
+            // 필터링된 모델 목록
+            let filteredLocalModels = localModels.filter { model in
+                let matchesFilter = searchText.isEmpty ||
+                model.lowercased().contains(searchText.lowercased())
+                
+                let notFiltered = !filterWords.contains { filter in
+                    model.lowercased().contains(filter.lowercased())
+                }
+                
+                return matchesFilter && notFiltered
+            }
+            
+            let filteredRemoteModels = remoteModels.filter { model in
+                let matchesFilter = searchText.isEmpty ||
+                model.lowercased().contains(searchText.lowercased())
+                
+                let notFiltered = !filterWords.contains { filter in
+                    model.lowercased().contains(filter.lowercased())
+                }
+                
+                return matchesFilter && notFiltered
+            }
+            
+            // 다운로드 가능한 모델의 총 크기 계산
+            let totalRemoteSize = filteredRemoteModels.reduce(Int64(0)) { total, model in
+                total + (viewModel.modelManagementState.modelSizes[model] ?? 0)
+            }
+            
             // 디버그 정보 표시
             VStack(alignment: .leading) {
                 Text("모델 정보")
@@ -67,9 +100,9 @@ struct ModelManagerView: View {
                     .padding(.top, 2)
                 
                 HStack {
-                    Text("전체 모델 수: \(viewModel.modelManagementState.availableModels.count)")
+                    Text("전체 모델 수: \(filteredLocalModels.count + filteredRemoteModels.count)")
                     Spacer()
-                    Text("다운로드된 모델 수: \(viewModel.modelManagementState.localModels.count)")
+                    Text("다운로드된 모델 수: \(filteredLocalModels.count)")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -106,34 +139,6 @@ struct ModelManagerView: View {
                 }
                 .padding(.horizontal)
                 .padding(.top, 4)
-            }
-            
-            // 로컬 모델 / 다운로드 가능 모델 섹션 분리
-            let allModels = viewModel.modelManagementState.availableModels
-            let localModels = allModels.filter { viewModel.modelManagementState.localModels.contains($0) }
-            let remoteModels = allModels.filter { !viewModel.modelManagementState.localModels.contains($0) }
-            
-            // 필터링된 모델 목록
-            let filteredLocalModels = localModels.filter { model in
-                let matchesFilter = searchText.isEmpty || 
-                    model.lowercased().contains(searchText.lowercased())
-                
-                let notFiltered = !filterWords.contains { filter in
-                    model.lowercased().contains(filter.lowercased())
-                }
-                
-                return matchesFilter && notFiltered
-            }
-            
-            let filteredRemoteModels = remoteModels.filter { model in
-                let matchesFilter = searchText.isEmpty || 
-                    model.lowercased().contains(searchText.lowercased())
-                
-                let notFiltered = !filterWords.contains { filter in
-                    model.lowercased().contains(filter.lowercased())
-                }
-                
-                return matchesFilter && notFiltered
             }
             
             if allModels.isEmpty {
@@ -177,10 +182,15 @@ struct ModelManagerView: View {
                         
                         // 다운로드 가능한 모델 섹션
                         if !filteredRemoteModels.isEmpty {
-                            Text("다운로드 가능한 모델")
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
+                            HStack {
+                                Text("다운로드 가능한 모델")
+                                    .font(.headline)
+                                Text("(총 \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file)))")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 8)
                             
                             VStack(spacing: 8) {
                                 ForEach(filteredRemoteModels, id: \.self) { model in
@@ -231,15 +241,20 @@ struct ModelRowView: View {
                         Text(viewModel.modelManagementState.displayName(for: model))
                             .font(.headline)
                     }
-                    
-                    // 모델 크기 정보
-                    Text(viewModel.modelManagementState.formattedModelSize(for: model))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if viewModel.modelManagementState.isDownloading(model: model){
+                        LoadingDotsView(text: "다운로드중")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else{
+                        // 모델 크기 정보
+                        Text(viewModel.modelManagementState.formattedModelSize(for: model))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
-
+                
                 Spacer()
-
+                
                 // 모델 상태에 따른 버튼 표시
                 modelActionButton(model: model)
             }
@@ -280,8 +295,9 @@ struct ModelRowView: View {
     @ViewBuilder
     private func modelActionButton(model: String) -> some View {
         if viewModel.modelManagementState.localModels.contains(model) {
-            // 로컬에 있는 모델 - 삭제 버튼 표시
+            // 로컬에 있는 모델 - 상태에 따라 다른 버튼 표시
             if (viewModel.selectedModel == model) && (viewModel.modelManagementState.modelState == .loaded) {
+                // 현재 로드된 모델 - 해제 버튼
                 Button {
                     Task {
                         await viewModel.releaseModel()
@@ -291,7 +307,29 @@ struct ModelRowView: View {
                         .foregroundColor(.red)
                 }
                 .help("모델을 삭제하시려면 해제 해야합니다")
+            } else if viewModel.modelManagementState.isDownloading(model: model) {
+                // 다운로드 중 - 상태 아이콘
+                Image(systemName: "arrow.down.circle")
+                    .foregroundColor(.blue)
+                    .overlay(
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.5)
+                    )
+            } else if viewModel.modelManagementState.modelState == .loading && viewModel.selectedModel == model {
+                // 로드 중인 모델 - 로딩 아이콘 표시
+                HStack {
+
+                    Text("모델 로드 중")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 0)
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .foregroundColor(.secondary)
+                }
             } else {
+                // 로드되지 않은 로컬 모델 - 삭제 버튼
                 Button(action: {
                     viewModel.deleteModel(model)
                 }) {
@@ -301,7 +339,7 @@ struct ModelRowView: View {
                 .buttonStyle(BorderlessButtonStyle())
                 .help("모델 삭제")
             }
-
+            
         } else if viewModel.modelManagementState.isDownloading(model: model) {
             // 다운로드 중 - 상태 아이콘
             Image(systemName: "arrow.down.circle")
@@ -322,8 +360,8 @@ struct ModelRowView: View {
             }
             .buttonStyle(BorderlessButtonStyle())
             .disabled(!viewModel.modelManagementState.canStartDownload(model: model))
-            .help(!viewModel.modelManagementState.canStartDownload(model: model) ? 
-                 "최대 동시 다운로드 수에 도달했습니다" : "모델 다운로드")
+            .help(!viewModel.modelManagementState.canStartDownload(model: model) ?
+                  "최대 동시 다운로드 수에 도달했습니다" : "모델 다운로드")
         }
     }
 }

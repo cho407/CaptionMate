@@ -58,7 +58,7 @@ struct ModelSelectorView: View {
                                         .foregroundStyle(model == viewModel.selectedModel ? loadingColor : .black)
                                 }
                             }
-                            .disabled(!isLocalModel && model != "openai_whisper-tiny")
+                            .disabled((!isLocalModel && model != "openai_whisper-tiny") || viewModel.modelManagementState.isDownloading(model: model))
                         }
                     } label: {
                         HStack {

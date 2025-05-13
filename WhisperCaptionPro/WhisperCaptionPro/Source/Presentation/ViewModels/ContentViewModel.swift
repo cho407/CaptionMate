@@ -15,8 +15,12 @@ import WhisperKit
 
 @MainActor
 class ContentViewModel: ObservableObject {
+    private var isLoadingModel = false
     // MARK: - Published Properties
     @Published var whisperKit: WhisperKit?
+    
+    // 현재 실제로 로드된 모델 추적 (selectedModel과 구분)
+    @Published var currentLoadedModel: String = ""
     
     // Model 및 전사 관련 상태
     @Published var transcriptionState = TranscriptionState()
@@ -151,159 +155,20 @@ class ContentViewModel: ObservableObject {
         uiState.transcriptionTask?.cancel()
         uiState.isTranscribingView = false
         
-        // 4. WhisperKit 인스턴스 해제
+        // 4. WhisperKit 인스턴스 해제 (변경된 부분)
         if let kit = whisperKit {
+            // 모델 언로드 호출로 내부 리소스 정리
             await kit.unloadModels()
+  
+            // 인스턴스 해제
+            whisperKit = nil
             print("모델 해제 완료: \(selectedModel)")
         }
     }
     
-    /// 로컬 및 원격 모델 목록 업데이트
-    func fetchModels() {
-        print("모델 목록 가져오기 시작...")
-        
-        // 상태 초기화
-        modelManagementState.availableModels = []
-        modelManagementState.modelSizes = [:] // 모델 크기 정보 초기화
-        
-        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
-            print("모델 경로 확인: \(modelPath)")
-            
-            // 디렉토리가 없으면 생성
-            if !FileManager.default.fileExists(atPath: modelPath) {
-                do {
-                    try FileManager.default.createDirectory(at: URL(fileURLWithPath: modelPath), withIntermediateDirectories: true)
-                    print("모델 디렉토리 생성: \(modelPath)")
-                } catch {
-                    print("모델 디렉토리 생성 실패: \(error.localizedDescription)")
-                }
-            }
-            
-            modelManagementState.localModelPath = modelPath
-            
-            do {
-                let allFiles = try FileManager.default.contentsOfDirectory(atPath: modelPath)
-                // .DS_Store 및 기타 시스템 파일 필터링 + 디렉토리만 포함
-                let fileManager = FileManager.default
-                let downloadedModels = allFiles.filter { fileName in
-                    // 숨겨진 파일 제외
-                    if fileName.hasPrefix(".") {
-                        return false
-                    }
-                    
-                    // 디렉토리인지 확인
-                    let fullPath = URL(fileURLWithPath: modelPath).appendingPathComponent(fileName).path
-                    var isDir: ObjCBool = false
-                    if fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) {
-                        return isDir.boolValue
-                    }
-                    return false
-                }
-                print("로컬 모델 목록: \(downloadedModels)")
-                
-                // 로컬 모델 및 크기 정보 갱신
-                for model in downloadedModels {
-                    let modelFolderURL = URL(fileURLWithPath: modelPath).appendingPathComponent(model)
-                    
-                    // 모델 크기 계산
-                    let totalSize = calculateFolderSize(url: modelFolderURL)
-                    modelManagementState.modelSizes[model] = totalSize
-                    
-                    if !modelManagementState.localModels.contains(model) {
-                        modelManagementState.localModels = downloadedModels
-                        
-                    }
-                }
-            } catch {
-                print("로컬 모델 목록 조회 실패: \(error.localizedDescription)")
-            }
-        }
-        
-        modelManagementState.localModels = WhisperKit.formatModelFiles(modelManagementState.localModels)
-        for model in modelManagementState.localModels where !modelManagementState.availableModels.contains(model) {
-            modelManagementState.availableModels.append(model)
-        }
-        
-        print("로컬에서 찾은 모델: \(modelManagementState.localModels)")
-        print("이전에 선택한 모델: \(selectedModel)")
-        
-        Task {
-            // 원격 모델 목록 가져오기 시도
-            var supportedModels: [String] = []
-            var disabledModels: [String] = []
-            
-            let modelSupport = await WhisperKit.recommendedRemoteModels()
-            supportedModels = modelSupport.supported
-            disabledModels = modelSupport.disabled
-            print("WhisperKit에서 모델 목록 가져옴: \(supportedModels.count)개")
-            
-            // 메인 스레드에서 UI 업데이트
-            await MainActor.run {
-                for model in supportedModels {
-                    if !modelManagementState.availableModels.contains(model) {
-                        modelManagementState.availableModels.append(model)
-                        
-                        // 원격 모델 예상 크기 - 실제 크기를 알 수 없으므로 예상치 설정
-                        if !modelManagementState.modelSizes.keys.contains(model) {
-                            // 모델 이름에 따라 예상 크기 설정 (MB 단위)
-                            let estimatedSize: Int64
-                            if model.contains("large") {
-                                estimatedSize = 3_000_000_000 // 약 3GB
-                            } else if model.contains("medium") {
-                                estimatedSize = 1_500_000_000 // 약 1.5GB
-                            } else if model.contains("small") {
-                                estimatedSize = 500_000_000 // 약 500MB
-                            } else if model.contains("base") {
-                                estimatedSize = 250_000_000 // 약 250MB
-                            } else {
-                                estimatedSize = 150_000_000 // 약 150MB (기본값)
-                            }
-                            modelManagementState.modelSizes[model] = estimatedSize
-                        }
-                    }
-                }
-                
-                for model in disabledModels {
-                    if !modelManagementState.disabledModels.contains(model) {
-                        modelManagementState.disabledModels.append(model)
-                    }
-                }
-                
-                print("업데이트된 사용 가능 모델 수: \(modelManagementState.availableModels.count)")
-                objectWillChange.send() // UI 갱신 강제
-            }
-        }
-    }
-    
-    /// 폴더 크기 계산 함수
-    private func calculateFolderSize(url: URL) -> Int64 {
-        let fileManager = FileManager.default
-        var folderSize: Int64 = 0
-        
-        do {
-            let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
-            
-            for fileURL in contents {
-                let fileAttributes = try fileURL.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
-                
-                if let isDirectory = fileAttributes.isDirectory, isDirectory {
-                    // 하위 폴더면 재귀적으로 계산
-                    folderSize += calculateFolderSize(url: fileURL)
-                } else if let fileSize = fileAttributes.fileSize {
-                    // 파일이면 크기 추가
-                    folderSize += Int64(fileSize)
-                }
-            }
-        } catch {
-            print("Error calculating folder size: \(error)")
-        }
-        
-        return folderSize
-    }
-    
-    /// 모델 로딩 (로컬/원격 모델 다운로드 및 초기화)
     func loadModel(_ model: String, redownload: Bool = false) {
+        guard !isLoadingModel else { return }
+        isLoadingModel = true
         print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
         print("""
             Computing Options:
@@ -312,14 +177,15 @@ class ContentViewModel: ObservableObject {
             - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
             - Prefill Data:     \(getComputeOptions().prefillCompute.description)
         """)
-        
-        // 로딩 시작 시 진행률 초기화
-        modelManagementState.loadingProgressValue = 0.0
-        
-        // 이미 로드된 모델이 있으면 해제
-        whisperKit = nil
-        
+
         Task {
+            // Unload any existing WhisperKit instance before creating a new one
+            if let kit = whisperKit {
+                await kit.unloadModels()
+                print("Previous WhisperKit models unloaded.")
+                whisperKit = nil
+            }
+
             let config = WhisperKitConfig(computeOptions: getComputeOptions(),
                                           verbose: true,
                                           logLevel: .debug,
@@ -327,97 +193,90 @@ class ContentViewModel: ObservableObject {
                                           load: false,
                                           download: false)
             whisperKit = try await WhisperKit(config)
-            guard let whisperKit = whisperKit else { return }
-            
-            // 이미 다운로드된 모델이고 재다운로드를 요청하지 않은 경우
-            if modelManagementState.localModels.contains(model) && !redownload {
-                modelManagementState.folder = URL(fileURLWithPath: modelManagementState.localModelPath)
-                    .appendingPathComponent(model)
-                print("모델 path: \(modelManagementState.folder)")
-                
-                // 다운로드 단계 건너뛰기 - 진행률 20%로 설정
-                await MainActor.run {
-                    modelManagementState.loadingProgressValue = 0.2
-                    modelManagementState.modelState = .downloaded
-                }
-            } else {
-                // 모델 다운로드 진행 - 진행률 0~20%
-                await MainActor.run {
-                    modelManagementState.modelState = .downloading
-                }
-                
-                modelManagementState.folder = try await WhisperKit.download(
-                    variant: model,
-                    from: repoName,
-                    progressCallback: { progress in
-                        DispatchQueue.main.async {
-                            // 다운로드는 전체 진행의 0~20%
-                            self.modelManagementState.loadingProgressValue = Float(progress.fractionCompleted) * 0.2
-                        }
-                    }
-                )
-                
-                await MainActor.run {
-                    modelManagementState.loadingProgressValue = 0.2
-                    modelManagementState.modelState = .downloaded
-                }
+            guard let whisperKit = whisperKit else {
+                isLoadingModel = false
+                return
             }
-            
-            if let modelFolder = modelManagementState.folder {
+
+            var folder: URL?
+
+            // Check if the model is available locally
+            if modelManagementState.localModels.contains(model) && !redownload {
+                // Get local model folder URL from localModels
+                // TODO: Make this configurable in the UI
+                folder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
+            } else {
+                // Download the model
+                folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
+                    DispatchQueue.main.async {
+                        self.modelManagementState.loadingProgressValue = Float(progress.fractionCompleted) * self.modelManagementState.specializationProgressRatio
+                        self.modelManagementState.modelState = .downloading
+                    }
+                })
+            }
+
+            await MainActor.run {
+                modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
+                modelManagementState.modelState = .downloaded
+            }
+
+            if let modelFolder = folder {
                 whisperKit.modelFolder = modelFolder
+
                 await MainActor.run {
-                    // 로딩 시작 - 진행률 20% -> 30%로 증가
-                    modelManagementState.loadingProgressValue = 0.3
-                    modelManagementState.modelState = .loading // prewarming 대신 loading 상태 사용
+                    // Set the loading progress to 90% of the way after prewarm
+                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
+                    modelManagementState.modelState = .prewarming
                 }
-                
-                // 커스텀 프로그레스 바 업데이트 - 30%에서 90%까지 부드럽게 증가
+
                 let progressBarTask = Task {
-                    // 시작 진행률: 30%, 목표 진행률: 90%, 최대 소요 시간: 180초
-                    await updateProgressBar(startProgress: 0.3, targetProgress: 0.9, maxTime: 10)
+                    await updateProgressBar(targetProgress: 0.9, maxTime: 30)
                 }
-                
+
+                // Prewarm models
                 do {
-                    // prewarmModels() 호출을 제거하고 바로 loadModels() 호출
-                    try await whisperKit.loadModels()
+                    try await whisperKit.prewarmModels()
                     progressBarTask.cancel()
                 } catch {
-                    print("Error loading models, retrying: \(error.localizedDescription)")
+                    print("Error prewarming models, retrying: \(error.localizedDescription)")
                     progressBarTask.cancel()
                     if !redownload {
                         loadModel(model, redownload: true)
+                        isLoadingModel = false
                         return
                     } else {
-                        await MainActor.run {
-                            modelManagementState.modelState = .unloaded
-                        }
+                        // Redownloading failed, error out
+                        modelManagementState.modelState = .unloaded
+                        isLoadingModel = false
                         return
                     }
                 }
-                
+
                 await MainActor.run {
-                    // 로드 완료 시 진행률 90% 고정
-                    modelManagementState.loadingProgressValue = 0.9
-                    modelManagementState.modelState = whisperKit.modelState
+                    // Set the loading progress to 90% of the way after prewarm
+                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio + 0.9 * (1 - modelManagementState.specializationProgressRatio)
+                    modelManagementState.modelState = .loading
                 }
-                
+
+                do {
+                    try await whisperKit.loadModels()
+                } catch {
+                    print("loadModels failed: \(error). Retrying once...")
+                    try await Task.sleep(nanoseconds: 200_000_000) // 200ms delay
+                    try await whisperKit.loadModels()
+                }
+
                 await MainActor.run {
                     if !modelManagementState.localModels.contains(model) {
                         modelManagementState.localModels.append(model)
-                        
-                        // 새로 다운로드된 모델의 크기 계산
-                        let modelSize = calculateFolderSize(url: modelFolder)
-                        modelManagementState.modelSizes[model] = modelSize
                     }
-                    modelManagementState.availableLanguages = Constants.languages.map { $0.key }
-                        .sorted()
-                    
-                    // 최종 완료 시 진행률 100%
+
+                    modelManagementState.availableLanguages = Constants.languages.map { $0.key }.sorted()
                     modelManagementState.loadingProgressValue = 1.0
                     modelManagementState.modelState = whisperKit.modelState
-                    print("모델 로드 완료: \(whisperKit.modelState)")
                 }
             }
+            isLoadingModel = false
         }
     }
     
@@ -453,6 +312,9 @@ class ContentViewModel: ObservableObject {
             let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)
                 .appendingPathComponent(model)
             do {
+                // 모델 크기 정보 백업
+                let modelSize = modelManagementState.modelSizes[model]
+                
                 try FileManager.default.removeItem(at: modelFolder)
                 if let index = modelManagementState.localModels.firstIndex(of: model) {
                     modelManagementState.localModels.remove(at: index)
@@ -463,8 +325,10 @@ class ContentViewModel: ObservableObject {
                     modelManagementState.modelState = .unloaded
                 }
                 
-                // 모델 크기 정보 업데이트
-                modelManagementState.modelSizes.removeValue(forKey: model)
+                // 모델 크기 정보 유지
+                if let size = modelSize {
+                    modelManagementState.modelSizes[model] = size
+                }
                 
                 print("모델 삭제 완료: \(model)")
             } catch {
@@ -475,18 +339,17 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - 모델 다운로드 관리
     
-    /// 모델 다운로드 시작
+    /// 모델 다운로드
     func downloadModel(_ model: String) {
-        // 이미 다운로드 중이거나 로컬에 있는 모델인지 확인
-        guard !modelManagementState.currentDownloadingModels.contains(model),
-              !modelManagementState.localModels.contains(model) else {
+        // 현재 다운로드 중인 모델 수가 최대 동시 다운로드 수보다 작은지 확인
+        guard modelManagementState.canStartDownload(model: model) else {
+            print("최대 동시 다운로드 수에 도달했습니다")
             return
         }
         
-        // 동시 다운로드 수 제한 확인
-        if modelManagementState.currentDownloadingModels.count >= modelManagementState.maxConcurrentDownloads {
-            // 동시 다운로드 제한 초과 - 대기열 처리 로직을 여기에 추가할 수 있음
-            print("최대 동시 다운로드 수 초과: \(model) 다운로드 불가")
+        // 다운로드 시작 전 디스크 공간 확인
+        guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            print("문서 디렉토리를 찾을 수 없습니다")
             return
         }
         
@@ -502,104 +365,119 @@ class ContentViewModel: ObservableObject {
             modelManagementState.downloadTasks[model] = nil
         }
         
-        // 이미 부분적으로 다운로드된 폴더가 있다면 삭제
-        let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
-        if FileManager.default.fileExists(atPath: modelFolder.path) {
+        // 백그라운드 작업 생성
+        let task = Task.detached(priority: .background) { [weak self] in
+            guard let self = self else { return }
+            
             do {
-                try FileManager.default.removeItem(at: modelFolder)
-                print("기존 부분 다운로드 폴더 삭제: \(model)")
-            } catch {
-                print("기존 폴더 삭제 실패: \(error.localizedDescription)")
-            }
-        }
-        
-        // 새 다운로드 작업 생성
-        let task = Task {
-            do {
-                // 다운로드 진행 전 크기 업데이트
-                let estimatedSize = modelManagementState.modelSizes[model] ?? 0
+                let resourceValues = try documents.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+                guard let availableSpace = resourceValues.volumeAvailableCapacity else {
+                    await MainActor.run {
+                        self.modelManagementState.downloadErrors[model] = "디스크 공간을 확인할 수 없습니다"
+                    }
+                    return
+                }
                 
-                // 다운로드 작업 시작 (취소 가능한 작업으로 구성)
-                let downloadTask = Task {
-                    do {
-                        // 다운로드 시작
-                        let modelFolder = try await WhisperKit.download(
-                            variant: model,
-                            from: repoName,
-                            progressCallback: { [weak self] progress in
-                                // 메인 스레드에서 진행 상황 업데이트
-                                guard let self = self else { return }
-                                DispatchQueue.main.async {
-                                    let progressValue = Float(progress.fractionCompleted)
-                                    self.modelManagementState.downloadProgress[model] = progressValue
-                                    
-                                    // 예상 다운로드된 크기 계산 및 상태 업데이트
-                                    _ = Int64(Double(estimatedSize) * Double(progressValue)) // 정보 목적으로만 계산
-                                    self.objectWillChange.send() // UI 갱신 알림
-                                }
-                            }
-                        )
+                // 모델 크기 예상치 계산 (안전 마진 20% 추가)
+                let estimatedSize: Int64
+                if model.contains("large") {
+                    estimatedSize = 3_600_000_000 // 3GB + 20%
+                } else if model.contains("medium") {
+                    estimatedSize = 1_800_000_000 // 1.5GB + 20%
+                } else if model.contains("small") {
+                    estimatedSize = 600_000_000 // 500MB + 20%
+                } else if model.contains("base") {
+                    estimatedSize = 300_000_000 // 250MB + 20%
+                } else {
+                    estimatedSize = 180_000_000 // 150MB + 20%
+                }
+                
+                if availableSpace < estimatedSize {
+                    let availableGB = Double(availableSpace) / 1_000_000_000.0
+                    let requiredGB = Double(estimatedSize) / 1_000_000_000.0
+                    let errorMessage = String(format: "디스크 공간이 부족합니다. 필요: %.1f GB, 가용: %.1f GB", requiredGB, availableGB)
+                    await MainActor.run {
+                        self.modelManagementState.downloadErrors[model] = errorMessage
+                    }
+                    return
+                }
+                
+                // 다운로드 진행률 업데이트를 위한 타이머 설정
+                let progressUpdateInterval: TimeInterval = 0.5 // 0.5초마다 업데이트
+                var lastUpdateTime = Date()
+                
+                // 다운로드 시작
+                let modelFolder = try await WhisperKit.download(
+                    variant: model,
+                    from: self.repoName,
+                    progressCallback: { [weak self] progress in
+                        guard let self = self else { return }
                         
                         // 작업이 취소되었는지 확인
                         if Task.isCancelled {
-                            throw CancellationError()
+                            return
                         }
                         
-                        // 다운로드 완료 처리
-                        await MainActor.run { [weak self] in
-                            guard let self = self else { return }
-                            
-                            if !self.modelManagementState.localModels.contains(model) {
-                                self.modelManagementState.localModels.append(model)
+                        // 진행률 업데이트 최적화 (너무 빈번한 업데이트 방지)
+                        let currentTime = Date()
+                        if currentTime.timeIntervalSince(lastUpdateTime) >= progressUpdateInterval {
+                            Task { @MainActor in
+                                self.modelManagementState.downloadProgress[model] = Float(progress.fractionCompleted)
+                                
+                                // 다운로드 중 디스크 공간 재확인 (50% 이상 다운로드된 경우에만)
+                                if progress.fractionCompleted > 0.5 {
+                                    if let resourceValues = try? documents.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
+                                       let currentSpace = resourceValues.volumeAvailableCapacity,
+                                       currentSpace < Int64(Double(estimatedSize) * (1.0 - progress.fractionCompleted)) {
+                                        self.modelManagementState.downloadErrors[model] = "다운로드 중 디스크 공간이 부족해졌습니다"
+                                        self.modelManagementState.currentDownloadingModels.remove(model)
+                                        return
+                                    }
+                                }
                             }
-                            
-                            // 실제 다운로드된 모델의 크기 계산
-                            let actualSize = calculateFolderSize(url: modelFolder)
-                            self.modelManagementState.modelSizes[model] = actualSize
-                            
-                            // 다운로드 상태 업데이트
-                            self.modelManagementState.currentDownloadingModels.remove(model)
-                            self.modelManagementState.downloadProgress[model] = 1.0 // 100% 완료
-                            self.modelManagementState.downloadTasks[model] = nil
-                            
-                            // 모든 다운로드가 완료되었는지 확인
-                            if self.modelManagementState.currentDownloadingModels.isEmpty {
-                                self.modelManagementState.isDownloading = false
-                            }
-                            
-                            print("모델 다운로드 완료: \(model), 크기: \(ByteCountFormatter.string(fromByteCount: actualSize, countStyle: .file))")
+                            lastUpdateTime = currentTime
                         }
-                    } catch is CancellationError {
-                        // 취소된 경우 부분 다운로드 파일 정리
-                        await cleanupPartialDownload(model)
-                        print("모델 다운로드 취소됨: \(model)")
-                    } catch {
-                        // 오류 발생 시 (취소가 아닌 경우)
-                        print("모델 다운로드 오류 (\(model)): \(error.localizedDescription)")
-                        
-                        await MainActor.run { [weak self] in
-                            guard let self = self else { return }
-                            // 오류 상태 업데이트
-                            self.modelManagementState.downloadErrors[model] = error.localizedDescription
-                            self.modelManagementState.currentDownloadingModels.remove(model)
-                            self.modelManagementState.downloadProgress[model] = nil
-                            self.modelManagementState.downloadTasks[model] = nil
-                            
-                            // 모든 다운로드가 완료되었는지 확인
-                            if self.modelManagementState.currentDownloadingModels.isEmpty {
-                                self.modelManagementState.isDownloading = false
-                            }
-                        }
-                        
-                        // 오류 발생 시에도 부분 다운로드 파일 정리
-                        await cleanupPartialDownload(model)
+                    }
+                )
+                
+                // 작업이 취소되었는지 확인
+                if Task.isCancelled {
+                    throw CancellationError()
+                }
+                
+                // 다운로드 완료 처리
+                await MainActor.run {
+                    self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.downloadProgress[model] = 1.0
+                    
+                    if !self.modelManagementState.localModels.contains(model) {
+                        self.modelManagementState.localModels.append(model)
+                    }
+                    
+                    // 실제 다운로드된 모델의 크기 계산
+                    let actualSize = self.calculateFolderSize(url: modelFolder)
+                    self.modelManagementState.modelSizes[model] = actualSize
+                    
+                    // 모든 다운로드가 완료되었는지 확인
+                    if self.modelManagementState.currentDownloadingModels.isEmpty {
+                        self.modelManagementState.isDownloading = false
                     }
                 }
                 
-                // 최상위 Task에서 다운로드 작업 완료까지 대기
-                try await downloadTask.value
+            } catch is CancellationError {
+                print("모델 다운로드 취소됨: \(model)")
+                await cleanupPartialDownload(model)
             } catch {
-                print("모델 다운로드 메인 태스크 오류: \(error.localizedDescription)")
+                print("모델 다운로드 실패: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.modelManagementState.downloadErrors[model] = "다운로드 실패: \(error.localizedDescription)"
+                    self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.downloadProgress[model] = nil
+                    
+                    if self.modelManagementState.currentDownloadingModels.isEmpty {
+                        self.modelManagementState.isDownloading = false
+                    }
+                }
                 await cleanupPartialDownload(model)
             }
         }
@@ -1310,5 +1188,148 @@ class ContentViewModel: ObservableObject {
                 print("파일 드랍 처리 실패: \(error?.localizedDescription ?? "Unknown error")")
             }
         }
+    }
+    
+    /// 로컬 및 원격 모델 목록 업데이트
+    func fetchModels() {
+        print("모델 목록 가져오기 시작...")
+        
+        // 상태 초기화
+        modelManagementState.availableModels = []
+        modelManagementState.modelSizes = [:] // 모델 크기 정보 초기화
+        
+        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
+            print("모델 경로 확인: \(modelPath)")
+            
+            // 디렉토리가 없으면 생성
+            if !FileManager.default.fileExists(atPath: modelPath) {
+                do {
+                    try FileManager.default.createDirectory(at: URL(fileURLWithPath: modelPath), withIntermediateDirectories: true)
+                    print("모델 디렉토리 생성: \(modelPath)")
+                } catch {
+                    print("모델 디렉토리 생성 실패: \(error.localizedDescription)")
+                }
+            }
+            
+            modelManagementState.localModelPath = modelPath
+            
+            do {
+                let allFiles = try FileManager.default.contentsOfDirectory(atPath: modelPath)
+                // .DS_Store 및 기타 시스템 파일 필터링 + 디렉토리만 포함
+                let fileManager = FileManager.default
+                let downloadedModels = allFiles.filter { fileName in
+                    // 숨겨진 파일 제외
+                    if fileName.hasPrefix(".") {
+                        return false
+                    }
+                    
+                    // 디렉토리인지 확인
+                    let fullPath = URL(fileURLWithPath: modelPath).appendingPathComponent(fileName).path
+                    var isDir: ObjCBool = false
+                    if fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) {
+                        return isDir.boolValue
+                    }
+                    return false
+                }
+                print("로컬 모델 목록: \(downloadedModels)")
+                
+                // 로컬 모델 및 크기 정보 갱신
+                for model in downloadedModels {
+                    let modelFolderURL = URL(fileURLWithPath: modelPath).appendingPathComponent(model)
+                    
+                    // 모델 크기 계산
+                    let totalSize = calculateFolderSize(url: modelFolderURL)
+                    modelManagementState.modelSizes[model] = totalSize
+                    
+                    if !modelManagementState.localModels.contains(model) {
+                        modelManagementState.localModels = downloadedModels
+                    }
+                }
+            } catch {
+                print("로컬 모델 목록 조회 실패: \(error.localizedDescription)")
+            }
+        }
+        
+        modelManagementState.localModels = WhisperKit.formatModelFiles(modelManagementState.localModels)
+        for model in modelManagementState.localModels where !modelManagementState.availableModels.contains(model) {
+            modelManagementState.availableModels.append(model)
+        }
+        
+        print("로컬에서 찾은 모델: \(modelManagementState.localModels)")
+        print("이전에 선택한 모델: \(selectedModel)")
+        
+        Task {
+            // 원격 모델 목록 가져오기 시도
+            var supportedModels: [String] = []
+            var disabledModels: [String] = []
+            
+            let modelSupport = await WhisperKit.recommendedRemoteModels()
+            supportedModels = modelSupport.supported
+            disabledModels = modelSupport.disabled
+            print("WhisperKit에서 모델 목록 가져옴: \(supportedModels.count)개")
+            
+            // 메인 스레드에서 UI 업데이트
+            await MainActor.run {
+                for model in supportedModels {
+                    if !modelManagementState.availableModels.contains(model) {
+                        modelManagementState.availableModels.append(model)
+                        
+                        // 원격 모델 예상 크기 - 실제 크기를 알 수 없으므로 예상치 설정
+                        if !modelManagementState.modelSizes.keys.contains(model) {
+                            // 모델 이름에 따라 예상 크기 설정 (MB 단위)
+                            let estimatedSize: Int64
+                            if model.contains("large") {
+                                estimatedSize = 3_000_000_000 // 약 3GB
+                            } else if model.contains("medium") {
+                                estimatedSize = 1_500_000_000 // 약 1.5GB
+                            } else if model.contains("small") {
+                                estimatedSize = 500_000_000 // 약 500MB
+                            } else if model.contains("base") {
+                                estimatedSize = 250_000_000 // 약 250MB
+                            } else {
+                                estimatedSize = 150_000_000 // 약 150MB (기본값)
+                            }
+                            modelManagementState.modelSizes[model] = estimatedSize
+                        }
+                    }
+                }
+                
+                for model in disabledModels {
+                    if !modelManagementState.disabledModels.contains(model) {
+                        modelManagementState.disabledModels.append(model)
+                    }
+                }
+                
+                print("업데이트된 사용 가능 모델 수: \(modelManagementState.availableModels.count)")
+                objectWillChange.send() // UI 갱신 강제
+            }
+        }
+    }
+    
+    /// 폴더 크기 계산 함수
+    private func calculateFolderSize(url: URL) -> Int64 {
+        let fileManager = FileManager.default
+        var folderSize: Int64 = 0
+        
+        do {
+            let contents = try fileManager.contentsOfDirectory(at: url, includingPropertiesForKeys: nil)
+            
+            for fileURL in contents {
+                let fileAttributes = try fileURL.resourceValues(forKeys: [.isDirectoryKey, .fileSizeKey])
+                
+                if let isDirectory = fileAttributes.isDirectory, isDirectory {
+                    // 하위 폴더면 재귀적으로 계산
+                    folderSize += calculateFolderSize(url: fileURL)
+                } else if let fileSize = fileAttributes.fileSize {
+                    // 파일이면 크기 추가
+                    folderSize += Int64(fileSize)
+                }
+            }
+        } catch {
+            print("Error calculating folder size: \(error)")
+        }
+        
+        return folderSize
     }
 }

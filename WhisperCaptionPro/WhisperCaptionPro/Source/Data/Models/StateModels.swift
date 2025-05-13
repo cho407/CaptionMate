@@ -76,13 +76,16 @@ struct ModelManagementState {
     var currentDownloadingModels: Set<String> = []
     var downloadErrors: [String: String] = [:]
     
-    // 다운로드 관리
-    var maxConcurrentDownloads: Int = 2
+    // 다운로드 관리 - 제한 해제
+    var maxConcurrentDownloads: Int = Int.max
     
     // UI 상태
     var modelFilter: String = ""
     
     var folder: URL?
+    
+    // 모델 로딩 작업 참조 (새로 추가)
+    var currentLoadingTask: Task<Void, Error>?
     
     // 모델 정보 포맷 헬퍼 함수들
     func formattedModelSize(for model: String) -> String {
@@ -100,7 +103,7 @@ struct ModelManagementState {
     }
     
     func canStartDownload(model: String) -> Bool {
-        return !isDownloading(model: model) && !localModels.contains(model) && currentDownloadingModels.count < maxConcurrentDownloads
+        return !isDownloading(model: model) && !localModels.contains(model)
     }
     
     func displayName(for model: String) -> String {
