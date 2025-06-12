@@ -34,23 +34,16 @@ struct ControlsView: View {
                 }
                 
                 HStack {
-                    let color: Color = viewModel.modelManagementState
-                        .modelState != .loaded ? .gray : .red
                     Button {
                         withAnimation {
                             viewModel.selectFile()
                         }
                     } label: {
-                        Text("FROM FILE")
+                        Text("Import File")
                             .font(.headline)
-                            .foregroundColor(color)
-                            .padding()
-                            .cornerRadius(40)
-                            .frame(minWidth: 70, minHeight: 70)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 40)
-                                    .stroke(color, lineWidth: 4)
-                            )
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .cornerRadius(8)
                     }
                     .fileImporter(
                         isPresented: $viewModel.uiState.isFilePickerPresented,
@@ -59,11 +52,10 @@ struct ControlsView: View {
                         onCompletion: viewModel.handleFilePicker
                     )
                     .lineLimit(1)
-                    .contentTransition(.symbolEffect(.replace))
-                    .buttonStyle(BorderlessButtonStyle())
-                    .disabled(viewModel.modelManagementState.modelState != .loaded)
-                    .frame(minWidth: 0, maxWidth: .infinity)
+                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.uiState.isTranscribingView)
                     .padding()
+                    
+                    Spacer()
                     
                     // 전사 시작 버튼
                     Button {
@@ -78,7 +70,8 @@ struct ControlsView: View {
                             .padding(.horizontal, 16)
                             .cornerRadius(8)
                     }
-                    .disabled(viewModel.audioState.isTranscribing)
+                    .lineLimit(1)
+                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
                 }
             }
         }

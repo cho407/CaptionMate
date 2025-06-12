@@ -56,11 +56,17 @@ struct ContentView: View {
             }
             .toolbar {
                 ToolbarItem {
-                    Button("Export Subtitle") {
+                    Button {
                         Task {
                             await viewModel.exportTranscription()
                         }
+                    } label: {
+                        HStack {
+                            Image(systemName: "laptopcomputer.and.arrow.down")
+                            Text("Export Subtitle")
+                        }
                     }
+                    .disabled(viewModel.transcriptionResult == nil)
                 }
             }
             .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {

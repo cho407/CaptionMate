@@ -105,16 +105,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.bufferSeconds = 0
         transcriptionState.confirmedSegments = []
         transcriptionState.unconfirmedSegments = []
-        
-        transcriptionState.eagerResults = []
-        transcriptionState.prevResult = nil
-        transcriptionState.lastAgreedSeconds = 0.0
-        transcriptionState.prevWords = []
-        transcriptionState.lastAgreedWords = []
-        transcriptionState.confirmedWords = []
-        transcriptionState.confirmedText = ""
-        transcriptionState.hypothesisWords = []
-        transcriptionState.hypothesisText = ""
+        transcriptionResult = nil
     }
     
     /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
@@ -127,153 +118,469 @@ class ContentViewModel: ObservableObject {
     
     // MARK: - Model Management
     
+    /// 캐시 디렉토리 정리 함수를 추가합니다
+    func clearCoreMLRuntimeCache() {
+        // 앱 캐시 디렉토리 경로 가져오기
+        let fileManager = FileManager.default
+        
+        // 1. 앱의 캐시 디렉토리 찾기
+        guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            print("캐시 디렉토리를 찾을 수 없습니다.")
+            return
+        }
+        
+        // 2. 앱의 번들 ID 가져오기 (동적으로 현재 앱 번들 ID 사용)
+        let bundleID = Bundle.main.bundleIdentifier ?? "com.WhisperCaptionPro"
+        
+        // 3. CoreML 캐시 디렉토리 찾기 - 여러 가능한 경로 확인
+        let possibleCacheDirs = [
+            cachesDirectory.appendingPathComponent(bundleID).appendingPathComponent("com.apple.e5rt.e5bundlecache"),
+            cachesDirectory.appendingPathComponent(bundleID).appendingPathComponent("com.apple.CoreML"),
+            cachesDirectory.appendingPathComponent("com.apple.CoreML"),
+            cachesDirectory.appendingPathComponent("CoreML")
+        ]
+        
+        // 4. 모든 가능한 캐시 디렉토리 정리
+        var clearedAny = false
+        for cacheDir in possibleCacheDirs {
+            if fileManager.fileExists(atPath: cacheDir.path) {
+                do {
+                    // a. 디렉토리 내용 가져오기
+                    let contents = try fileManager.contentsOfDirectory(at: cacheDir, includingPropertiesForKeys: nil)
+                    
+                    // b. 각 파일/폴더 삭제
+                    for item in contents {
+                        do {
+                            try fileManager.removeItem(at: item)
+                            print("캐시 아이템 삭제 완료: \(item.lastPathComponent)")
+                            clearedAny = true
+                        } catch {
+                            print("캐시 아이템 삭제 실패: \(item.lastPathComponent) - \(error.localizedDescription)")
+                        }
+                    }
+                    
+                    print("CoreML 캐시 디렉토리 정리 완료: \(cacheDir.path)")
+                } catch {
+                    print("CoreML 캐시 디렉토리 접근 실패: \(error.localizedDescription)")
+                }
+            }
+        }
+        
+        // 5. 임시 디렉토리 정리
+        // tmpdir은 모든 앱이 공유하므로 CoreML/WhisperKit 관련 파일만 신중하게 삭제
+        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
+        do {
+            let tempContents = try fileManager.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil)
+            
+            // WhisperKit 또는 CoreML 관련 파일만 필터링
+            let coreMLTempFiles = tempContents.filter { file in
+                let fileName = file.lastPathComponent.lowercased()
+                return fileName.contains("coreml") || 
+                       fileName.contains("whisper") || 
+                       fileName.contains(".bundle") || 
+                       fileName.contains("model") ||
+                       fileName.contains("mps") ||
+                       fileName.contains("mlmodel")
+            }
+            
+            for tempFile in coreMLTempFiles {
+                do {
+                    try fileManager.removeItem(at: tempFile)
+                    print("임시 파일 삭제 완료: \(tempFile.lastPathComponent)")
+                    clearedAny = true
+                } catch {
+                    print("임시 파일 삭제 실패: \(tempFile.lastPathComponent) - \(error.localizedDescription)")
+                }
+            }
+        } catch {
+            print("임시 디렉토리 검색 실패: \(error.localizedDescription)")
+        }
+        
+        // 6. 결과 메시지 출력
+        if clearedAny {
+            print("CoreML 캐시 파일 정리 완료")
+        } else {
+            print("정리할 CoreML 캐시 파일을 찾지 못했습니다")
+        }
+    }
+    
+    // 디스크 여유 공간 확인 함수를 추가합니다
+    func checkDiskSpace() -> (available: Int64, required: Int64, isEnough: Bool) {
+        let fileManager = FileManager.default
+        guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+            return (available: 0, required: 0, isEnough: false)
+        }
+        
+        do {
+            let resourceValues = try cachesDirectory.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+            guard let availableSpace = resourceValues.volumeAvailableCapacity else {
+                return (available: 0, required: 0, isEnough: false)
+            }
+            
+            // volumeAvailableCapacity는 Int 타입이므로 Int64로 변환
+            let availableSpaceInt64 = Int64(availableSpace)
+            
+            // CoreML에 필요한 예상 캐싱 공간 (모델에 따라 다르지만 대략 500MB-1GB)
+            let requiredSpace: Int64 = 3_000_000_000 // 1GB
+            
+            return (available: availableSpaceInt64, required: requiredSpace, isEnough: availableSpaceInt64 > requiredSpace)
+        } catch {
+            print("디스크 공간 확인 실패: \(error.localizedDescription)")
+            return (available: 0, required: 0, isEnough: false)
+        }
+    }
+    
     /// 모델 해제 (메모리에서 완전히 해제)
     func releaseModel() async {
         print("모델 해제 시작: \(selectedModel)")
         
-        // 1. 모델 상태 초기화
-        modelManagementState.modelState = .unloaded
-        modelManagementState.loadingProgressValue = 0.0
+        // 해제 프로세스 시작 상태 설정
+        await MainActor.run {
+            modelManagementState.modelState = .unloading
+            modelManagementState.loadingProgressValue = 0.0
+            
+            // 에러 상태 초기화
+            modelManagementState.hasModelLoadError = false
+            modelManagementState.modelLoadError = nil
+        }
         
-        // 2. 전사 관련 상태 초기화
-        transcriptionState.currentText = ""
-        transcriptionState.currentChunks = [:]
-        transcriptionState.confirmedSegments = []
-        transcriptionState.unconfirmedSegments = []
-        transcriptionState.eagerResults = []
-        transcriptionState.prevResult = nil
-        transcriptionState.lastAgreedSeconds = 0.0
-        transcriptionState.prevWords = []
-        transcriptionState.lastAgreedWords = []
-        transcriptionState.confirmedWords = []
-        transcriptionState.confirmedText = ""
-        transcriptionState.hypothesisWords = []
-        transcriptionState.hypothesisText = ""
+        // 점진적인 진행률 업데이트를 위한 Task 시작
+        let releaseProgressTask = Task {
+            await updateProgressBar(startProgress: 0.0, targetProgress: 0.5, maxTime: 2.0)
+        }
         
-        // 3. 백그라운드 작업 취소
+        // 백그라운드 작업 취소
         uiState.transcribeTask?.cancel()
         uiState.transcriptionTask?.cancel()
         uiState.isTranscribingView = false
         
-        // 4. WhisperKit 인스턴스 해제 (변경된 부분)
+        // 전사 관련 상태 초기화
+        resetState()
+        
+        // CoreML 런타임 캐시 정리
+        clearCoreMLRuntimeCache()
+        
+        // WhisperKit 인스턴스 해제
         if let kit = whisperKit {
             // 모델 언로드 호출로 내부 리소스 정리
+            releaseProgressTask.cancel() // 진행 작업 취소
+            
+            // 모델 언로드 작업에 대한 새로운 진행률 표시 시작
+            let unloadProgressTask = Task {
+                await updateProgressBar(startProgress: 0.5, targetProgress: 0.9, maxTime: 2.0)
+            }
+            
             await kit.unloadModels()
-  
+            unloadProgressTask.cancel()
+            
+            // 인스턴스 해제 및 완료 진행률 표시
+            let finalProgressTask = Task {
+                await updateProgressBar(startProgress: 0.9, targetProgress: 1.0, maxTime: 0.5)
+            }
+            
+            // 짧은 딜레이 후 최종 상태 설정 (진행률 표시 완료를 위해)
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            finalProgressTask.cancel()
+            
             // 인스턴스 해제
-            whisperKit = nil
-            print("모델 해제 완료: \(selectedModel)")
+            await MainActor.run {
+                whisperKit = nil
+                modelManagementState.modelState = .unloaded
+                modelManagementState.loadingProgressValue = 0.0 // 마지막에 0으로 리셋
+                currentLoadedModel = ""
+                print("모델 해제 완료: \(selectedModel)")
+            }
+        } else {
+            // WhisperKit 인스턴스가 없는 경우
+            releaseProgressTask.cancel()
+            
+            // 짧은 딜레이 후 완료 상태 설정 (시각적 효과를 위해)
+            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
+            
+            await MainActor.run {
+                modelManagementState.modelState = .unloaded
+                modelManagementState.loadingProgressValue = 0.0
+                currentLoadedModel = ""
+            }
         }
     }
     
     func loadModel(_ model: String, redownload: Bool = false) {
         guard !isLoadingModel else { return }
         isLoadingModel = true
-        print("Selected Model: \(UserDefaults.standard.string(forKey: "selectedModel") ?? "nil")")
-        print("""
-            Computing Options:
-            - Mel Spectrogram:  \(getComputeOptions().melCompute.description)
-            - Audio Encoder:    \(getComputeOptions().audioEncoderCompute.description)
-            - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
-            - Prefill Data:     \(getComputeOptions().prefillCompute.description)
-        """)
+        
+        // 상태 초기화
+        modelManagementState.modelState = .unloading
+        modelManagementState.loadingProgressValue = 0.0
+        
+        // 다운로드 진행률 초기화 (모델에 대한 다운로드 진행률 별도 관리)
+        if redownload || !modelManagementState.localModels.contains(model) {
+            modelManagementState.downloadProgress[model] = 0.0
+        }
+        
+        // 에러 상태 초기화
+        modelManagementState.hasModelLoadError = false
+        modelManagementState.modelLoadError = nil
 
         Task {
-            // Unload any existing WhisperKit instance before creating a new one
+            // 로딩 단계별 진행률 비율 설정 (초기화/프리워밍/로딩)
+            let initProgressRatio: Float = 0.9         // 초기화 단계 (0.0 ~ 0.2)
+            let prewarmProgressRatio: Float = 0.7      // 프리워밍 단계 (0.2 ~ 0.7)
+            let loadProgressRatio: Float = 1.0         // 로딩 단계 (0.7 ~ 1.0)
+            
+            // 1. 초기화 단계 진행률 표시 시작
+            let initProgressTask = Task {
+                await updateProgressBar(startProgress: 0.0, targetProgress: initProgressRatio, maxTime: 2.0)
+            }
+            
+            // 디스크 공간 확인 및 캐시 정리
+            let diskSpace = checkDiskSpace()
+            if !diskSpace.isEnough {
+                print("⚠️ 디스크 공간 부족: 사용 가능 \(diskSpace.available / 1_000_000) MB, 필요 \(diskSpace.required / 1_000_000) MB")
+                clearCoreMLRuntimeCache()
+            }
+            
+            // 기존 WhisperKit 인스턴스 해제
             if let kit = whisperKit {
-                await kit.unloadModels()
-                print("Previous WhisperKit models unloaded.")
+                do {
+                    await kit.unloadModels()
+                    print("이전 WhisperKit 모델 해제 완료")
+                } catch {
+                    print("⚠️ 이전 모델 언로드 실패: \(error.localizedDescription)")
+                }
                 whisperKit = nil
             }
+            
+            // 초기화 진행률 업데이트 작업 완료
+            initProgressTask.cancel()
+            await MainActor.run {
+                modelManagementState.loadingProgressValue = initProgressRatio
+            }
+            
+            print("선택된 모델: \(model)")
+            print("""
+                연산 옵션:
+                - Mel Spectrogram:  \(getComputeOptions().melCompute.description)
+                - Audio Encoder:    \(getComputeOptions().audioEncoderCompute.description)
+                - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
+                - Prefill Data:     \(getComputeOptions().prefillCompute.description)
+            """)
 
-            let config = WhisperKitConfig(computeOptions: getComputeOptions(),
-                                          verbose: true,
-                                          logLevel: .debug,
-                                          prewarm: false,
-                                          load: false,
-                                          download: false)
-            whisperKit = try await WhisperKit(config)
+            // 2. WhisperKit 인스턴스 생성
+            do {
+                let config = WhisperKitConfig(computeOptions: getComputeOptions(),
+                                           verbose: true,
+                                           logLevel: .debug,
+                                           prewarm: false,
+                                           load: false,
+                                           download: false)
+                whisperKit = try await WhisperKit(config)
+            } catch {
+                print("⚠️ WhisperKit 초기화 실패: \(error.localizedDescription)")
+                await MainActor.run {
+                    modelManagementState.modelState = .unloaded
+                    modelManagementState.hasModelLoadError = true
+                    modelManagementState.modelLoadError = "모델 초기화 실패: \(error.localizedDescription)"
+                    modelManagementState.loadingProgressValue = 0.0
+                    isLoadingModel = false
+                }
+                return
+            }
+            
             guard let whisperKit = whisperKit else {
-                isLoadingModel = false
+                await MainActor.run {
+                    modelManagementState.modelState = .unloaded
+                    modelManagementState.hasModelLoadError = true
+                    modelManagementState.modelLoadError = "WhisperKit 인스턴스 생성 실패"
+                    modelManagementState.loadingProgressValue = 0.0
+                    isLoadingModel = false
+                }
                 return
             }
 
+            // 3. 모델 파일 설정 단계 (다운로드 또는 로컬 경로 설정)
             var folder: URL?
-
-            // Check if the model is available locally
-            if modelManagementState.localModels.contains(model) && !redownload {
-                // Get local model folder URL from localModels
-                // TODO: Make this configurable in the UI
-                folder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
-            } else {
-                // Download the model
-                folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
-                    DispatchQueue.main.async {
-                        self.modelManagementState.loadingProgressValue = Float(progress.fractionCompleted) * self.modelManagementState.specializationProgressRatio
-                        self.modelManagementState.modelState = .downloading
+            do {
+                if modelManagementState.localModels.contains(model) && !redownload {
+                    // 로컬 모델 경로 가져오기 - 다운로드 없이 바로 로드
+                    folder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
+                    
+                    // 로컬 모델은 다운로드 상태를 완료로 설정
+                    if modelManagementState.downloadProgress[model] == nil {
+                        modelManagementState.downloadProgress[model] = 1.0
                     }
-                })
-            }
-
-            await MainActor.run {
-                modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
-                modelManagementState.modelState = .downloaded
+                } else {
+                    // 다운로드 시작 전 상태 업데이트
+                    await MainActor.run {
+                        modelManagementState.modelState = .downloading
+                        modelManagementState.currentDownloadingModels.insert(model)
+                        modelManagementState.isDownloading = true
+                    }
+                    
+                    let downloadTask = Task {
+                        await updateProgressBar(startProgress: 0.0, targetProgress: 0.99, maxTime: 20.0)
+                    }
+                    
+                    // 모델 다운로드 (별도의 다운로드 진행률 업데이트)
+                    folder = try await WhisperKit.download(variant: model, from: repoName, progressCallback: { progress in
+                        Task { @MainActor in
+                            // 다운로드 전용 진행률 업데이트 (0.0 ~ 1.0)
+                            self.modelManagementState.downloadProgress[model] = Float(progress.fractionCompleted)
+                        }
+                    })
+                    
+                    
+                    // 다운로드 완료 후 상태 업데이트
+                    downloadTask.cancel()
+                    await MainActor.run {
+                        modelManagementState.modelState = .downloaded
+                        modelManagementState.downloadProgress[model] = 1.0
+                        modelManagementState.currentDownloadingModels.remove(model)
+                        
+                        // 다운로드 중인 모델이 더 없다면 다운로드 상태 해제
+                        if modelManagementState.currentDownloadingModels.isEmpty {
+                            modelManagementState.isDownloading = false
+                        }
+                        
+                        if !modelManagementState.localModels.contains(model) {
+                            modelManagementState.localModels.append(model)
+                        }
+                    }
+                }
+            } catch {
+                print("⚠️ 모델 다운로드 실패: \(error.localizedDescription)")
+                await MainActor.run {
+                    modelManagementState.modelState = .unloaded
+                    modelManagementState.hasModelLoadError = true
+                    modelManagementState.modelLoadError = "모델 다운로드 실패: \(error.localizedDescription)"
+                    modelManagementState.loadingProgressValue = 0.0
+                    modelManagementState.downloadProgress[model] = nil
+                    modelManagementState.currentDownloadingModels.remove(model)
+                    
+                    // 다운로드 중인 모델이 더 없다면 다운로드 상태 해제
+                    if modelManagementState.currentDownloadingModels.isEmpty {
+                        modelManagementState.isDownloading = false
+                    }
+                    
+                    isLoadingModel = false
+                }
+                return
             }
 
             if let modelFolder = folder {
+                // 4. 모델 프리워밍 단계
                 whisperKit.modelFolder = modelFolder
 
+                // 프리워밍 시작
                 await MainActor.run {
-                    // Set the loading progress to 90% of the way after prewarm
-                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio
                     modelManagementState.modelState = .prewarming
                 }
-
-                let progressBarTask = Task {
-                    await updateProgressBar(targetProgress: 0.9, maxTime: 30)
+                
+                // 프리워밍 진행률 업데이트 작업 시작
+                let prewarmProgressTask = Task {
+                    await updateProgressBar(startProgress: 0.0,
+                                           targetProgress: prewarmProgressRatio,
+                                           maxTime: 15) // 프리워밍은 보통 시간이 좀 더 걸림
                 }
 
-                // Prewarm models
+                // 모델 프리워밍
                 do {
                     try await whisperKit.prewarmModels()
-                    progressBarTask.cancel()
+                    prewarmProgressTask.cancel()
+                    
+                    // 프리워밍 완료 후 진행률 업데이트
+                    await MainActor.run {
+                        modelManagementState.loadingProgressValue = prewarmProgressRatio
+                    }
                 } catch {
-                    print("Error prewarming models, retrying: \(error.localizedDescription)")
-                    progressBarTask.cancel()
+                    print("⚠️ 모델 prewarm 실패: \(error.localizedDescription)")
+                    prewarmProgressTask.cancel()
+                    
+                    // 재다운로드 시도 (한 번만)
                     if !redownload {
+                        await MainActor.run {
+                            modelManagementState.loadingProgressValue = 0.0
+                            modelManagementState.hasModelLoadError = true
+                            modelManagementState.modelLoadError = "모델 최적화 실패, 재시도 중..."
+                        }
                         loadModel(model, redownload: true)
                         isLoadingModel = false
                         return
                     } else {
-                        // Redownloading failed, error out
-                        modelManagementState.modelState = .unloaded
-                        isLoadingModel = false
+                        await MainActor.run {
+                            modelManagementState.modelState = .unloaded
+                            modelManagementState.hasModelLoadError = true
+                            modelManagementState.modelLoadError = "모델 최적화 실패: \(error.localizedDescription)"
+                            modelManagementState.loadingProgressValue = 0.0
+                            isLoadingModel = false
+                        }
                         return
                     }
                 }
 
+                // 5. 모델 로딩 단계
                 await MainActor.run {
-                    // Set the loading progress to 90% of the way after prewarm
-                    modelManagementState.loadingProgressValue = modelManagementState.specializationProgressRatio + 0.9 * (1 - modelManagementState.specializationProgressRatio)
                     modelManagementState.modelState = .loading
                 }
-
-                do {
-                    try await whisperKit.loadModels()
-                } catch {
-                    print("loadModels failed: \(error). Retrying once...")
-                    try await Task.sleep(nanoseconds: 200_000_000) // 200ms delay
-                    try await whisperKit.loadModels()
+                
+                // 로딩 진행률 업데이트 작업 시작
+                let loadProgressTask = Task {
+                    await updateProgressBar(startProgress: prewarmProgressRatio, 
+                                           targetProgress: loadProgressRatio, 
+                                           maxTime: 10)
                 }
 
-                await MainActor.run {
-                    if !modelManagementState.localModels.contains(model) {
-                        modelManagementState.localModels.append(model)
+                // 모델 로드 시도
+                do {
+                    try await whisperKit.loadModels()
+                    loadProgressTask.cancel()
+                } catch {
+                    print("⚠️ 모델 로드 실패: \(error.localizedDescription)")
+                    loadProgressTask.cancel()
+                    
+                    // MPSGraph 관련 에러인 경우 캐시 정리 후 한 번만 재시도
+                    let errorString = error.localizedDescription
+                    if errorString.contains("MPSGraph") || errorString.contains("MPSGraphExecutable") || errorString.contains("No space left on device") {
+                        print("MPSGraph 관련 에러 또는 디스크 공간 부족 감지됨, 캐시 정리 후 재시도...")
+                        clearCoreMLRuntimeCache()
+                        
+                        // 한 번 더 시도
+                        do {
+                            try await Task.sleep(nanoseconds: 500_000_000) // 500ms 대기
+                            try await whisperKit.loadModels()
+                        } catch {
+                            await MainActor.run {
+                                modelManagementState.modelState = .unloaded
+                                modelManagementState.hasModelLoadError = true
+                                modelManagementState.modelLoadError = "모델 로드 실패 (재시도 후): \(error.localizedDescription)"
+                                modelManagementState.loadingProgressValue = 0.0
+                                isLoadingModel = false
+                            }
+                            return
+                        }
+                    } else {
+                        await MainActor.run {
+                            modelManagementState.modelState = .unloaded
+                            modelManagementState.hasModelLoadError = true
+                            modelManagementState.modelLoadError = "모델 로드 실패: \(error.localizedDescription)"
+                            modelManagementState.loadingProgressValue = 0.0
+                            isLoadingModel = false
+                        }
+                        return
                     }
+                }
 
+                // 모델 로딩 성공
+                await MainActor.run {
+                    // 모델 정보 업데이트 및 완료 상태 설정
                     modelManagementState.availableLanguages = Constants.languages.map { $0.key }.sorted()
-                    modelManagementState.loadingProgressValue = 1.0
+                    modelManagementState.loadingProgressValue = loadProgressRatio
                     modelManagementState.modelState = whisperKit.modelState
+                    currentLoadedModel = model
+                    
+                    // 에러 상태 초기화 (성공적으로 로드됨)
+                    modelManagementState.hasModelLoadError = false
+                    modelManagementState.modelLoadError = nil
                 }
             }
             isLoadingModel = false
@@ -285,13 +592,17 @@ class ContentViewModel: ObservableObject {
         let progressRange = targetProgress - startProgress
         let decayConstant = -log(1 - 0.95) / Float(maxTime) // 95% 완료에 도달하는 시간 기준
         let startTime = Date()
+        let updateInterval: TimeInterval = 0.2 // 업데이트 간격 (0.2초)
         
-        while true {
+        // 업데이트 간격을 더 길게 설정하여 CPU 사용량 감소
+        while !Task.isCancelled {
             let elapsedTime = Date().timeIntervalSince(startTime)
+            // 자연스러운 곡선을 위해 지수 함수 사용
             let decayFactor = exp(-decayConstant * Float(elapsedTime))
             let progressIncrement = progressRange * (1 - decayFactor)
             let currentProgress = startProgress + progressIncrement
             
+            // MainActor에서 한 번만 상태 업데이트
             await MainActor.run {
                 modelManagementState.loadingProgressValue = min(currentProgress, targetProgress)
             }
@@ -299,7 +610,7 @@ class ContentViewModel: ObservableObject {
             if currentProgress >= targetProgress { break }
             
             do {
-                try await Task.sleep(nanoseconds: 100_000_000) // 0.1초 간격으로 업데이트
+                try await Task.sleep(nanoseconds: UInt64(updateInterval * 1_000_000_000))
             } catch {
                 break
             }
@@ -1197,6 +1508,10 @@ class ContentViewModel: ObservableObject {
         // 상태 초기화
         modelManagementState.availableModels = []
         modelManagementState.modelSizes = [:] // 모델 크기 정보 초기화
+        
+        // 에러 상태 초기화
+        modelManagementState.hasModelLoadError = false
+        modelManagementState.modelLoadError = nil
         
         if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path

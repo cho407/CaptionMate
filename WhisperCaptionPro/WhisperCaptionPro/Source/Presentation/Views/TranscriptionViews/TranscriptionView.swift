@@ -95,16 +95,18 @@ struct TranscriptionView: View {
                     ProgressView(whisperKit.progress)
                         .progressViewStyle(.linear)
                         .labelsHidden()
-                        .padding(.horizontal)
+                        .padding(.leading)
 
                     Button {
                         viewModel.uiState.transcribeTask?.cancel()
                         viewModel.uiState.transcribeTask = nil
+                        viewModel.resetState()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.secondary)
                     }
                     .buttonStyle(BorderlessButtonStyle())
+                    .padding(.trailing)
                 }
             }
         }

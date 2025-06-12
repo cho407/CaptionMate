@@ -37,17 +37,7 @@ struct TranscriptionState {
     var effectiveRealTimeFactor: TimeInterval = 0
     var effectiveSpeedFactor: TimeInterval = 0
     var totalInferenceTime: TimeInterval = 0
-    
-    // Eager mode 관련
-    var eagerResults: [TranscriptionResult?] = []
-    var prevResult: TranscriptionResult? = nil
-    var lastAgreedSeconds: Float = 0.0
-    var prevWords: [WordTiming] = []
-    var lastAgreedWords: [WordTiming] = []
-    var confirmedWords: [WordTiming] = []
-    var confirmedText: String = ""
-    var hypothesisWords: [WordTiming] = []
-    var hypothesisText: String = ""
+
 }
 
 struct ModelManagementState {
@@ -60,9 +50,13 @@ struct ModelManagementState {
     var availableLanguages: [String] = []
     var disabledModels: [String] = WhisperKit.recommendedModels().disabled
     
+    // 에러 관련 상태
+    var modelLoadError: String? = nil
+    var hasModelLoadError: Bool = false
+    
     // 다운로드/로딩 진행률
     var loadingProgressValue: Float = 0.0
-    var specializationProgressRatio: Float = 0.7
+    var specializationProgressRatio: Float = 0.2
     var downloadProgress: [String: Float] = [:]
     var downloadTasks: [String: Task<Void, Never>] = [:]
     
@@ -83,9 +77,6 @@ struct ModelManagementState {
     var modelFilter: String = ""
     
     var folder: URL?
-    
-    // 모델 로딩 작업 참조 (새로 추가)
-    var currentLoadingTask: Task<Void, Error>?
     
     // 모델 정보 포맷 헬퍼 함수들
     func formattedModelSize(for model: String) -> String {

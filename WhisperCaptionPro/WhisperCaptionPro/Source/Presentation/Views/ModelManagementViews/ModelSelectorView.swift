@@ -71,7 +71,7 @@ struct ModelSelectorView: View {
                         .padding(.vertical, 4)
                         .cornerRadius(6)
                     }
-                    .disabled(viewModel.modelManagementState.modelState == .loading)
+                    .disabled(viewModel.modelManagementState.modelState == .loading || viewModel.modelManagementState.modelState == .downloading || viewModel.modelManagementState.modelState == .prewarming)
                     
                 } else {
                     HStack {
@@ -98,6 +98,15 @@ struct ModelSelectorView: View {
 
             if viewModel.modelManagementState.modelState == .unloaded {
                 Divider()
+                
+                // 에러 메시지 표시
+                if viewModel.modelManagementState.hasModelLoadError, let errorMsg = viewModel.modelManagementState.modelLoadError {
+                    Text(errorMsg)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .lineLimit(2)
+                        .padding(.top, 2)
+                }
             } else if viewModel.modelManagementState.loadingProgressValue < 1.0 {
                 VStack {
                     HStack {
@@ -117,9 +126,32 @@ struct ModelSelectorView: View {
                         .monospacedDigit()
                         
                     }
-                    if viewModel.modelManagementState.modelState == .loading {
+                    
+                    // 에러 메시지 표시 (로딩 중 에러)
+                    if viewModel.modelManagementState.hasModelLoadError, let errorMsg = viewModel.modelManagementState.modelLoadError {
+                        Text(errorMsg)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .lineLimit(2)
+                            .padding(.top, 2)
+                    } else if viewModel.modelManagementState.modelState == .loading {
                         // 로딩 텍스트와 점 애니메이션만 표시
                         LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 로드 중")
+                            .font(.callout)
+                            .foregroundColor(.middleDarkGray)
+                    } else if viewModel.modelManagementState.modelState == .prewarming {
+                        // 로딩 텍스트와 점 애니메이션만 표시
+                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 최적화 중")
+                            .font(.callout)
+                            .foregroundColor(.middleDarkGray)
+                    } else if viewModel.modelManagementState.modelState == .unloading {
+                        // 로딩 텍스트와 점 애니메이션만 표시
+                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 초기화 중")
+                            .font(.callout)
+                            .foregroundColor(.middleDarkGray)
+                    } else if viewModel.modelManagementState.modelState == .downloading {
+                        // 로딩 텍스트와 점 애니메이션만 표시
+                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 다운로드 중")
                             .font(.callout)
                             .foregroundColor(.middleDarkGray)
                     }

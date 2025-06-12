@@ -316,11 +316,22 @@ struct ModelRowView: View {
                             .progressViewStyle(CircularProgressViewStyle())
                             .scaleEffect(0.5)
                     )
-            } else if viewModel.modelManagementState.modelState == .loading && viewModel.selectedModel == model {
+            } else if (viewModel.modelManagementState.modelState == .loading || viewModel.modelManagementState.modelState == .prewarming) && viewModel.selectedModel == model {
                 // 로드 중인 모델 - 로딩 아이콘 표시
                 HStack {
-
+                    
                     Text("모델 로드 중")
+                        .font(.callout)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 0)
+                    ProgressView()
+                        .scaleEffect(0.5)
+                        .foregroundColor(.secondary)
+                }
+            } else if viewModel.modelManagementState.modelState == .unloading && viewModel.selectedModel == model {
+                HStack {
+                    
+                    Text("모델 해제 중")
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 0)

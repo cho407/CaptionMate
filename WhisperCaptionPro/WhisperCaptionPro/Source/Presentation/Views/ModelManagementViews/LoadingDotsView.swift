@@ -50,8 +50,8 @@ struct LoadingDotsModifier: ViewModifier {
         timer = Timer.publish(every: 0.3, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
-                dotsCount = (dotsCount + 1) % 4
-            }
+            dotsCount = (dotsCount + 1) % 4
+        }
     }
     
     // 타이머 정지
