@@ -32,8 +32,6 @@ struct ContentView: View {
                     let build = Bundle.main
                         .infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
                     Text("App Version: \(version) (\(build))")
-                    Text("Device Model: \(WhisperKit.deviceName())")
-                    Text("OS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
                 }
                 .font(.caption.monospaced())
                 .foregroundColor(.secondary)
@@ -44,35 +42,15 @@ struct ContentView: View {
             .padding(.horizontal)
             Spacer()
         } detail: {
-            VStack {
-                if viewModel.uiState.isTranscribingView{
-                    VStack(alignment: .leading) {
-                        TranscriptionView(viewModel: viewModel)
-                    }
-                } else {
-                    AudioControlView(contentViewModel: viewModel)
-                }
-                ControlsView(viewModel: viewModel)
+            NavigationStack{
+                AudioControlView(contentViewModel: viewModel)
+
             }
-            .toolbar {
-                ToolbarItem {
-                    Button {
-                        Task {
-                            await viewModel.exportTranscription()
-                        }
-                    } label: {
-                        HStack {
-                            Image(systemName: "laptopcomputer.and.arrow.down")
-                            Text("Export Subtitle")
-                        }
-                    }
-                    .disabled(viewModel.transcriptionResult == nil)
-                }
-            }
-            .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {
-                ModelManagerView(viewModel: viewModel)
-                    .frame(minWidth: 600, minHeight: 500)
-            }
+            .navigationBarBackButtonHidden(true)
+        }
+        .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {
+            ModelManagerView(viewModel: viewModel)
+                .frame(minWidth: 600, minHeight: 500)
         }
         .onAppear {
             viewModel.fetchModels()

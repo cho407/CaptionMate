@@ -44,31 +44,6 @@ struct BasicSettingsView: View {
             }
             .padding(.horizontal)
             .padding(.top)
-
-            HStack {
-                Text(
-                    "\(viewModel.transcriptionState.effectiveRealTimeFactor, specifier: "%.3f") RTF"
-                )
-                .font(.body)
-                Spacer()
-                #if os(macOS)
-                    Text(
-                        "\(viewModel.transcriptionState.effectiveSpeedFactor, specifier: "%.1f") Speed Factor"
-                    )
-                    .font(.body)
-                    .lineLimit(1)
-                    Spacer()
-                #endif
-                Text("\(viewModel.transcriptionState.tokensPerSecond, specifier: "%.0f") tok/s")
-                    .font(.body)
-                Spacer()
-                Text(
-                    "First token: \(viewModel.transcriptionState.firstTokenTime - viewModel.transcriptionState.pipelineStart, specifier: "%.2f")s"
-                )
-                .font(.body)
-            }
-            .padding()
-            .frame(maxWidth: .infinity)
         }
     }
 }

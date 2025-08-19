@@ -1018,6 +1018,7 @@ class ContentViewModel: ObservableObject {
     /// 파일 전사 시작 (선택된 파일 URL로 전사 실행)
     func transcribeFile(path: String) {
         resetState()
+        stopImportedAudio()
         whisperKit?.audioProcessor = AudioProcessor()
         uiState.transcribeTask = Task {
             audioState.isTranscribing = true

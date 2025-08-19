@@ -41,9 +41,7 @@ struct ControlsView: View {
                     } label: {
                         Text("Import File")
                             .font(.headline)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .cornerRadius(8)
+                            .padding(8)
                     }
                     .fileImporter(
                         isPresented: $viewModel.uiState.isFilePickerPresented,
@@ -56,22 +54,22 @@ struct ControlsView: View {
                     .padding()
                     
                     Spacer()
-                    
-                    // 전사 시작 버튼
-                    Button {
+                    Button("전사 시작") {
                         if let url = viewModel.audioState.importedAudioURL {
                             viewModel.transcribeFile(path: url.path)
                         }
                         viewModel.uiState.isTranscribingView = true
-                    } label: {
-                        Text("전사 시작")
-                            .font(.headline)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 16)
-                            .cornerRadius(8)
                     }
-                    .lineLimit(1)
+                    .simpleButtonStyle(
+                        background: (viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.audioState.importedAudioURL == nil) ? .brightGray : .accentColor,
+                        foreground: .white,
+                        cornerRadius: 8,
+                        horizontalPadding: 16,
+                        verticalPadding: 10
+                    )
                     .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
+                    // 전사 시작 버튼
+
                 }
             }
         }
@@ -82,6 +80,9 @@ struct ControlsView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled)
                 .presentationContentInteraction(.scrolls)
+        }
+        .navigationDestination(isPresented: $viewModel.uiState.isTranscribingView) {
+            TranscriptionView(viewModel: viewModel)
         }
     }
 }

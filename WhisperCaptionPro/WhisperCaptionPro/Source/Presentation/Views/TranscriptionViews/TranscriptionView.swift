@@ -80,11 +80,12 @@ struct TranscriptionView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                .padding()
             }
+            .background(Color.lotionWhite)
             .frame(maxWidth: .infinity)
             .defaultScrollAnchor(.bottom)
             .textSelection(.enabled)
-            .padding()
 
             if let whisperKit = viewModel.whisperKit,
                viewModel.audioState.isTranscribing,
@@ -109,6 +110,7 @@ struct TranscriptionView: View {
                     .padding(.trailing)
                 }
             }
+            TranscriptionControlView(viewModel: viewModel)
         }
     }
 }

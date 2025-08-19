@@ -275,6 +275,9 @@ struct AudioControlView: View {
             }else{
                 AudioPlaceholderView(isTargeted: contentViewModel.uiState.isTargeted)
             }
+            // 하단 컨드롤러
+            ControlsView(viewModel: contentViewModel)
+
         }
         .onDrop(of: [UTType.fileURL.identifier], isTargeted: $contentViewModel.uiState.isTargeted) { providers in
             contentViewModel.handleDroppedFiles(providers: providers)

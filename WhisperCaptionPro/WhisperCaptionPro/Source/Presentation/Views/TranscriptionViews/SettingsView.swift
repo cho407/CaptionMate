@@ -199,34 +199,9 @@ struct SettingsView: View {
                 }
             }
             .padding(.horizontal)
-
-            Section(header: Text("Experimental")) {
-                HStack {
-                    Text("Eager Streaming Mode")
-                    InfoButton("Updates transcription more frequently but may be less accurate.")
-                    Spacer()
-                    Toggle("", isOn: $viewModel.enableEagerDecoding)
-                }
-                .padding(.horizontal)
-                .padding(.top)
-
-                VStack {
-                    Text("Token Confirmations")
-                    HStack {
-                        Slider(
-                            value: $viewModel.tokenConfirmationsNeeded,
-                            in: 1 ... 10,
-                            step: 1
-                        )
-                        Text(viewModel.tokenConfirmationsNeeded.formatted(.number))
-                            .frame(width: 30)
-                        InfoButton("Number of consecutive tokens required for confirmation.")
-                    }
-                }
-                .padding(.horizontal)
-            }
         }
-        .frame(minHeight: 700)
+        .padding(.vertical)
+        .frame(minHeight: 650)
         .navigationTitle("Decoding Options")
         .toolbar {
             ToolbarItem {
