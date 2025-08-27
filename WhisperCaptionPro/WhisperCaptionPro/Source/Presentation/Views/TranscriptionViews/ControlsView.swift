@@ -50,7 +50,8 @@ struct ControlsView: View {
                         onCompletion: viewModel.handleFilePicker
                     )
                     .lineLimit(1)
-                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.uiState.isTranscribingView)
+                    .disabled(viewModel.audioState.isTranscribing ||
+                              viewModel.uiState.isTranscribingView)
                     .padding()
                     
                     Spacer()

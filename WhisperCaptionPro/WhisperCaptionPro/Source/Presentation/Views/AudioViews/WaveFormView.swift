@@ -192,7 +192,11 @@ struct WaveformLineView: View {
                 
                 // 재생 위치 표시선 - 현재 재생 중인 라인에만 표시
                 if isCurrentLine {
-                    let positionRatio = min(1.0, max(0.0, (contentViewModel.audioPlayer?.currentTime ?? 0 - startTime) / (endTime - startTime)))
+                    let currentTime = contentViewModel.audioPlayer?.currentTime ?? 0
+                    let lineDuration = endTime - startTime
+                    let positionInLine = currentTime - startTime
+                    let positionRatio = lineDuration > 0 ? min(1.0, max(0.0, positionInLine / lineDuration)) : 0.0
+                    
                     Rectangle()
                         .fill(Color.blue)
                         .frame(width: 1, height: waveformHeight)
@@ -435,8 +439,10 @@ struct PositionIndicatorView: View {
     let isCurrentLine: Bool
     
     private var positionRatio: CGFloat {
-        if endTime <= startTime { return 0 }
-        let ratio = (currentTime - startTime) / (endTime - startTime)
+        let lineDuration = endTime - startTime
+        if lineDuration <= 0 { return 0 }
+        let positionInLine = currentTime - startTime
+        let ratio = positionInLine / lineDuration
         return CGFloat(max(0, min(1, ratio)))
     }
     
