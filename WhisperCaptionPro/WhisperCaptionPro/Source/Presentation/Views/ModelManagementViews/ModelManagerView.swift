@@ -38,11 +38,11 @@ struct ModelManagerView: View {
         VStack {
             // 상단 타이틀 및 닫기 버튼
             HStack {
-                Text("모델 관리")
+                Text("Manage Models")
                     .font(.largeTitle)
                     .bold()
                 Spacer()
-                Button("닫기") {
+                Button("Close") {
                     viewModel.fetchModels()
                     dismiss()
                 }
@@ -55,7 +55,7 @@ struct ModelManagerView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
-                TextField("모델 검색", text: $searchText)
+                TextField("Search Models", text: $searchText)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
             }
             .padding(.horizontal)
@@ -95,20 +95,20 @@ struct ModelManagerView: View {
             
             // 디버그 정보 표시
             VStack(alignment: .leading) {
-                Text("모델 정보")
+                Text("Model Info")
                     .font(.headline)
                     .padding(.top, 2)
                 
                 HStack {
-                    Text("전체 모델 수: \(filteredLocalModels.count + filteredRemoteModels.count)")
+                    Text("Total Models Count: \(filteredLocalModels.count + filteredRemoteModels.count)")
                     Spacer()
-                    Text("다운로드된 모델 수: \(filteredLocalModels.count)")
+                    Text("Downloaded Models Count: \(filteredLocalModels.count)")
                 }
                 .font(.caption)
                 .foregroundColor(.secondary)
                 
                 if viewModel.modelManagementState.availableModels.isEmpty {
-                    Text("모델 정보를 불러오는 중...")
+                    Text("Loading Model Info...")
                         .foregroundColor(.orange)
                         .padding(.top, 4)
                 }
@@ -122,7 +122,7 @@ struct ModelManagerView: View {
                     HStack {
                         Image(systemName: "arrow.down.circle.fill")
                             .foregroundColor(.blue)
-                        Text("다운로드 중: \(viewModel.modelManagementState.currentDownloadingModels.count)개 모델 (\(totalDownloadingSize))")
+                        Text("Downloading: \(viewModel.modelManagementState.currentDownloadingModels.count) Models (\(totalDownloadingSize))")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         Spacer()
@@ -147,7 +147,7 @@ struct ModelManagerView: View {
                     Spacer()
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle())
-                    Text("모델 목록을 불러오는 중...")
+                    Text("Loading Model List...")
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .padding()
@@ -164,7 +164,7 @@ struct ModelManagerView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         // 로컬에 있는 모델 섹션
                         if !filteredLocalModels.isEmpty {
-                            Text("설치된 모델")
+                            Text("Downloaded Models")
                                 .font(.headline)
                                 .padding(.horizontal)
                                 .padding(.top, 8)
@@ -183,9 +183,9 @@ struct ModelManagerView: View {
                         // 다운로드 가능한 모델 섹션
                         if !filteredRemoteModels.isEmpty {
                             HStack {
-                                Text("다운로드 가능한 모델")
+                                Text("Available Models")
                                     .font(.headline)
-                                Text("(총 \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file)))")
+                                Text("(Total: \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file)))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -242,7 +242,7 @@ struct ModelRowView: View {
                             .font(.headline)
                     }
                     if viewModel.modelManagementState.isDownloading(model: model){
-                        LoadingDotsView(text: "다운로드중")
+                        LoadingDotsView(text: "Downloading")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else{
@@ -303,10 +303,10 @@ struct ModelRowView: View {
                         await viewModel.releaseModel()
                     }
                 } label: {
-                    Text("모델 해제")
+                    Text("Unload Model")
                         .foregroundColor(.red)
                 }
-                .help("모델을 삭제하시려면 해제 해야합니다")
+                .help("You must unload the model before deleting it")
             } else if viewModel.modelManagementState.isDownloading(model: model) {
                 // 다운로드 중 - 상태 아이콘
                 Image(systemName: "arrow.down.circle")
@@ -320,7 +320,7 @@ struct ModelRowView: View {
                 // 로드 중인 모델 - 로딩 아이콘 표시
                 HStack {
                     
-                    Text("모델 로드 중")
+                    Text("Loading Model")
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 0)
@@ -331,7 +331,7 @@ struct ModelRowView: View {
             } else if viewModel.modelManagementState.modelState == .unloading && viewModel.selectedModel == model {
                 HStack {
                     
-                    Text("모델 해제 중")
+                    Text("Unloading Model")
                         .font(.callout)
                         .foregroundColor(.secondary)
                         .padding(.horizontal, 0)
@@ -348,7 +348,7 @@ struct ModelRowView: View {
                         .foregroundColor(.red)
                 }
                 .buttonStyle(BorderlessButtonStyle())
-                .help("모델 삭제")
+                .help("Delete Model")
             }
             
         } else if viewModel.modelManagementState.isDownloading(model: model) {
@@ -360,7 +360,7 @@ struct ModelRowView: View {
                         .progressViewStyle(CircularProgressViewStyle())
                         .scaleEffect(0.5)
                 )
-                .help("다운로드 중...")
+                .help("Downloading...")
         } else {
             // 다운로드 가능한 모델 - 다운로드 버튼
             Button(action: {
@@ -372,7 +372,7 @@ struct ModelRowView: View {
             .buttonStyle(BorderlessButtonStyle())
             .disabled(!viewModel.modelManagementState.canStartDownload(model: model))
             .help(!viewModel.modelManagementState.canStartDownload(model: model) ?
-                  "최대 동시 다운로드 수에 도달했습니다" : "모델 다운로드")
+                  "Maximum simultaneous downloads reached" : "Download Model")
         }
     }
 }

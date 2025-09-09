@@ -93,7 +93,7 @@ struct ModelSelectorView: View {
                     Image(systemName: "tray.and.arrow.down.fill")
                 }
                 .buttonStyle(BorderlessButtonStyle())
-                .help("모델 관리")
+                .help("Manage Models")
             }
 
             if viewModel.modelManagementState.modelState == .unloaded {
@@ -136,22 +136,22 @@ struct ModelSelectorView: View {
                             .padding(.top, 2)
                     } else if viewModel.modelManagementState.modelState == .loading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 로드 중")
+                        LoadingDotsView(text: "Loading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
                             .font(.callout)
                             .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .prewarming {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 최적화 중")
+                        LoadingDotsView(text: "Specializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
                             .font(.callout)
                             .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .unloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 초기화 중")
+                        LoadingDotsView(text: "Initializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
                             .font(.callout)
                             .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .downloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "\(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")) 모델 다운로드 중")
+                        LoadingDotsView(text: "Downloading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
                             .font(.callout)
                             .foregroundColor(.middleDarkGray)
                     }

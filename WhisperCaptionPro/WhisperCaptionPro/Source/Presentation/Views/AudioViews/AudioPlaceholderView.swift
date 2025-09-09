@@ -22,7 +22,7 @@ struct AudioPlaceholderView: View {
                 .font(.largeTitle)
                 .foregroundColor(isTargeted ? .secondary : .brightGray)
                 .padding(.bottom, 5)
-            Text("파일을 마우스로 끌어오세요")
+            Text("Drag and drop a file here")
                 .font(.headline)
                 .foregroundColor(isTargeted ? .secondary : .brightGray)
             Spacer()

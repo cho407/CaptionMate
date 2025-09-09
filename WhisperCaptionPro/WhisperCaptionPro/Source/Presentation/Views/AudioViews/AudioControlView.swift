@@ -49,7 +49,7 @@ struct AudioControlView: View {
                             HStack(spacing: 4) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 12))
-                                Text("삭제")
+                                Text("Delete")
                                     .font(.system(size: 12))
                             }
                             .foregroundColor(.red)
@@ -92,7 +92,7 @@ struct AudioControlView: View {
                                                         .foregroundColor(.secondary)
                                                         .padding(.bottom, 5)
                                                     
-                                                    Text("새로운 파일로 교체")
+                                                    Text("Replace with New File")
                                                         .font(.headline)
                                                         .foregroundColor(.secondary)
                                                     
@@ -251,7 +251,7 @@ struct AudioControlView: View {
                         Spacer()
                         
                         // 단축키 안내 (중앙 정렬)
-                        Text("단축키: 스페이스바(재생/정지), ←/→(이동), ↑/↓(볼륨), ⌘ + ↑/↓(속도)")
+                        Text("Shortcut: Space (Play/Pause), ←/→(Navigate), ↑/↓(Volume), ⌘ + ↑/↓(Playback Speed)")
                             .font(.system(size: 10))
                             .foregroundColor(.gray)
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -259,7 +259,7 @@ struct AudioControlView: View {
                         Spacer()
                         
                         // 재생 속도 표시 (좌측)
-                        Text("재생 속도: ")
+                        Text("Playback Speed: ")
                             .font(.system(size: 12))
                             .foregroundColor(.gray)
                         + Text(contentViewModel.currentPlaybackRateText())

@@ -55,7 +55,7 @@ struct ControlsView: View {
                     .padding()
                     
                     Spacer()
-                    Button("전사 시작") {
+                    Button("Start Transcription") {
                         if let url = viewModel.audioState.importedAudioURL {
                             viewModel.transcribeFile(path: url.path)
                         }

@@ -41,7 +41,7 @@ struct TranscriptionControlView: View {
                         viewModel.resetState()
                     }
                 } label: {
-                    Text("뒤로가기")
+                    Text("Back")
                         .font(.headline)
                         .foregroundStyle(viewModel.audioState.isTranscribing ? disableColor : .red)
                         .padding(.vertical, 8)
