@@ -241,11 +241,15 @@ struct ModelRowView: View {
                         Text(viewModel.modelManagementState.displayName(for: model))
                             .font(.headline)
                     }
-                    if viewModel.modelManagementState.isDownloading(model: model){
+                    if viewModel.modelManagementState.isCancelling(model: model) {
+                        LoadingDotsView(text: "Cancelling")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    } else if viewModel.modelManagementState.isDownloading(model: model) {
                         LoadingDotsView(text: "Downloading")
                             .font(.caption)
                             .foregroundColor(.secondary)
-                    } else{
+                    } else {
                         // 모델 크기 정보
                         Text(viewModel.modelManagementState.formattedModelSize(for: model))
                             .font(.caption)
@@ -259,8 +263,24 @@ struct ModelRowView: View {
                 modelActionButton(model: model)
             }
             
-            // 다운로드 중인 경우 진행바 표시
-            if viewModel.modelManagementState.isDownloading(model: model) {
+            // 다운로드 중이거나 취소 중인 경우 진행바 표시
+            if viewModel.modelManagementState.isCancelling(model: model) {
+                HStack {
+                    ProgressView()
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .opacity(0.6)
+                    
+                    Text("Cancelling...")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                        .frame(width: 80, alignment: .trailing)
+                    
+                    // 취소 중이므로 버튼 비활성화
+                    Image(systemName: "hourglass")
+                        .foregroundColor(.orange)
+                }
+                .padding(.top, 4)
+            } else if viewModel.modelManagementState.isDownloading(model: model) {
                 HStack {
                     ProgressView(value: viewModel.modelManagementState.downloadProgress[model] ?? 0, total: 1.0)
                         .progressViewStyle(LinearProgressViewStyle())
@@ -307,6 +327,15 @@ struct ModelRowView: View {
                         .foregroundColor(.red)
                 }
                 .help("You must unload the model before deleting it")
+            } else if viewModel.modelManagementState.isCancelling(model: model) {
+                // 취소 중 - 취소 아이콘
+                Image(systemName: "hourglass")
+                    .foregroundColor(.orange)
+                    .overlay(
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle())
+                            .scaleEffect(0.4)
+                    )
             } else if viewModel.modelManagementState.isDownloading(model: model) {
                 // 다운로드 중 - 상태 아이콘
                 Image(systemName: "arrow.down.circle")
@@ -351,6 +380,16 @@ struct ModelRowView: View {
                 .help("Delete Model")
             }
             
+        } else if viewModel.modelManagementState.isCancelling(model: model) {
+            // 취소 중 - 취소 아이콘
+            Image(systemName: "hourglass")
+                .foregroundColor(.orange)
+                .overlay(
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .scaleEffect(0.4)
+                )
+                .help("Cancelling download...")
         } else if viewModel.modelManagementState.isDownloading(model: model) {
             // 다운로드 중 - 상태 아이콘
             Image(systemName: "arrow.down.circle")

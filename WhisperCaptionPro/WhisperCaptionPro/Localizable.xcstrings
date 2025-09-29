@@ -136,6 +136,26 @@
         }
       }
     },
+    "Cancelling download..." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 취소중…"
+          }
+        }
+      }
+    },
+    "Cancelling..." : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "취소중…"
+          }
+        }
+      }
+    },
     "Chunking Strategy" : {
       "localizations" : {
         "ko" : {
@@ -182,6 +202,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU"
+          }
+        }
+      }
+    },
+    "Current Language: %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 언어: %@"
           }
         }
       }
@@ -292,6 +322,16 @@
         }
       }
     },
+    "English" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "English"
+          }
+        }
+      }
+    },
     "Enter frame rate" : {
       "localizations" : {
         "ko" : {
@@ -348,6 +388,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "파일 불러오기"
+          }
+        }
+      }
+    },
+    "Language" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "언어"
           }
         }
       }
@@ -718,6 +768,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "모델을 삭제하려면 해제해야 합니다."
+          }
+        }
+      }
+    },
+    "한국어" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한국어"
           }
         }
       }

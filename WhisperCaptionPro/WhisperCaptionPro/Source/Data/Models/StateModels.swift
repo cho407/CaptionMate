@@ -69,6 +69,9 @@ struct ModelManagementState {
     var isDownloading: Bool = false
     var currentDownloadingModels: Set<String> = []
     var downloadErrors: [String: String] = [:]
+    var cancellingModels: Set<String> = [] // 취소 중인 모델들
+    var lastProgressCallbackTime: [String: Date] = [:] // Progress 콜백 마지막 활동 시간
+    var downloadProgressObjects: [String: Progress] = [:] // NSProgress 객체 저장
     
     // 다운로드 관리 - 제한 해제
     var maxConcurrentDownloads: Int = Int.max
@@ -93,8 +96,12 @@ struct ModelManagementState {
         return currentDownloadingModels.contains(model)
     }
     
+    func isCancelling(model: String) -> Bool {
+        return cancellingModels.contains(model)
+    }
+    
     func canStartDownload(model: String) -> Bool {
-        return !isDownloading(model: model) && !localModels.contains(model)
+        return !isDownloading(model: model) && !isCancelling(model: model) && !localModels.contains(model)
     }
     
     func displayName(for model: String) -> String {

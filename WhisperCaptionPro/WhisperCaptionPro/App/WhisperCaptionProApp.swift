@@ -46,6 +46,25 @@ struct WhisperCaptionProApp: App {
                 .keyboardShortcut(.downArrow, modifiers: []) // ↓ 키만 눌러도 실행
                 .disabled(contentViewModel.audioVolume == 0.0)
             }
+            
+            CommandMenu("Settings") {
+                Menu("Language") {
+                    Button("English") {
+                        contentViewModel.changeAppLanguage(to: "en")
+                    }
+                    .disabled(contentViewModel.appLanguage == "en")
+                    
+                    Button("한국어") {
+                        contentViewModel.changeAppLanguage(to: "ko")
+                    }
+                    .disabled(contentViewModel.appLanguage == "ko")
+                }
+                
+                Divider()
+                
+                Text("Current Language: \(contentViewModel.getCurrentLanguageDisplayName())")
+                    .disabled(true)
+            }
         }
     }
 }

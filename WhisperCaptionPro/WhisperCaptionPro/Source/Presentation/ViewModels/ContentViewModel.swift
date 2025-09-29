@@ -10,6 +10,7 @@ import Combine
 import CoreML
 import SwiftUI
 import WhisperKit
+import AppKit
 
 // MARK: - ContentViewModel
 
@@ -77,8 +78,51 @@ class ContentViewModel: ObservableObject {
     @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false
     @AppStorage("frameRate") var frameRate: Double = 30.0
+    @AppStorage("appLanguage") var appLanguage: String = "en" // "en" or "ko"
     
     // MARK: - Methods
+    
+    /// 앱 언어 변경
+    func changeAppLanguage(to language: String) {
+        appLanguage = language
+        
+        // 시스템에 언어 변경 알림
+        if let languageCode = getLanguageCode(for: language) {
+            UserDefaults.standard.set([languageCode], forKey: "AppleLanguages")
+            UserDefaults.standard.synchronize()
+            
+            print("App language changed to: \(language)")
+            
+            // 앱 재시작 필요 알림 (선택사항)
+            DispatchQueue.main.async {
+                let alert = NSAlert()
+                alert.messageText = language == "ko" ? "언어 변경" : "Language Changed"
+                alert.informativeText = language == "ko" ? 
+                    "언어 변경사항을 적용하려면 앱을 재시작해주세요." : 
+                    "Please restart the app to apply language changes."
+                alert.addButton(withTitle: language == "ko" ? "확인" : "OK")
+                alert.runModal()
+            }
+        }
+    }
+    
+    /// 언어 코드 변환
+    private func getLanguageCode(for language: String) -> String? {
+        switch language {
+        case "en": return "en"
+        case "ko": return "ko"
+        default: return nil
+        }
+    }
+    
+    /// 현재 언어 표시명
+    func getCurrentLanguageDisplayName() -> String {
+        switch appLanguage {
+        case "ko": return "한국어"
+        case "en": return "English"
+        default: return "English"
+        }
+    }
     
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
     func resetState() {
@@ -125,7 +169,7 @@ class ContentViewModel: ObservableObject {
         
         // 1. 앱의 캐시 디렉토리 찾기
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask).first else {
-            print("캐시 디렉토리를 찾을 수 없습니다.")
+            print("Cache directory not found.")
             return
         }
         
@@ -152,16 +196,16 @@ class ContentViewModel: ObservableObject {
                     for item in contents {
                         do {
                             try fileManager.removeItem(at: item)
-                            print("캐시 아이템 삭제 완료: \(item.lastPathComponent)")
+                            print("Cache item deleted: \(item.lastPathComponent)")
                             clearedAny = true
                         } catch {
-                            print("캐시 아이템 삭제 실패: \(item.lastPathComponent) - \(error.localizedDescription)")
+                            print("Failed to delete cache item: \(item.lastPathComponent) - \(error.localizedDescription)")
                         }
                     }
                     
-                    print("CoreML 캐시 디렉토리 정리 완료: \(cacheDir.path)")
+                    print("CoreML cache directory cleaned: \(cacheDir.path)")
                 } catch {
-                    print("CoreML 캐시 디렉토리 접근 실패: \(error.localizedDescription)")
+                    print("Failed to access CoreML cache directory: \(error.localizedDescription)")
                 }
             }
         }
@@ -186,21 +230,21 @@ class ContentViewModel: ObservableObject {
             for tempFile in coreMLTempFiles {
                 do {
                     try fileManager.removeItem(at: tempFile)
-                    print("임시 파일 삭제 완료: \(tempFile.lastPathComponent)")
+                    print("Temporary file deleted: \(tempFile.lastPathComponent)")
                     clearedAny = true
                 } catch {
-                    print("임시 파일 삭제 실패: \(tempFile.lastPathComponent) - \(error.localizedDescription)")
+                    print("Failed to delete temporary file: \(tempFile.lastPathComponent) - \(error.localizedDescription)")
                 }
             }
         } catch {
-            print("임시 디렉토리 검색 실패: \(error.localizedDescription)")
+            print("Failed to search temporary directory: \(error.localizedDescription)")
         }
         
         // 6. 결과 메시지 출력
         if clearedAny {
-            print("CoreML 캐시 파일 정리 완료")
+            print("CoreML cache files cleaned")
         } else {
-            print("정리할 CoreML 캐시 파일을 찾지 못했습니다")
+            print("No CoreML cache files found to clean")
         }
     }
     
@@ -225,14 +269,14 @@ class ContentViewModel: ObservableObject {
             
             return (available: availableSpaceInt64, required: requiredSpace, isEnough: availableSpaceInt64 > requiredSpace)
         } catch {
-            print("디스크 공간 확인 실패: \(error.localizedDescription)")
+            print("Failed to check disk space: \(error.localizedDescription)")
             return (available: 0, required: 0, isEnough: false)
         }
     }
     
     /// 모델 해제 (메모리에서 완전히 해제)
     func releaseModel() async {
-        print("모델 해제 시작: \(selectedModel)")
+        print("Starting model release: \(selectedModel)")
         
         // 해제 프로세스 시작 상태 설정
         await MainActor.run {
@@ -288,7 +332,7 @@ class ContentViewModel: ObservableObject {
                 modelManagementState.modelState = .unloaded
                 modelManagementState.loadingProgressValue = 0.0 // 마지막에 0으로 리셋
                 currentLoadedModel = ""
-                print("모델 해제 완료: \(selectedModel)")
+                print("Model release completed: \(selectedModel)")
             }
         } else {
             // WhisperKit 인스턴스가 없는 경우
@@ -336,18 +380,14 @@ class ContentViewModel: ObservableObject {
             // 디스크 공간 확인 및 캐시 정리
             let diskSpace = checkDiskSpace()
             if !diskSpace.isEnough {
-                print("⚠️ 디스크 공간 부족: 사용 가능 \(diskSpace.available / 1_000_000) MB, 필요 \(diskSpace.required / 1_000_000) MB")
+                print("⚠️ Insufficient disk space: Available \(diskSpace.available / 1_000_000) MB, Required \(diskSpace.required / 1_000_000) MB")
                 clearCoreMLRuntimeCache()
             }
             
             // 기존 WhisperKit 인스턴스 해제
             if let kit = whisperKit {
-                do {
-                    await kit.unloadModels()
-                    print("이전 WhisperKit 모델 해제 완료")
-                } catch {
-                    print("⚠️ 이전 모델 언로드 실패: \(error.localizedDescription)")
-                }
+                await kit.unloadModels()
+                print("Previous WhisperKit model released")
                 whisperKit = nil
             }
             
@@ -357,7 +397,7 @@ class ContentViewModel: ObservableObject {
                 modelManagementState.loadingProgressValue = initProgressRatio
             }
             
-            print("선택된 모델: \(model)")
+            print("Selected model: \(model)")
             print("""
                 연산 옵션:
                 - Mel Spectrogram:  \(getComputeOptions().melCompute.description)
@@ -376,11 +416,11 @@ class ContentViewModel: ObservableObject {
                                            download: false)
                 whisperKit = try await WhisperKit(config)
             } catch {
-                print("⚠️ WhisperKit 초기화 실패: \(error.localizedDescription)")
+                print("⚠️ WhisperKit initialization failed: \(error.localizedDescription)")
                 await MainActor.run {
                     modelManagementState.modelState = .unloaded
                     modelManagementState.hasModelLoadError = true
-                    modelManagementState.modelLoadError = "모델 초기화 실패: \(error.localizedDescription)"
+                    modelManagementState.modelLoadError = "Model initialization failed: \(error.localizedDescription)"
                     modelManagementState.loadingProgressValue = 0.0
                     isLoadingModel = false
                 }
@@ -391,7 +431,7 @@ class ContentViewModel: ObservableObject {
                 await MainActor.run {
                     modelManagementState.modelState = .unloaded
                     modelManagementState.hasModelLoadError = true
-                    modelManagementState.modelLoadError = "WhisperKit 인스턴스 생성 실패"
+                    modelManagementState.modelLoadError = "WhisperKit instance creation failed"
                     modelManagementState.loadingProgressValue = 0.0
                     isLoadingModel = false
                 }
@@ -448,11 +488,11 @@ class ContentViewModel: ObservableObject {
                     }
                 }
             } catch {
-                print("⚠️ 모델 다운로드 실패: \(error.localizedDescription)")
+                print("⚠️ Model download failed: \(error.localizedDescription)")
                 await MainActor.run {
                     modelManagementState.modelState = .unloaded
                     modelManagementState.hasModelLoadError = true
-                    modelManagementState.modelLoadError = "모델 다운로드 실패: \(error.localizedDescription)"
+                    modelManagementState.modelLoadError = "Model download failed: \(error.localizedDescription)"
                     modelManagementState.loadingProgressValue = 0.0
                     modelManagementState.downloadProgress[model] = nil
                     modelManagementState.currentDownloadingModels.remove(model)
@@ -493,7 +533,7 @@ class ContentViewModel: ObservableObject {
                         modelManagementState.loadingProgressValue = prewarmProgressRatio
                     }
                 } catch {
-                    print("⚠️ 모델 prewarm 실패: \(error.localizedDescription)")
+                    print("⚠️ Model prewarm failed: \(error.localizedDescription)")
                     prewarmProgressTask.cancel()
                     
                     // 재다운로드 시도 (한 번만)
@@ -501,7 +541,7 @@ class ContentViewModel: ObservableObject {
                         await MainActor.run {
                             modelManagementState.loadingProgressValue = 0.0
                             modelManagementState.hasModelLoadError = true
-                            modelManagementState.modelLoadError = "모델 최적화 실패, 재시도 중..."
+                            modelManagementState.modelLoadError = "Model optimization failed, retrying..."
                         }
                         loadModel(model, redownload: true)
                         isLoadingModel = false
@@ -510,7 +550,7 @@ class ContentViewModel: ObservableObject {
                         await MainActor.run {
                             modelManagementState.modelState = .unloaded
                             modelManagementState.hasModelLoadError = true
-                            modelManagementState.modelLoadError = "모델 최적화 실패: \(error.localizedDescription)"
+                            modelManagementState.modelLoadError = "Model optimization failed: \(error.localizedDescription)"
                             modelManagementState.loadingProgressValue = 0.0
                             isLoadingModel = false
                         }
@@ -535,13 +575,13 @@ class ContentViewModel: ObservableObject {
                     try await whisperKit.loadModels()
                     loadProgressTask.cancel()
                 } catch {
-                    print("⚠️ 모델 로드 실패: \(error.localizedDescription)")
+                    print("⚠️ Model load failed: \(error.localizedDescription)")
                     loadProgressTask.cancel()
                     
                     // MPSGraph 관련 에러인 경우 캐시 정리 후 한 번만 재시도
                     let errorString = error.localizedDescription
                     if errorString.contains("MPSGraph") || errorString.contains("MPSGraphExecutable") || errorString.contains("No space left on device") {
-                        print("MPSGraph 관련 에러 또는 디스크 공간 부족 감지됨, 캐시 정리 후 재시도...")
+                        print("MPSGraph error or disk space shortage detected, retrying after cache cleanup...")
                         clearCoreMLRuntimeCache()
                         
                         // 한 번 더 시도
@@ -552,7 +592,7 @@ class ContentViewModel: ObservableObject {
                             await MainActor.run {
                                 modelManagementState.modelState = .unloaded
                                 modelManagementState.hasModelLoadError = true
-                                modelManagementState.modelLoadError = "모델 로드 실패 (재시도 후): \(error.localizedDescription)"
+                                modelManagementState.modelLoadError = "Model load failed (after retry): \(error.localizedDescription)"
                                 modelManagementState.loadingProgressValue = 0.0
                                 isLoadingModel = false
                             }
@@ -562,7 +602,7 @@ class ContentViewModel: ObservableObject {
                         await MainActor.run {
                             modelManagementState.modelState = .unloaded
                             modelManagementState.hasModelLoadError = true
-                            modelManagementState.modelLoadError = "모델 로드 실패: \(error.localizedDescription)"
+                            modelManagementState.modelLoadError = "Model load failed: \(error.localizedDescription)"
                             modelManagementState.loadingProgressValue = 0.0
                             isLoadingModel = false
                         }
@@ -641,7 +681,7 @@ class ContentViewModel: ObservableObject {
                     modelManagementState.modelSizes[model] = size
                 }
                 
-                print("모델 삭제 완료: \(model)")
+                print("Model deleted: \(model)")
             } catch {
                 print("Error deleting model: \(error)")
             }
@@ -654,13 +694,13 @@ class ContentViewModel: ObservableObject {
     func downloadModel(_ model: String) {
         // 현재 다운로드 중인 모델 수가 최대 동시 다운로드 수보다 작은지 확인
         guard modelManagementState.canStartDownload(model: model) else {
-            print("최대 동시 다운로드 수에 도달했습니다")
+            print("Maximum concurrent downloads reached")
             return
         }
         
         // 다운로드 시작 전 디스크 공간 확인
         guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
-            print("문서 디렉토리를 찾을 수 없습니다")
+            print("Document directory not found")
             return
         }
         
@@ -684,7 +724,7 @@ class ContentViewModel: ObservableObject {
                 let resourceValues = try documents.resourceValues(forKeys: [.volumeAvailableCapacityKey])
                 guard let availableSpace = resourceValues.volumeAvailableCapacity else {
                     await MainActor.run {
-                        self.modelManagementState.downloadErrors[model] = "디스크 공간을 확인할 수 없습니다"
+                        self.modelManagementState.downloadErrors[model] = "Cannot check disk space"
                     }
                     return
                 }
@@ -706,7 +746,7 @@ class ContentViewModel: ObservableObject {
                 if availableSpace < estimatedSize {
                     let availableGB = Double(availableSpace) / 1_000_000_000.0
                     let requiredGB = Double(estimatedSize) / 1_000_000_000.0
-                    let errorMessage = String(format: "디스크 공간이 부족합니다. 필요: %.1f GB, 가용: %.1f GB", requiredGB, availableGB)
+                    let errorMessage = String(format: "Insufficient disk space. Required: %.1f GB, Available: %.1f GB", requiredGB, availableGB)
                     await MainActor.run {
                         self.modelManagementState.downloadErrors[model] = errorMessage
                     }
@@ -724,15 +764,81 @@ class ContentViewModel: ObservableObject {
                     progressCallback: { [weak self] progress in
                         guard let self = self else { return }
                         
+                        // Progress 콜백 활동 기록 (모든 콜백에서 기록)
+                        Task { @MainActor in
+                            self.modelManagementState.lastProgressCallbackTime[model] = Date()
+                            
+                            // Progress 객체 저장 (처음 한 번만)
+                            if self.modelManagementState.downloadProgressObjects[model] == nil {
+                                self.modelManagementState.downloadProgressObjects[model] = progress
+                                print("Progress object stored: \(model)")
+                            }
+                            
+                            // Progress 완료 감지 (1.0 도달 시 cancelling 상태 해제)
+                            if self.modelManagementState.cancellingModels.contains(model) && 
+                               progress.fractionCompleted >= 1.0 {
+                                print("Progress completion detected (fractionCompleted: \(progress.fractionCompleted)) - Cancelling state released: \(model)")
+                                self.modelManagementState.cancellingModels.remove(model)
+                                self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+                                self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+                                
+                                // 부분 다운로드 파일 정리 (비동기)
+                                Task {
+                                    await self.cleanupPartialDownload(model)
+                                }
+                            }
+                        }
+                        
                         // 작업이 취소되었는지 확인
                         if Task.isCancelled {
+                            print("Task cancellation detected - terminating from progress callback: \(model)")
                             return
+                        }
+                        
+                        // 취소 중인 상태인지 확인 - 즉시 중단
+                        let isCancelling = Task { @MainActor in
+                            return self.modelManagementState.cancellingModels.contains(model)
+                        }
+                        
+                        Task {
+                            if await isCancelling.value || progress.isCancelled {
+                                print("Cancellation detected - immediate download stop: \(model) (progress: \(String(format: "%.1f", progress.fractionCompleted * 100))%)")
+                                
+                                // Progress가 취소되었으면 즉시 파일 삭제 (UI는 유지)
+                                if progress.isCancelled {
+                                    print("NSProgress cancellation detected - starting immediate file deletion: \(model)")
+                                    
+                                    // 즉시 부분 다운로드 파일 정리 (UI는 유지)
+                                    Task {
+                                        await self.cleanupPartialDownload(model)
+                                    }
+                                    
+                                    // 마지막 취소 완료 콜백까지 기다리기 위해 타임스탬프만 업데이트
+                                    await MainActor.run {
+                                        self.modelManagementState.lastProgressCallbackTime[model] = Date()
+                                    }
+                                }
+                                
+                                // Progress 콜백에서 즉시 return하여 더 이상 진행하지 않음
+                                return
+                            }
                         }
                         
                         // 진행률 업데이트 최적화 (너무 빈번한 업데이트 방지)
                         let currentTime = Date()
                         if currentTime.timeIntervalSince(lastUpdateTime) >= progressUpdateInterval {
                             Task { @MainActor in
+                                // 취소 중인 상태라면 UI 업데이트 건너뛰기
+                                if self.modelManagementState.cancellingModels.contains(model) {
+                                    print("Cancelling - skipping UI update: \(model)")
+                                    return
+                                }
+                                
+                                // 다운로드 중이 아니면 종료
+                                guard self.modelManagementState.currentDownloadingModels.contains(model) else {
+                                    return
+                                }
+                                
                                 self.modelManagementState.downloadProgress[model] = Float(progress.fractionCompleted)
                                 
                                 // 다운로드 중 디스크 공간 재확인 (50% 이상 다운로드된 경우에만)
@@ -740,7 +846,7 @@ class ContentViewModel: ObservableObject {
                                     if let resourceValues = try? documents.resourceValues(forKeys: [.volumeAvailableCapacityKey]),
                                        let currentSpace = resourceValues.volumeAvailableCapacity,
                                        currentSpace < Int64(Double(estimatedSize) * (1.0 - progress.fractionCompleted)) {
-                                        self.modelManagementState.downloadErrors[model] = "다운로드 중 디스크 공간이 부족해졌습니다"
+                                        self.modelManagementState.downloadErrors[model] = "Disk space became insufficient during download"
                                         self.modelManagementState.currentDownloadingModels.remove(model)
                                         return
                                     }
@@ -776,14 +882,21 @@ class ContentViewModel: ObservableObject {
                 }
                 
             } catch is CancellationError {
-                print("모델 다운로드 취소됨: \(model)")
-                await cleanupPartialDownload(model)
+                print("Model download cancelled: \(model)")
+                // 취소 중 상태가 아니라면 즉시 정리 (모니터링이 없는 경우)
+                let isCancelling = await MainActor.run { self.modelManagementState.cancellingModels.contains(model) }
+                if !isCancelling {
+                    await cleanupPartialDownload(model)
+                }
             } catch {
-                print("모델 다운로드 실패: \(error.localizedDescription)")
+                print("Model download failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    self.modelManagementState.downloadErrors[model] = "다운로드 실패: \(error.localizedDescription)"
+                    self.modelManagementState.downloadErrors[model] = "Download failed: \(error.localizedDescription)"
                     self.modelManagementState.currentDownloadingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = nil
+                    self.modelManagementState.cancellingModels.remove(model) // 에러 시 취소 상태도 해제
+                    self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+                    self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
                     
                     if self.modelManagementState.currentDownloadingModels.isEmpty {
                         self.modelManagementState.isDownloading = false
@@ -797,30 +910,16 @@ class ContentViewModel: ObservableObject {
         modelManagementState.downloadTasks[model] = task
     }
     
-    /// 부분 다운로드 파일 정리 헬퍼 메서드
+    /// 부분 다운로드 파일 정리 헬퍼 메서드 (파일 삭제만)
     private func cleanupPartialDownload(_ model: String) async {
-        await MainActor.run { [weak self] in
-            guard let self = self else { return }
-            
-            // 상태 업데이트
-            self.modelManagementState.downloadProgress[model] = nil
-            self.modelManagementState.currentDownloadingModels.remove(model)
-            self.modelManagementState.downloadTasks[model] = nil
-            
-            // 모든 다운로드가 취소되었는지 확인
-            if self.modelManagementState.currentDownloadingModels.isEmpty {
-                self.modelManagementState.isDownloading = false
-            }
-        }
-        
         // 부분적으로 다운로드된 파일 삭제
         let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath).appendingPathComponent(model)
         if FileManager.default.fileExists(atPath: modelFolder.path) {
             do {
                 try FileManager.default.removeItem(at: modelFolder)
-                print("부분 다운로드 파일 삭제 완료: \(model)")
+                print("Partial download file deleted: \(model)")
             } catch {
-                print("부분 다운로드 파일 삭제 실패: \(error.localizedDescription)")
+                print("Failed to delete partial download file: \(error.localizedDescription)")
             }
         }
     }
@@ -832,27 +931,94 @@ class ContentViewModel: ObservableObject {
             return
         }
         
-        print("다운로드 취소 요청: \(model)")
+        print("Download cancellation requested: \(model)")
         
-        // 작업 취소
+        // 1. 즉시 취소 중 상태로 변경
+        modelManagementState.cancellingModels.insert(model)
+        modelManagementState.currentDownloadingModels.remove(model)
+        
+        // 2. NSProgress 직접 취소 (다운로드 즉시 중단)
+        if let progress = modelManagementState.downloadProgressObjects[model] {
+            progress.cancel()
+            print("NSProgress directly cancelled: \(model)")
+        }
+        
+        // 3. Task 취소
         task.cancel()
         
-        // UI 즉시 업데이트
-        Task { @MainActor in
-            modelManagementState.downloadProgress[model] = nil
-            modelManagementState.currentDownloadingModels.remove(model)
-            modelManagementState.downloadTasks[model] = nil
+        // 3. Progress 콜백이 완전히 멈출 때까지 모니터링 시작
+        Task {
+            await monitorProgressCompletion(model: model)
+        }
+        
+        print("Download cancellation processing completed - Progress completion monitoring started: \(model)")
+    }
+    
+    /// 마지막 취소 완료 콜백 감지 모니터링
+    private func monitorProgressCompletion(model: String) async {
+        let maxWaitTime: TimeInterval = 30.0 // 최대 30초 대기
+        let checkInterval: TimeInterval = 0.5 // 0.5초마다 확인
+        let inactivityThreshold: TimeInterval = 3.0 // 3초간 비활성 시 마지막 콜백으로 간주
+        
+        let startTime = Date()
+        print("Cancellation completion callback monitoring started: \(model)")
+        
+        while await MainActor.run(body: { self.modelManagementState.cancellingModels.contains(model) }) {
+            // 최대 대기 시간 초과 확인
+            if Date().timeIntervalSince(startTime) > maxWaitTime {
+                print("Cancellation completion monitoring timeout (30s) - forced termination: \(model)")
+                break
+            }
             
-            // 모든 다운로드가 취소되었는지 확인
-            if modelManagementState.currentDownloadingModels.isEmpty {
-                modelManagementState.isDownloading = false
+            // 마지막 Progress 콜백 활동 확인
+            let lastActivity = await MainActor.run {
+                return self.modelManagementState.lastProgressCallbackTime[model]
+            }
+            
+            if let lastActivity = lastActivity {
+                let timeSinceLastActivity = Date().timeIntervalSince(lastActivity)
+                
+                // 3초간 비활성이면 마지막 취소 완료 콜백으로 간주
+                if timeSinceLastActivity > inactivityThreshold {
+                    print("Last cancellation completion callback detected (\(String(format: "%.1f", timeSinceLastActivity))s inactive) - Cancelling UI released: \(model)")
+                    break
+                }
+            }
+            
+            // 대기
+            do {
+                try await Task.sleep(nanoseconds: UInt64(checkInterval * 1_000_000_000))
+            } catch {
+                break
             }
         }
         
-        // 부분 다운로드 파일 비동기 정리 시작
-        Task {
-            await cleanupPartialDownload(model)
+        // 최종 정리 (마지막 콜백 완료 후)
+        await finalizeProgressCompletion(model: model)
+    }
+    
+    /// Progress 완료 후 최종 상태 정리
+    private func finalizeProgressCompletion(model: String) async {
+        await MainActor.run {
+            // 취소 중 상태 해제
+            self.modelManagementState.cancellingModels.remove(model)
+            self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+            self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+            
+            // 다운로드 관련 상태 정리
+            self.modelManagementState.downloadProgress[model] = nil
+            self.modelManagementState.downloadTasks[model] = nil
+            
+            // 모든 다운로드가 완료되었는지 확인
+            if self.modelManagementState.currentDownloadingModels.isEmpty {
+                self.modelManagementState.isDownloading = false
+            }
+            
+            print("Progress completion confirmed - Cancelling UI released: \(model)")
         }
+        
+        // 부분 다운로드 파일 정리
+        await cleanupPartialDownload(model)
     }
     
     // MARK: - 파일 선택 및 처리
@@ -903,7 +1069,7 @@ class ContentViewModel: ObservableObject {
                 // 재생 시간 업데이트 (재생 시작 전에 미리 설정)
                 audioState.totalDuration = durationInSeconds
                 audioPlayer?.currentTime = 0.0
-                print("오디오 파일 재생 시간: \(durationInSeconds)초")
+                print("Audio file duration: \(durationInSeconds) seconds")
                 
                 // 미리 AVAudioPlayer 생성하여 정보 준비
                 let player = try AVAudioPlayer(contentsOf: selectedFileURL)
@@ -918,7 +1084,7 @@ class ContentViewModel: ObservableObject {
                     audioState.totalDuration = player.duration
                 }
             } catch {
-                print("오디오 파일 정보 읽기 오류: \(error.localizedDescription)")
+                print("Audio file info reading error: \(error.localizedDescription)")
             }
             
             // 파일 URL 저장
@@ -994,8 +1160,8 @@ class ContentViewModel: ObservableObject {
         }
         
         // 디버그 로그
-        print("오디오 분석 - 평균 레벨: \(avgLevel) dB, 추정 LUFS: \(estimatedLUFS), 피크: \(peakLevel) dB")
-        print("노멀라이제이션 계수: \(normalizedVolumeFactor)")
+        print("Audio analysis - Average level: \(avgLevel) dB, Estimated LUFS: \(estimatedLUFS), Peak: \(peakLevel) dB")
+        print("Normalization factor: \(normalizedVolumeFactor)")
         
         // 초기 볼륨 적용
         applyVolume()
@@ -1368,7 +1534,7 @@ class ContentViewModel: ObservableObject {
                 audioState.waveformSamples = waveformSamples
                 
                 // 디버그 로그
-                print("파형 업데이트 완료: \(waveformSamples.count) 샘플, 총 시간: \(audioState.totalDuration)초")
+                print("Waveform update completed: \(waveformSamples.count) samples, total duration: \(audioState.totalDuration) seconds")
             }
         } catch {
             print("Error processing waveform: \(error.localizedDescription)")
@@ -1487,7 +1653,7 @@ class ContentViewModel: ObservableObject {
                             // 파형 생성 처리
                             await self.processWaveform()
                         } catch {
-                            print("오디오 파일 로드 오류: \(error.localizedDescription)")
+                            print("Audio file load error: \(error.localizedDescription)")
                         }
                     }
                     
@@ -1497,14 +1663,14 @@ class ContentViewModel: ObservableObject {
                     }
                 }
             } else {
-                print("파일 드랍 처리 실패: \(error?.localizedDescription ?? "Unknown error")")
+                print("File drop processing failed: \(error?.localizedDescription ?? "Unknown error")")
             }
         }
     }
     
     /// 로컬 및 원격 모델 목록 업데이트
     func fetchModels() {
-        print("모델 목록 가져오기 시작...")
+        print("Starting to fetch model list...")
         
         // 상태 초기화
         modelManagementState.availableModels = []
@@ -1516,15 +1682,15 @@ class ContentViewModel: ObservableObject {
         
         if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
             let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
-            print("모델 경로 확인: \(modelPath)")
+            print("Model path verification: \(modelPath)")
             
             // 디렉토리가 없으면 생성
             if !FileManager.default.fileExists(atPath: modelPath) {
                 do {
                     try FileManager.default.createDirectory(at: URL(fileURLWithPath: modelPath), withIntermediateDirectories: true)
-                    print("모델 디렉토리 생성: \(modelPath)")
+                    print("Model directory created: \(modelPath)")
                 } catch {
-                    print("모델 디렉토리 생성 실패: \(error.localizedDescription)")
+                    print("Failed to create model directory: \(error.localizedDescription)")
                 }
             }
             
@@ -1548,7 +1714,7 @@ class ContentViewModel: ObservableObject {
                     }
                     return false
                 }
-                print("로컬 모델 목록: \(downloadedModels)")
+                print("Local model list: \(downloadedModels)")
                 
                 // 로컬 모델 및 크기 정보 갱신
                 for model in downloadedModels {
@@ -1563,7 +1729,7 @@ class ContentViewModel: ObservableObject {
                     }
                 }
             } catch {
-                print("로컬 모델 목록 조회 실패: \(error.localizedDescription)")
+                print("Failed to fetch local model list: \(error.localizedDescription)")
             }
         }
         
@@ -1572,8 +1738,8 @@ class ContentViewModel: ObservableObject {
             modelManagementState.availableModels.append(model)
         }
         
-        print("로컬에서 찾은 모델: \(modelManagementState.localModels)")
-        print("이전에 선택한 모델: \(selectedModel)")
+        print("Models found locally: \(modelManagementState.localModels)")
+        print("Previously selected model: \(selectedModel)")
         
         Task {
             // 원격 모델 목록 가져오기 시도
@@ -1583,7 +1749,7 @@ class ContentViewModel: ObservableObject {
             let modelSupport = await WhisperKit.recommendedRemoteModels()
             supportedModels = modelSupport.supported
             disabledModels = modelSupport.disabled
-            print("WhisperKit에서 모델 목록 가져옴: \(supportedModels.count)개")
+            print("Fetched model list from WhisperKit: \(supportedModels.count) models")
             
             // 메인 스레드에서 UI 업데이트
             await MainActor.run {
@@ -1617,7 +1783,7 @@ class ContentViewModel: ObservableObject {
                     }
                 }
                 
-                print("업데이트된 사용 가능 모델 수: \(modelManagementState.availableModels.count)")
+                print("Updated available model count: \(modelManagementState.availableModels.count)")
                 objectWillChange.send() // UI 갱신 강제
             }
         }
@@ -1649,3 +1815,4 @@ class ContentViewModel: ObservableObject {
         return folderSize
     }
 }
+
