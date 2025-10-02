@@ -119,6 +119,9 @@ struct AudioState {
     var isPlaying: Bool = false
     var totalDuration: Double = 0.0
     var playbackTimer: Timer?
+    
+    /// 임시 디렉토리에 저장된 오디오 파일 URL (정리용)
+    var temporaryAudioURL: URL?
 }
 
 struct UIState {
@@ -131,4 +134,5 @@ struct UIState {
     var isTranscribingView: Bool = false
     var isModelmanagerViewPresented: Bool = false
     var isTargeted: Bool = false
+    var isLanguageChanged: Bool = false
 }

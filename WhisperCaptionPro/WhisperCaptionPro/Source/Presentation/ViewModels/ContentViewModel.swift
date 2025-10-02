@@ -93,19 +93,13 @@ class ContentViewModel: ObservableObject {
             
             print("App language changed to: \(language)")
             
-            // 앱 재시작 필요 알림 (선택사항)
-            DispatchQueue.main.async {
-                let alert = NSAlert()
-                alert.messageText = language == "ko" ? "언어 변경" : "Language Changed"
-                alert.informativeText = language == "ko" ? 
-                    "언어 변경사항을 적용하려면 앱을 재시작해주세요." : 
-                    "Please restart the app to apply language changes."
-                alert.addButton(withTitle: language == "ko" ? "확인" : "OK")
-                alert.runModal()
+            // 언어 변경 후 잠시 지연을 두고 Alert 표시 (새로운 locale 환경에서 Alert가 생성되도록)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.uiState.isLanguageChanged.toggle()
             }
         }
     }
-    
+
     /// 언어 코드 변환
     private func getLanguageCode(for language: String) -> String? {
         switch language {
@@ -130,6 +124,9 @@ class ContentViewModel: ObservableObject {
         uiState.isTranscribingView = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
+        
+        // 임시 파일 정리
+        cleanupPreviousAudioFile()
         
         transcriptionState.currentText = ""
         transcriptionState.currentChunks = [:]
@@ -210,31 +207,48 @@ class ContentViewModel: ObservableObject {
             }
         }
         
-        // 5. 임시 디렉토리 정리
-        // tmpdir은 모든 앱이 공유하므로 CoreML/WhisperKit 관련 파일만 신중하게 삭제
+        // 5. 임시 디렉토리 정리 (강화된 버전)
+        // tmpdir은 모든 앱이 공유하므로 관련 파일만 신중하게 삭제
         let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
         do {
-            let tempContents = try fileManager.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil)
+            let tempContents = try fileManager.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: [.fileSizeKey, .creationDateKey])
             
-            // WhisperKit 또는 CoreML 관련 파일만 필터링
-            let coreMLTempFiles = tempContents.filter { file in
+            // 앱 관련 임시 파일 필터링 (더 포괄적)
+            let appTempFiles = tempContents.filter { file in
                 let fileName = file.lastPathComponent.lowercased()
                 return fileName.contains("coreml") || 
                        fileName.contains("whisper") || 
                        fileName.contains(".bundle") || 
                        fileName.contains("model") ||
                        fileName.contains("mps") ||
-                       fileName.contains("mlmodel")
+                       fileName.contains("mlmodel") ||
+                       fileName.contains(".wav") ||
+                       fileName.contains(".mp3") ||
+                       fileName.contains(".m4a") ||
+                       fileName.contains(".aac") ||
+                       fileName.contains(".flac") ||
+                       fileName.hasPrefix("tmp") ||  // 시스템 임시 파일
+                       fileName.contains("download") // 다운로드 관련
             }
             
-            for tempFile in coreMLTempFiles {
+            var totalClearedSize: Int64 = 0
+            for tempFile in appTempFiles {
                 do {
+                    // 파일 크기 확인
+                    let resourceValues = try tempFile.resourceValues(forKeys: [.fileSizeKey])
+                    let fileSize = resourceValues.fileSize ?? 0
+                    
                     try fileManager.removeItem(at: tempFile)
-                    print("Temporary file deleted: \(tempFile.lastPathComponent)")
+                    totalClearedSize += Int64(fileSize)
+                    print("Temporary file deleted: \(tempFile.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)))")
                     clearedAny = true
                 } catch {
                     print("Failed to delete temporary file: \(tempFile.lastPathComponent) - \(error.localizedDescription)")
                 }
+            }
+            
+            if totalClearedSize > 0 {
+                print("Total temporary files cleaned: \(ByteCountFormatter.string(fromByteCount: totalClearedSize, countStyle: .file))")
             }
         } catch {
             print("Failed to search temporary directory: \(error.localizedDescription)")
@@ -1048,7 +1062,8 @@ class ContentViewModel: ObservableObject {
     @MainActor
     private func processSelectedFile(_ selectedFileURL: URL) async {
         do {
-            // 기존 오디오 플레이어 정리
+            // 기존 오디오 플레이어 및 임시 파일 정리
+            cleanupPreviousAudioFile()
             stopImportedAudio()
             audioPlayer = nil
             
@@ -1058,6 +1073,9 @@ class ContentViewModel: ObservableObject {
             let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
             try audioFileData.write(to: localFileURL)
             print("File saved to temporary directory: \(localFileURL)")
+            
+            // 임시 파일 URL 저장 (나중에 정리용)
+            audioState.temporaryAudioURL = localFileURL
             audioState.audioFileName = selectedFileURL.deletingPathExtension().lastPathComponent
             
             // 파일을 임포트한 후 바로 총 재생 시간을 확인하고 업데이트
@@ -1491,11 +1509,46 @@ class ContentViewModel: ObservableObject {
         // 재생 중이면 먼저 정지
         stopImportedAudio()
         
+        // 임시 파일 정리
+        cleanupPreviousAudioFile()
+        
         // 파일 삭제 대신 앱에서만 초기화
         audioState.importedAudioURL = nil
         audioState.audioFileName = ""
         audioState.waveformSamples = []
         print("Imported audio removed from app.")
+    }
+    
+    /// 이전 오디오 임시 파일 정리
+    private func cleanupPreviousAudioFile() {
+        if let tempURL = audioState.temporaryAudioURL {
+            do {
+                if FileManager.default.fileExists(atPath: tempURL.path) {
+                    try FileManager.default.removeItem(at: tempURL)
+                    print("Previous temporary audio file deleted: \(tempURL.lastPathComponent)")
+                }
+            } catch {
+                print("Failed to delete previous temporary audio file: \(error.localizedDescription)")
+            }
+            audioState.temporaryAudioURL = nil
+        }
+    }
+    
+    /// 앱 시작 시 통합 정리 (이전 세션의 모든 임시 파일)
+    func performStartupCleanup() async {
+        print("🧹 Starting comprehensive cleanup on app launch...")
+        
+        // 1. 현재 세션의 오디오 임시 파일 정리
+        cleanupPreviousAudioFile()
+        
+        // 2. 백그라운드에서 전체 임시 파일 정리
+        await Task.detached(priority: .background) {
+            await MainActor.run {
+                self.clearCoreMLRuntimeCache()
+            }
+        }.value
+        
+        print("✅ Startup cleanup completed")
     }
     
     /// 오디오 파일에서 파형 데이터를 생성 (RMS 기반 계산 예시)
@@ -1619,7 +1672,8 @@ class ContentViewModel: ObservableObject {
                     // 파일 접근 권한 확보
                     let shouldStopAccessing = url.startAccessingSecurityScopedResource()
                     
-                    // 기존 오디오 플레이어 정리
+                    // 기존 오디오 플레이어 및 임시 파일 정리
+                    self.cleanupPreviousAudioFile()
                     self.stopImportedAudio()
                     self.audioPlayer = nil
                     

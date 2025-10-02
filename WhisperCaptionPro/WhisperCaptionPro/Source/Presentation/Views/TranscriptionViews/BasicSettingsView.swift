@@ -16,17 +16,23 @@ struct BasicSettingsView: View {
             HStack {
                 Picker("", selection: $viewModel.selectedTask) {
                     ForEach(DecodingTask.allCases, id: \.self) { task in
-                        Text(task.description.capitalized).tag(task.description)
+                        Text(LocalizedStringKey(task.description.capitalized)).tag(task.description)
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
+                .pickerStyle(.segmented)
+                .onChange(of: viewModel.selectedTask) { _, newValue in
+                    // Translate 작업 선택 시 자동 언어 감지 활성화
+                    if newValue == "translate" {
+                        viewModel.isAutoLanguageEnable = true
+                    }
+                }
             }
             .padding(.horizontal)
             
             HStack {
                 Toggle("Auto Language", isOn: $viewModel.isAutoLanguageEnable)
                     .toggleStyle(.checkbox)
-                    .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))
+                    .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) || viewModel.selectedTask == "translate")
 
                 LabeledContent {
                     Picker("", selection: $viewModel.selectedLanguage) {

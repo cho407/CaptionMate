@@ -29,6 +29,7 @@ struct WhisperCaptionProApp: App {
         WindowGroup {
             ContentView(viewModel: contentViewModel)
                 .frame(minWidth: 1000, minHeight: 700)
+                .environment(\.locale, Locale(identifier: contentViewModel.appLanguage))
         }
         .modelContainer(sharedModelContainer)
         // MARK: - 상단 툴바

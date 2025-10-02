@@ -52,8 +52,17 @@ struct ContentView: View {
             ModelManagerView(viewModel: viewModel)
                 .frame(minWidth: 600, minHeight: 500)
         }
+        .alert("Language Changed", isPresented: $viewModel.uiState.isLanguageChanged) {
+            Button("OK") { }
+        } message: {
+            Text("The language has been changed.")
+        }
         .onAppear {
             viewModel.fetchModels()
+            // 앱 시작 시 이전 세션의 모든 임시 파일 정리
+            Task {
+                await viewModel.performStartupCleanup()
+            }
         }
     }
 }
