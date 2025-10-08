@@ -8,10 +8,13 @@
 import SwiftUI
 
 struct InfoButton: View {
-    var infoText: String
+    @Environment(\.locale) private var locale
+    
     @State private var showInfo = false
+    
+    var infoText: LocalizedStringKey
 
-    init(_ infoText: String) {
+    init(_ infoText: LocalizedStringKey) {
         self.infoText = infoText
     }
 
@@ -25,6 +28,12 @@ struct InfoButton: View {
         .popover(isPresented: $showInfo) {
             Text(infoText)
                 .padding()
+                .environment(\.locale, locale)
+        }
+        .onChange(of: locale) { oldValue, newValue in
+            if showInfo {
+                showInfo = false
+            }
         }
         .buttonStyle(BorderlessButtonStyle())
     }

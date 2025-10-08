@@ -5,6 +5,7 @@
 
     },
     "(Total: %@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -70,6 +71,12 @@
         }
       }
     },
+    "%lld" : {
+
+    },
+    "30" : {
+
+    },
     "App Version: %@ (%@)" : {
       "localizations" : {
         "en" : {
@@ -107,7 +114,24 @@
       }
     },
     "Available Models" : {
+      "extractionState" : "stale",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 가능한 모델"
+          }
+        }
+      }
+    },
+    "available_models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Available Models"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -217,11 +241,44 @@
       }
     },
     "Decoding Options" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "디코딩 옵션"
+          }
+        }
+      }
+    },
+    "decoding_options" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decoding Options"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디코딩 옵션"
+          }
+        }
+      }
+    },
+    "decoding_quality" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Decoding Quality"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디코딩 품질"
           }
         }
       }
@@ -247,6 +304,7 @@
       }
     },
     "Done" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -266,7 +324,24 @@
         }
       }
     },
+    "downloaded" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaded"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 완료"
+          }
+        }
+      }
+    },
     "Downloaded Models" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -277,6 +352,7 @@
       }
     },
     "Downloaded Models Count: %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -286,7 +362,56 @@
         }
       }
     },
+    "downloaded_models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloaded Models"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드된 모델"
+          }
+        }
+      }
+    },
+    "downloading_models_count %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading %lld Model(s)"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld개 모델 다운로드 중"
+          }
+        }
+      }
+    },
+    "downloading_status" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading Status"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 진행 상태"
+          }
+        }
+      }
+    },
     "Downloading: %lld Models (%@)" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -333,6 +458,7 @@
       }
     },
     "Enter frame rate" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -358,6 +484,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "첫번째 토큰: %.2fs"
+          }
+        }
+      }
+    },
+    "format_and_preview" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Format & Preview"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "형식 및 미리보기"
           }
         }
       }
@@ -392,6 +534,227 @@
         }
       }
     },
+    "info.cache_prefill" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When Cache Prefill is on, the decoder will try to use a lookup table of pre-computed KV caches instead of computing them during the decoding loop, which can speed up inference."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "캐시 미리 채우기가 활성화되면 디코더는 디코딩 루프 중에 계산하는 대신 미리 계산된 KV 캐시의 조회 테이블을 사용하려고 시도하여 추론 속도를 높일 수 있습니다."
+          }
+        }
+      }
+    },
+    "info.chunking_strategy" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 데이터 분할에 사용할 전략을 선택합니다. VAD를 선택하면 오디오가 음성 활동(침묵 구간 분할)을 기반으로 분할됩니다."
+          }
+        }
+      }
+    },
+    "info.compression_check_tokens" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number of tokens used to check for repetitive patterns via compression. This helps detect and prevent model hallucinations."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "압축을 통해 반복적인 패턴을 확인하는 데 사용되는 토큰 수입니다. 모델 환각을 감지하고 방지하는 데 도움이 됩니다."
+          }
+        }
+      }
+    },
+    "info.frame_rate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Frame rate for video subtitle export. This setting is only used when exporting to video subtitle formats (e.g., FCPXML)."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "비디오 자막 내보내기용 프레임 레이트입니다. 이 설정은 비디오 자막 형식(예: FCPXML)으로 내보낼 때만 사용됩니다."
+          }
+        }
+      }
+    },
+    "info.max_fallback_count" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number of fallback attempts for token selection when the initial temperature fails to produce valid tokens."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "초기 온도가 유효한 토큰을 생성하지 못할 때 토큰 선택에 대한 재시도 횟수입니다."
+          }
+        }
+      }
+    },
+    "info.max_tokens_per_loop" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Maximum number of tokens generated per decoding loop. Lower values use less memory but may require more loops."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디코딩 루프당 생성되는 최대 토큰 수입니다. 값이 낮을수록 메모리를 덜 사용하지만 더 많은 루프가 필요할 수 있습니다."
+          }
+        }
+      }
+    },
+    "info.prompt_prefill" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When Prompt Prefill is on, it forces the task, language, and timestamp tokens in the decoding loop. Toggle it off if you'd like the model to generate those tokens itself."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프롬프트 사전 입력이 활성화되면 디코딩 루프에서 작업, 언어 및 타임스탬프 토큰이 강제로 적용됩니다. 모델이 이러한 토큰을 스스로 생성하도록 하려면 비활성화하세요."
+          }
+        }
+      }
+    },
+    "info.show_decoder_preview" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 설정을 활성화하면 전사 중 UI에 디코더 출력의 작은 미리보기가 표시됩니다. 디버깅에 유용할 수 있습니다."
+          }
+        }
+      }
+    },
+    "info.show_timestamps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 설정을 활성화하면 UI와 프리필 토큰에 타임스탬프가 포함/제외됩니다.\n\"프롬프트 사전 입력\"을 해제하지 않는 한 <|notimestamps|> 또는 <|0.00|>이 강제로 적용됩니다."
+          }
+        }
+      }
+    },
+    "info.special_characters" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggling this will include/exclude special characters in the transcription text."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 설정을 활성화하면 전사 텍스트에 특수 문자가 포함/제외됩니다."
+          }
+        }
+      }
+    },
+    "info.starting_temperature" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Controls the initial randomness of token selection in the decoding loop. Higher values produce more random results."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디코딩 루프에서 토큰 선택의 초기 무작위성을 제어합니다. 값이 높을수록 더 무작위적인 결과가 생성됩니다."
+          }
+        }
+      }
+    },
+    "info.word_timestamps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggling this will enable/disable word-level timestamps in the transcription output.\nWhen enabled, each transcription segment is split into individual words with precise start and end times calculated using dynamic alignment.\nDisabling this option will result in only segment-level timestamps."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 설정을 활성화하면 전사 출력에서 단어 단위 타임스탬프가 활성화/비활성화됩니다.\n활성화하면 각 전사 세그먼트가 개별 단어로 분할되며 동적 정렬을 사용하여 정확한 시작 및 종료 시간이 계산됩니다.\n이 옵션을 비활성화하면 세그먼트 단위 타임스탬프만 생성됩니다."
+          }
+        }
+      }
+    },
+    "info.workers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Number of concurrent transcription workers. Higher values may increase memory usage but can improve speed."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동시 전사 작업 수입니다. 값이 높을수록 메모리 사용량이 증가할 수 있지만 속도가 향상될 수 있습니다."
+          }
+        }
+      }
+    },
     "Language" : {
       "localizations" : {
         "ko" : {
@@ -414,7 +777,11 @@
         }
       }
     },
+    "Loading" : {
+
+    },
     "Loading Model" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -425,6 +792,7 @@
       }
     },
     "Loading Model Info..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -435,6 +803,7 @@
       }
     },
     "Loading Model List..." : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -444,8 +813,56 @@
         }
       }
     },
+    "loading_model_info" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading Model Info..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 정보 불러오는 중..."
+          }
+        }
+      }
+    },
+    "loading_model_list" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loading Model List..."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 목록 불러오는 중..."
+          }
+        }
+      }
+    },
     "Manage Models" : {
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 관리"
+          }
+        }
+      }
+    },
+    "manage_models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage Models"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -485,7 +902,24 @@
       }
     },
     "Model Info" : {
+      "extractionState" : "stale",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 정보"
+          }
+        }
+      }
+    },
+    "model_info" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model Info"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -514,6 +948,9 @@
         }
       }
     },
+    "of" : {
+
+    },
     "OK" : {
       "comment" : "OK button title",
       "localizations" : {
@@ -521,6 +958,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "확인"
+          }
+        }
+      }
+    },
+    "performance" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Performance"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "성능"
           }
         }
       }
@@ -546,6 +999,7 @@
       }
     },
     "Realtime Delay Interval" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -576,7 +1030,24 @@
       }
     },
     "Search Models" : {
+      "extractionState" : "stale",
       "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 검색"
+          }
+        }
+      }
+    },
+    "search_models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search Models"
+          }
+        },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
@@ -636,6 +1107,7 @@
       }
     },
     "Silence Threshold" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -746,6 +1218,7 @@
       }
     },
     "Total Models Count: %lld" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -754,6 +1227,42 @@
           }
         }
       }
+    },
+    "total_models" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total Models"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 모델"
+          }
+        }
+      }
+    },
+    "total_size:" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Total:"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "총 용량:"
+          }
+        }
+      }
+    },
+    "total_size: %@" : {
+
     },
     "Transcribe" : {
       "extractionState" : "stale",
@@ -787,7 +1296,11 @@
         }
       }
     },
+    "Unloading" : {
+
+    },
     "Unloading Model" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {
@@ -847,7 +1360,11 @@
         }
       }
     },
+    "Workers" : {
+
+    },
     "Workers:" : {
+      "extractionState" : "stale",
       "localizations" : {
         "ko" : {
           "stringUnit" : {

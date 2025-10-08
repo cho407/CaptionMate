@@ -12,34 +12,6 @@ struct TranscriptionView: View {
 
     var body: some View {
         VStack {
-            if !viewModel.transcriptionState.bufferEnergy.isEmpty {
-                ScrollView(.horizontal) {
-                    HStack(spacing: 1) {
-                        let startIndex = max(
-                            viewModel.transcriptionState.bufferEnergy.count - 300,
-                            0
-                        )
-                        ForEach(
-                            Array(viewModel.transcriptionState.bufferEnergy
-                                .enumerated())[startIndex...],
-                            id: \.element
-                        ) { _, energy in
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .frame(width: 2, height: CGFloat(energy) * 24)
-                            }
-                            .frame(maxHeight: 24)
-                            .background(energy > Float(viewModel.silenceThreshold) ? Color
-                                .green
-                                .opacity(0.2) : Color.red.opacity(0.2))
-                        }
-                    }
-                }
-                .defaultScrollAnchor(.trailing)
-                .frame(height: 24)
-                .scrollIndicators(.never)
-            }
-
             ScrollView {
                 VStack(alignment: .leading) {
                     ForEach(Array(viewModel.transcriptionState.confirmedSegments.enumerated()),

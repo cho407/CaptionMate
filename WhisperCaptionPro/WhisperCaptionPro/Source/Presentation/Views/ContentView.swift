@@ -51,6 +51,7 @@ struct ContentView: View {
         .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {
             ModelManagerView(viewModel: viewModel)
                 .frame(minWidth: 600, minHeight: 500)
+                .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
         .alert("Language Changed", isPresented: $viewModel.uiState.isLanguageChanged) {
             Button("OK") { }

@@ -81,6 +81,7 @@ struct ControlsView: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackgroundInteraction(.enabled)
                 .presentationContentInteraction(.scrolls)
+                .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
         .navigationDestination(isPresented: $viewModel.uiState.isTranscribingView) {
             TranscriptionView(viewModel: viewModel)

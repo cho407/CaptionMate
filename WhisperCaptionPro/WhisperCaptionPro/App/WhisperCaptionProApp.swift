@@ -60,6 +60,10 @@ struct WhisperCaptionProApp: App {
                     }
                     .disabled(contentViewModel.appLanguage == "ko")
                 }
+                .disabled(
+                    contentViewModel.uiState.isFilePickerPresented ||  // 파일 불러오기 창 열림
+                    contentViewModel.isExporting                       // 자막 내보내기 창 열림
+                )
                 
                 Divider()
                 

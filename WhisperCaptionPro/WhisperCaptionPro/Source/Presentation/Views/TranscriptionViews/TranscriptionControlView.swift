@@ -65,6 +65,7 @@ struct TranscriptionControlView: View {
                             .padding(8)
                     }
                 }
+                .environment(\.locale, .init(identifier: viewModel.appLanguage))
                 .disabled(viewModel.transcriptionResult == nil)
             }
             

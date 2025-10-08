@@ -52,39 +52,72 @@ class ContentViewModel: ObservableObject {
     private var playbackTimerCancellable: AnyCancellable?
     
     // MARK: - AppStorage (사용자 설정, UserDefaults 기반)
-    @AppStorage("selectedAudioInput") var selectedAudioInput: String = "No Audio Input"
     @AppStorage("selectedModel") var selectedModel: String = WhisperKit.recommendedModels().default
     @AppStorage("selectedTask") var selectedTask: String = "transcribe"
     @AppStorage("selectedLanguage") var selectedLanguage: String = "english"
     @AppStorage("repoName") var repoName: String = "argmaxinc/whisperkit-coreml"
-    @AppStorage("enableTimestamps") var enableTimestamps: Bool = true
-    @AppStorage("enablePromptPrefill") var enablePromptPrefill: Bool = true
-    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true
-    @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool = false
-    @AppStorage("enableEagerDecoding") var enableEagerDecoding: Bool = false
-    @AppStorage("enableDecoderPreview") var enableDecoderPreview: Bool = true
-    @AppStorage("temperatureStart") var temperatureStart: Double = 0.0
-    @AppStorage("fallbackCount") var fallbackCount: Double = 5.0
-    @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double = 60.0
-    @AppStorage("sampleLength") var sampleLength: Double = 224.0
-    @AppStorage("silenceThreshold") var silenceThreshold: Double = 0.3
-    @AppStorage("realtimeDelayInterval") var realtimeDelayInterval: Double = 1.0
-    @AppStorage("useVAD") var useVAD: Bool = true
-    @AppStorage("tokenConfirmationsNeeded") var tokenConfirmationsNeeded: Double = 2.0
-    @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double = 4.0
-    @AppStorage("chunkingStrategy") var chunkingStrategy: ChunkingStrategy = .vad
+    
+    // 전사 설정 - DecodingOptions에 적용됨
+    @AppStorage("enableTimestamps") var enableTimestamps: Bool = true  // ✓ 적용됨 (withoutTimestamps)
+    @AppStorage("enablePromptPrefill") var enablePromptPrefill: Bool = true  // ✓ 적용됨 (usePrefillPrompt)
+    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true  // ✓ 적용됨 (usePrefillCache)
+    @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool = false  // ✓ 적용됨 (skipSpecialTokens)
+    @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false  // ✓ 적용됨 (wordTimestamps)
+    @AppStorage("temperatureStart") var temperatureStart: Double = 0.0  // ✓ 적용됨 (temperature)
+    @AppStorage("fallbackCount") var fallbackCount: Double = 5.0  // ✓ 적용됨 (temperatureFallbackCount)
+    @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double = 60.0  // ✓ 적용됨 (decodingCallback에서 사용)
+    @AppStorage("sampleLength") var sampleLength: Int = 224  // ✓ 적용됨 (sampleLength)
+    @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double = 4.0  // ✓ 적용됨 (concurrentWorkerCount)
+    @AppStorage("chunkingStrategy") var chunkingStrategy: ChunkingStrategy = .vad  // ✓ 적용됨 (chunkingStrategy)
+    
+    // UI 전용 설정 - 전사 로직에 적용되지 않음
+    @AppStorage("enableDecoderPreview") var enableDecoderPreview: Bool = true  // UI 표시용
+    
+    // Export 전용 설정
+    @AppStorage("frameRate") var frameRate: Double = 30.0  // Export 시에만 사용 (FCPXML 등)
+
+    // 기타 설정
     @AppStorage("encoderComputeUnits") var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
-    @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool = false
-    @AppStorage("frameRate") var frameRate: Double = 30.0
-    @AppStorage("appLanguage") var appLanguage: String = "en" // "en" or "ko"
+    @AppStorage("appLanguage") var appLanguage: String = detectSystemLanguage()
+    
+    // MARK: - Initialization
+    
+    init() {
+        // 첫 실행 시에만 시스템 언어로 설정 (이미 저장된 값이 있으면 유지)
+        if UserDefaults.standard.object(forKey: "appLanguage") == nil {
+            appLanguage = ContentViewModel.detectSystemLanguage()
+        }
+    }
+    
+    /// 시스템 언어 감지 (확장 가능한 구조)
+    private static func detectSystemLanguage() -> String {
+        let systemLanguage = Locale.preferredLanguages.first ?? "en"
+        
+        // 지원하는 언어 목록 (확장 가능)
+        let supportedLanguages = ["ko"] // 현재는 한국어만 추가 지원
+        
+        // 시스템 언어가 지원 목록에 있는지 확인
+        for supported in supportedLanguages {
+            if systemLanguage.hasPrefix(supported) {
+                return supported
+            }
+        }
+        
+        // 기본값은 영어
+        return "en"
+    }
     
     // MARK: - Methods
     
     /// 앱 언어 변경
     func changeAppLanguage(to language: String) {
         appLanguage = language
+        
+        // Sheet들 닫기 (다시 열 때 새 언어로 표시됨)
+        uiState.showAdvancedOptions = false           // SettingsView
+        uiState.isModelmanagerViewPresented = false   // ModelManagerView
         
         // 시스템에 언어 변경 알림
         if let languageCode = getLanguageCode(for: language) {
@@ -1258,7 +1291,7 @@ class ContentViewModel: ObservableObject {
             language: isAutoLanguageEnable ? nil : languageCode, // 자동 언어 감지 옵션
             temperature: Float(temperatureStart),
             temperatureFallbackCount: Int(fallbackCount),
-            sampleLength: Int(sampleLength),
+            sampleLength: sampleLength,
             usePrefillPrompt: enablePromptPrefill,
             usePrefillCache: enableCachePrefill,
             detectLanguage: isAutoLanguageEnable,
@@ -1608,11 +1641,18 @@ class ContentViewModel: ObservableObject {
         return rmsValues
     }
     
-    // MARK: - Export Service 호출 (ViewModel 내)
+    // MARK: - Export Service 호출
     func exportTranscription() async {
         guard var result = transcriptionResult else {
             print("No transcription result available.")
             return
+        }
+        
+        // Export 시작 (언어 메뉴 비활성화)
+        isExporting = true
+        defer {
+            // Export 완료 후 항상 실행
+            isExporting = false
         }
         
         // 세그먼트와 단어 처리: 앞뒤 공백 제거 후 빈 세그먼트 제거 등

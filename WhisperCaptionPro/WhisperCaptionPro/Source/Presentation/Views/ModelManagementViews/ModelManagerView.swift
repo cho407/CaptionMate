@@ -16,13 +16,23 @@ struct ModelManagerView: View {
     // 필터링할 단어 목록
     let filterWords: [String] = ["distil", "MB", "2024"]
     
-    // 다운로드 진행 상황에 대한 계산 속성
+    // 다운로드 진행 상황 - 가중 평균 (모델 크기 고려)
     private var totalDownloadProgress: Double {
-        let downloads = viewModel.modelManagementState.downloadProgress
-        if downloads.isEmpty { return 0 }
+        let downloadingModels = viewModel.modelManagementState.currentDownloadingModels
+        if downloadingModels.isEmpty { return 0 }
         
-        let sum = downloads.values.reduce(0.0) { $0 + Double($1) }
-        return sum / Double(downloads.count)
+        var totalSize: Int64 = 0
+        var downloadedSize: Double = 0
+        
+        for model in downloadingModels {
+            let modelSize = viewModel.modelManagementState.modelSizes[model] ?? 0
+            let progress = Double(viewModel.modelManagementState.downloadProgress[model] ?? 0)
+            
+            totalSize += modelSize
+            downloadedSize += Double(modelSize) * progress
+        }
+        
+        return totalSize > 0 ? downloadedSize / Double(totalSize) : 0
     }
     
     // 다운로드 중인 총 크기
@@ -34,31 +44,59 @@ struct ModelManagerView: View {
         return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
     
+    // 다운로드된 크기 계산
+    private var downloadedSize: String {
+        let downloadingModels = viewModel.modelManagementState.currentDownloadingModels
+        var downloaded: Int64 = 0
+        
+        for model in downloadingModels {
+            let modelSize = viewModel.modelManagementState.modelSizes[model] ?? 0
+            let progress = Double(viewModel.modelManagementState.downloadProgress[model] ?? 0)
+            downloaded += Int64(Double(modelSize) * progress)
+        }
+        
+        return ByteCountFormatter.string(fromByteCount: downloaded, countStyle: .file)
+    }
+    
     var body: some View {
-        VStack {
-            // 상단 타이틀 및 닫기 버튼
-            HStack {
-                Text("Manage Models")
-                    .font(.largeTitle)
-                    .bold()
+        VStack(spacing: 0) {
+            
+            // MARK: Header
+            HStack(alignment: .firstTextBaseline) {
+                HStack(spacing: 8) {
+                    Image(systemName: "tray.and.arrow.down.fill")
+                        .foregroundStyle(.secondary)
+                    Text("manage_models")
+                        .font(.title3.weight(.semibold))
+                }
                 Spacer()
-                Button("Close") {
+                Button {
                     viewModel.fetchModels()
                     dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .imageScale(.large)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel(Text("Close"))
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
+                .buttonStyle(.plain)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+
+            Divider()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
             
             // 검색 필드
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.gray)
-                TextField("Search Models", text: $searchText)
-                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                    .foregroundStyle(.secondary)
+                TextField("search_models", text: $searchText)
+                    .textFieldStyle(.roundedBorder)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
             
             // 로컬 모델 / 다운로드 가능 모델 섹션 분리
             let allModels = viewModel.modelManagementState.availableModels
@@ -93,114 +131,192 @@ struct ModelManagerView: View {
                 total + (viewModel.modelManagementState.modelSizes[model] ?? 0)
             }
             
-            // 디버그 정보 표시
-            VStack(alignment: .leading) {
-                Text("Model Info")
-                    .font(.headline)
-                    .padding(.top, 2)
-                
-                HStack {
-                    Text("Total Models Count: \(filteredLocalModels.count + filteredRemoteModels.count)")
-                    Spacer()
-                    Text("Downloaded Models Count: \(filteredLocalModels.count)")
+            // 상태 정보 표시
+            GroupBox {
+                VStack(spacing: 8) {
+                    HStack {
+                        Label("total_models", systemImage: "square.stack.3d.up")
+                            .font(.caption)
+                        Spacer()
+                        Text("\(filteredLocalModels.count + filteredRemoteModels.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    HStack {
+                        Label("downloaded", systemImage: "checkmark.circle")
+                            .font(.caption)
+                        Spacer()
+                        Text("\(filteredLocalModels.count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                    
+                    if viewModel.modelManagementState.availableModels.isEmpty {
+                        Divider()
+                        HStack {
+                            Text("loading_model_info")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        }
+                    }
                 }
-                .font(.caption)
-                .foregroundColor(.secondary)
-                
-                if viewModel.modelManagementState.availableModels.isEmpty {
-                    Text("Loading Model Info...")
-                        .foregroundColor(.orange)
-                        .padding(.top, 4)
-                }
+                .padding(.vertical, 4)
+            } label: {
+                Label("model_info", systemImage: "info.circle")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
-            .padding(.horizontal)
-            .padding(.top, 4)
+            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+            .padding(.horizontal, 16)
             
             // 다운로드 총 진행 상황 표시
             if !viewModel.modelManagementState.currentDownloadingModels.isEmpty {
-                VStack(spacing: 4) {
-                    HStack {
-                        Image(systemName: "arrow.down.circle.fill")
-                            .foregroundColor(.blue)
-                        Text("Downloading: \(viewModel.modelManagementState.currentDownloadingModels.count) Models (\(totalDownloadingSize))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                    }
-                    
-                    // 전체 다운로드 진행률 표시
-                    ProgressView(value: totalDownloadProgress, total: 1.0)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .frame(maxWidth: .infinity)
-                    
-                    Text(String(format: "전체 진행률: %.1f%%", totalDownloadProgress * 100))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal)
-                .padding(.top, 4)
-            }
-            
-            if allModels.isEmpty {
-                // 모델이 없는 경우 로딩 표시
-                VStack {
-                    Spacer()
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle())
-                    Text("Loading Model List...")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .padding()
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .onAppear {
-                    // 모델 목록 갱신 시도
-                    viewModel.fetchModels()
-                }
-            } else {
-                // 메인 목록 영역
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        // 로컬에 있는 모델 섹션
-                        if !filteredLocalModels.isEmpty {
-                            Text("Downloaded Models")
-                                .font(.headline)
-                                .padding(.horizontal)
-                                .padding(.top, 8)
+                GroupBox {
+                    VStack(spacing: 10) {
+                        // 상단 정보 행
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.down.circle.fill")
+                                .foregroundStyle(.blue)
+                                .symbolEffect(.pulse)
                             
-                            VStack(spacing: 8) {
-                                ForEach(filteredLocalModels, id: \.self) { model in
-                                    ModelRowView(model: model, viewModel: viewModel)
-                                        .padding(.horizontal)
-                                        .background(Color.blue.opacity(0.05))
-                                        .cornerRadius(8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("downloading_models_count \(viewModel.modelManagementState.currentDownloadingModels.count)")
+                                    .font(.caption.weight(.medium))
+                                
+                                HStack(spacing: 4) {
+                                    Text(downloadedSize)
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.blue)
+                                    Text("of")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    Text(totalDownloadingSize)
+                                        .font(.caption2.monospacedDigit())
+                                        .foregroundStyle(.secondary)
                                 }
                             }
-                            .padding(.horizontal)
+                            
+                            Spacer()
+                            
+                            Text(String(format: "%.1f%%", totalDownloadProgress * 100))
+                                .font(.caption.monospacedDigit().weight(.semibold))
+                                .foregroundStyle(.blue)
+                        }
+                        
+                        // 진행 바
+                        ZStack(alignment: .leading) {
+                            // 배경
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color.blue.opacity(0.1))
+                                .frame(height: 8)
+                            
+                            // 진행 바 (애니메이션)
+                            GeometryReader { geometry in
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [.blue, .cyan],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: geometry.size.width * totalDownloadProgress, height: 8)
+                                    .animation(.easeInOut(duration: 0.3), value: totalDownloadProgress)
+                            }
+                            .frame(height: 8)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                } label: {
+                    Label("downloading_status", systemImage: "chart.bar.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.blue)
+                }
+                .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+            
+            // 스크롤 영역 구분선
+            Divider()
+                .padding(.top, 12)
+            
+            // 메인 콘텐츠 영역
+            ScrollView {
+                if allModels.isEmpty {
+                            // 모델이 없는 경우 로딩 표시
+                            VStack(spacing: 16) {
+                                Spacer()
+                        ProgressView()
+                            .scaleEffect(1.2)
+                        Text("loading_model_list")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 300)
+                            .onAppear {
+                                viewModel.fetchModels()
+                            }
+                } else {
+                    LazyVStack(spacing: 16, pinnedViews: []) {
+                                // 로컬에 있는 모델 섹션
+                        if !filteredLocalModels.isEmpty {
+                            GroupBox {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(filteredLocalModels, id: \.self) { model in
+                                        ModelRowView(model: model, viewModel: viewModel)
+                                        
+                                        if model != filteredLocalModels.last {
+                                            Divider()
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            } label: {
+                                Label("downloaded_models", systemImage: "checkmark.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.green)
+                            }
+                            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
                         }
                         
                         // 다운로드 가능한 모델 섹션
                         if !filteredRemoteModels.isEmpty {
-                            HStack {
-                                Text("Available Models")
-                                    .font(.headline)
-                                Text("(Total: \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file)))")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            
-                            VStack(spacing: 8) {
-                                ForEach(filteredRemoteModels, id: \.self) { model in
-                                    ModelRowView(model: model, viewModel: viewModel)
-                                        .padding(.horizontal)
-                                        .background(Color.gray.opacity(0.1))
-                                        .cornerRadius(8)
+                            GroupBox {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(filteredRemoteModels, id: \.self) { model in
+                                        ModelRowView(model: model, viewModel: viewModel)
+                                        
+                                        if model != filteredRemoteModels.last {
+                                            Divider()
+                                        }
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            } label: {
+                                HStack {
+                                    Label("available_models", systemImage: "arrow.down.circle")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.blue)
+                                    Spacer()
+                                    Text("total_size: \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
                             }
-                            .padding(.horizontal)
+                            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+                            .padding(.horizontal, 16)
+                            .padding(.top, filteredLocalModels.isEmpty ? 12 : 0)
                         }
                     }
                     .padding(.bottom, 16)
@@ -219,41 +335,38 @@ struct ModelRowView: View {
     let model: String
     @ObservedObject var viewModel: ContentViewModel
     
-    // 행의 높이를 동적으로 조정하기 위한 상태
-    @State private var isExpanded: Bool = false
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             // 모델 이름 행
-            HStack {
-                VStack(alignment: .leading) {
-                    HStack {
-                        if viewModel.selectedModel == model && viewModel.modelManagementState.modelState == .loaded {
-                            Image(systemName: "circle.fill")
-                                .foregroundColor(.green)
-                                .font(.callout)
-                                .symbolEffect(.pulse)
-                        } else if viewModel.modelManagementState.localModels.contains(model) {
-                            Image(systemName: "circle.fill")
-                                .foregroundColor(.ultraBrightGray)
-                                .font(.callout)
-                        }
-                        Text(viewModel.modelManagementState.displayName(for: model))
-                            .font(.headline)
-                    }
+            HStack(spacing: 12) {
+                // 상태 인디케이터
+                if viewModel.selectedModel == model && viewModel.modelManagementState.modelState == .loaded {
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                        .symbolEffect(.pulse)
+                } else if viewModel.modelManagementState.localModels.contains(model) {
+                    Image(systemName: "circle.fill")
+                        .foregroundStyle(Color.ultraBrightGray)
+                        .font(.caption)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(viewModel.modelManagementState.displayName(for: model))
+                        .font(.subheadline.weight(.medium))
+                    
                     if viewModel.modelManagementState.isCancelling(model: model) {
                         LoadingDotsView(text: "Cancelling")
-                            .font(.caption)
-                            .foregroundColor(.orange)
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
                     } else if viewModel.modelManagementState.isDownloading(model: model) {
                         LoadingDotsView(text: "Downloading")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
                     } else {
-                        // 모델 크기 정보
                         Text(viewModel.modelManagementState.formattedModelSize(for: model))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 
@@ -265,50 +378,81 @@ struct ModelRowView: View {
             
             // 다운로드 중이거나 취소 중인 경우 진행바 표시
             if viewModel.modelManagementState.isCancelling(model: model) {
-                HStack {
-                    ProgressView()
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .opacity(0.6)
-                    
-                    Text("Cancelling...")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                        .frame(width: 80, alignment: .trailing)
-                    
-                    // 취소 중이므로 버튼 비활성화
-                    Image(systemName: "hourglass")
-                        .foregroundColor(.orange)
-                }
-                .padding(.top, 4)
-            } else if viewModel.modelManagementState.isDownloading(model: model) {
-                HStack {
-                    ProgressView(value: viewModel.modelManagementState.downloadProgress[model] ?? 0, total: 1.0)
-                        .progressViewStyle(LinearProgressViewStyle())
-                    
-                    Text(viewModel.modelManagementState.formattedDownloadProgress(for: model))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .frame(width: 40, alignment: .trailing)
-                    
-                    // 취소 버튼
-                    Button(action: {
-                        viewModel.cancelDownload(model)
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.red)
+                VStack(spacing: 6) {
+                    HStack {
+                        Text("Cancelling...")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                        
+                        Spacer()
+                        
+                        ProgressView()
+                            .scaleEffect(0.6)
+                            .tint(.orange)
                     }
-                    .buttonStyle(BorderlessButtonStyle())
+                    
+                    // 취소 진행 바
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.orange.opacity(0.1))
+                            .frame(height: 6)
+                        
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.orange.opacity(0.7), .orange],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(height: 6)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
-                .padding(.top, 4)
+            } else if viewModel.modelManagementState.isDownloading(model: model) {
+                VStack(spacing: 6) {
+                    HStack {
+                        Text(viewModel.modelManagementState.formattedDownloadProgress(for: model))
+                            .font(.caption2.monospacedDigit())
+                            .foregroundStyle(.blue)
+                        
+                        Spacer()
+                        
+                        // 취소 버튼
+                        Button {
+                            viewModel.cancelDownload(model)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.red)
+                                .imageScale(.small)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    // 다운로드 진행 바 (상단 바와 동일한 스타일)
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Color.blue.opacity(0.1))
+                            .frame(height: 6)
+                        
+                        GeometryReader { geometry in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.blue, .cyan],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: geometry.size.width * CGFloat((viewModel.modelManagementState.downloadProgress[model] ?? 0)), height: 6)
+                                .animation(.easeInOut(duration: 0.3), value: viewModel.modelManagementState.downloadProgress[model])
+                        }
+                        .frame(height: 6)
+                    }
+                }
             }
         }
-        .padding(.vertical, 8)
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation {
-                isExpanded.toggle()
-            }
-        }
+        .padding(.vertical, 6)
     }
     
     // 모델 상태에 따른 동작 버튼
@@ -347,36 +491,31 @@ struct ModelRowView: View {
                     )
             } else if (viewModel.modelManagementState.modelState == .loading || viewModel.modelManagementState.modelState == .prewarming) && viewModel.selectedModel == model {
                 // 로드 중인 모델 - 로딩 아이콘 표시
-                HStack {
-                    
-                    Text("Loading Model")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 0)
+                HStack(spacing: 6) {
+                    Text("Loading")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     ProgressView()
-                        .scaleEffect(0.5)
-                        .foregroundColor(.secondary)
+                        .scaleEffect(0.6)
                 }
             } else if viewModel.modelManagementState.modelState == .unloading && viewModel.selectedModel == model {
-                HStack {
-                    
-                    Text("Unloading Model")
-                        .font(.callout)
-                        .foregroundColor(.secondary)
-                        .padding(.horizontal, 0)
+                HStack(spacing: 6) {
+                    Text("Unloading")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     ProgressView()
-                        .scaleEffect(0.5)
-                        .foregroundColor(.secondary)
+                        .scaleEffect(0.6)
                 }
             } else {
                 // 로드되지 않은 로컬 모델 - 삭제 버튼
-                Button(action: {
+                Button {
                     viewModel.deleteModel(model)
-                }) {
+                } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundStyle(.red)
+                        .imageScale(.medium)
                 }
-                .buttonStyle(BorderlessButtonStyle())
+                .buttonStyle(.plain)
                 .help("Delete Model")
             }
             
@@ -402,13 +541,14 @@ struct ModelRowView: View {
                 .help("Downloading...")
         } else {
             // 다운로드 가능한 모델 - 다운로드 버튼
-            Button(action: {
+            Button {
                 viewModel.downloadModel(model)
-            }) {
+            } label: {
                 Image(systemName: "arrow.down.circle")
-                    .foregroundColor(.blue)
+                    .foregroundStyle(.blue)
+                    .imageScale(.medium)
             }
-            .buttonStyle(BorderlessButtonStyle())
+            .buttonStyle(.plain)
             .disabled(!viewModel.modelManagementState.canStartDownload(model: model))
             .help(!viewModel.modelManagementState.canStartDownload(model: model) ?
                   "Maximum simultaneous downloads reached" : "Download Model")
