@@ -76,7 +76,7 @@ struct TranscriptionView: View {
                         viewModel.resetState()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.red)
                     }
                     .buttonStyle(BorderlessButtonStyle())
                     .padding(.trailing)

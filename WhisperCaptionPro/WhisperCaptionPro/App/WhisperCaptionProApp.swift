@@ -11,6 +11,7 @@ import SwiftUI
 @main
 struct WhisperCaptionProApp: App {
     @StateObject var contentViewModel: ContentViewModel = ContentViewModel()
+    @State private var showLegalInfo = false
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
@@ -30,6 +31,9 @@ struct WhisperCaptionProApp: App {
             ContentView(viewModel: contentViewModel)
                 .frame(minWidth: 1000, minHeight: 700)
                 .environment(\.locale, Locale(identifier: contentViewModel.appLanguage))
+                .sheet(isPresented: $showLegalInfo) {
+                    LegalView()
+                }
         }
         .modelContainer(sharedModelContainer)
         // MARK: - 상단 툴바
@@ -69,6 +73,12 @@ struct WhisperCaptionProApp: App {
                 
                 Text("Current Language: \(contentViewModel.getCurrentLanguageDisplayName())")
                     .disabled(true)
+            }
+            
+            CommandGroup(after: .help) {
+                Button("legal_information") {
+                    showLegalInfo = true
+                }
             }
         }
     }

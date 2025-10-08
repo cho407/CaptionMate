@@ -1,0 +1,19 @@
+/* 
+  InfoPlist.strings
+  WhisperCaptionPro
+  
+  Korean localization for Info.plist
+*/
+
+/* Copyright */
+"NSHumanReadableCopyright" = "Copyright © 2025 Harrison Cho. 모든 권리 보유.";
+
+/* File Type Descriptions */
+"Final Cut Pro XML" = "Final Cut Pro XML";
+"SRT" = "SRT 자막";
+"webVTT" = "WebVTT 자막";
+"JSON" = "JSON 자막";
+
+/* Document Type Name */
+"Final Cut Pro XML Subtitle" = "Final Cut Pro XML 자막";
+
