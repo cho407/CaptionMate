@@ -9,11 +9,12 @@ import SwiftUI
 
 struct ControlsView: View {
     @ObservedObject var viewModel: ContentViewModel
-    
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         VStack {
             BasicSettingsView(viewModel: viewModel)
-                        
+
             VStack {
                 HStack {
                     Button {
@@ -22,17 +23,19 @@ struct ControlsView: View {
                         Label("Reset", systemImage: "arrow.clockwise")
                     }
                     .buttonStyle(BorderlessButtonStyle())
-                    
+                    .accessibilityIdentifier("Reset")
+
                     Spacer()
-                    
+
                     Button {
                         viewModel.uiState.showAdvancedOptions.toggle()
                     } label: {
                         Label("Settings", systemImage: "slider.horizontal.3")
                     }
                     .buttonStyle(BorderlessButtonStyle())
+                    .accessibilityIdentifier("Settings")
                 }
-                
+
                 HStack {
                     Button {
                         withAnimation {
@@ -51,9 +54,10 @@ struct ControlsView: View {
                     )
                     .lineLimit(1)
                     .disabled(viewModel.audioState.isTranscribing ||
-                              viewModel.uiState.isTranscribingView)
+                        viewModel.uiState.isTranscribingView)
                     .padding()
-                    
+                    .accessibilityIdentifier("Import File")
+
                     Spacer()
                     Button("Start Transcription") {
                         if let url = viewModel.audioState.importedAudioURL {
@@ -62,15 +66,17 @@ struct ControlsView: View {
                         viewModel.uiState.isTranscribingView = true
                     }
                     .simpleButtonStyle(
-                        background: (viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.audioState.importedAudioURL == nil) ? .brightGray : .accentColor,
-                        foreground: .white,
+                        background: (viewModel.audioState.isTranscribing || viewModel
+                            .modelManagementState.modelState != .loaded || viewModel.audioState
+                            .importedAudioURL == nil) ? .brightGray : .accentColor,
+                        foreground: Color.controlButtonForeground(for: colorScheme),
                         cornerRadius: 8,
                         horizontalPadding: 16,
                         verticalPadding: 10
                     )
-                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState.modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
-                    // 전사 시작 버튼
-
+                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState
+                        .modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
+                    .accessibilityIdentifier("Start Transcription")
                 }
             }
         }

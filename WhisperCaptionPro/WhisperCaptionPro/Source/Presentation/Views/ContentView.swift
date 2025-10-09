@@ -42,9 +42,8 @@ struct ContentView: View {
             .padding(.horizontal)
             Spacer()
         } detail: {
-            NavigationStack{
+            NavigationStack {
                 AudioControlView(contentViewModel: viewModel)
-
             }
             .navigationBarBackButtonHidden(true)
         }
@@ -54,7 +53,7 @@ struct ContentView: View {
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
         .alert("Language Changed", isPresented: $viewModel.uiState.isLanguageChanged) {
-            Button("OK") { }
+            Button("OK") {}
         } message: {
             Text("The language has been changed.")
         }

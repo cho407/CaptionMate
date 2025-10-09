@@ -5,8 +5,8 @@
 //  Created by 조형구 on 5/7/25.
 //
 
-import SwiftUI
 import Combine
+import SwiftUI
 
 // 로딩 점 애니메이션을 위한 ViewModifier
 struct LoadingDotsModifier: ViewModifier {
@@ -14,11 +14,11 @@ struct LoadingDotsModifier: ViewModifier {
     @State private var dotsCount = 0
     @State private var timer: AnyCancellable?
     private let id = UUID() // 각 인스턴스를 구분하기 위한 고유 ID
-    
+
     func body(content: Content) -> some View {
         HStack(spacing: 0) {
             Text(text)
-            
+
             // 점 애니메이션
             Text(dotString())
                 .frame(width: 30, alignment: .leading)
@@ -31,7 +31,7 @@ struct LoadingDotsModifier: ViewModifier {
             stopTimer()
         }
     }
-    
+
     // 점의 개수에 따른 문자열 생성
     private func dotString() -> String {
         switch dotsCount {
@@ -42,18 +42,18 @@ struct LoadingDotsModifier: ViewModifier {
         default: return " "
         }
     }
-    
+
     // 타이머 시작 - Combine 사용
     private func startTimer() {
         stopTimer() // 기존 타이머 정리
-        
+
         timer = Timer.publish(every: 0.3, on: .main, in: .common)
             .autoconnect()
             .sink { _ in
-            dotsCount = (dotsCount + 1) % 4
-        }
+                dotsCount = (dotsCount + 1) % 4
+            }
     }
-    
+
     // 타이머 정지
     private func stopTimer() {
         timer?.cancel()
@@ -71,7 +71,7 @@ extension View {
 // 기존 LoadingDotsView 유지 (하위 호환성)
 struct LoadingDotsView: View {
     let text: String
-    
+
     var body: some View {
         EmptyView()
             .withLoadingDots(text)
@@ -88,9 +88,9 @@ extension String {
 #Preview {
     VStack(spacing: 20) {
         LoadingDotsView(text: "기존 방식 로딩 중")
-        
+
         Text("").withLoadingDots("새로운 방식 로딩 중")
-        
+
         "직접 문자열 로딩 중".withLoadingDots()
     }
 }

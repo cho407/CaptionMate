@@ -28,11 +28,12 @@ struct BasicSettingsView: View {
                 }
             }
             .padding(.horizontal)
-            
+
             HStack {
                 Toggle("Auto Language", isOn: $viewModel.isAutoLanguageEnable)
                     .toggleStyle(.checkbox)
-                    .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) || viewModel.selectedTask == "translate")
+                    .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false) ||
+                        viewModel.selectedTask == "translate")
 
                 LabeledContent {
                     Picker("", selection: $viewModel.selectedLanguage) {

@@ -50,9 +50,9 @@ struct TranscriptionControlView: View {
                 .lineLimit(1)
                 .disabled(viewModel.audioState.isTranscribing)
                 .padding()
-                
+
                 Spacer()
-                
+
                 // 자막 내보내기 버튼
                 Button {
                     Task {
@@ -68,7 +68,6 @@ struct TranscriptionControlView: View {
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
                 .disabled(viewModel.transcriptionResult == nil)
             }
-            
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal)

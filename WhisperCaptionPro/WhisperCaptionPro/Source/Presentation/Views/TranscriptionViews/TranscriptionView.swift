@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TranscriptionView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack {
@@ -18,29 +19,13 @@ struct TranscriptionView: View {
                             id: \.element) { _, segment in
                         let timestampText = viewModel
                             .enableTimestamps ?
-                        TimeInterval(segment.start)
+                            TimeInterval(segment.start)
                             .formatTimeRange(to: TimeInterval(segment.end)) :
-                        ""
+                            ""
                         Text(timestampText + segment.text)
                             .font(.headline)
                             .fontWeight(.bold)
                             .tint(.green)
-                            .multilineTextAlignment(.leading)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    ForEach(
-                        Array(viewModel.transcriptionState.unconfirmedSegments.enumerated()),
-                        id: \.element
-                    ) { _, segment in
-                        let timestampText = viewModel
-                            .enableTimestamps ?
-                        TimeInterval(segment.start)
-                            .formatTimeRange(to: TimeInterval(segment.end)) :
-                        ""
-                        Text(timestampText + segment.text)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.gray)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -54,7 +39,7 @@ struct TranscriptionView: View {
                 }
                 .padding()
             }
-            .background(Color.lotionWhite)
+            .background(Color.transcriptionBackground(for: colorScheme))
             .frame(maxWidth: .infinity)
             .defaultScrollAnchor(.bottom)
             .textSelection(.enabled)

@@ -1,5 +1,5 @@
 //
-//  Ex+GlowEffect.swift
+//  Ex+Animation.swift
 //  WhisperCaptionPro
 //
 //  Created by 조형구 on 4/16/25.
@@ -11,8 +11,7 @@ import SwiftUI
 // Shape에 글로우 효과를 추가하는 확장
 extension Shape {
     func glow(color: Color, lineWidth: CGFloat, blurRadius: CGFloat = 4.0) -> some View {
-        self
-            .stroke(color, lineWidth: lineWidth)
+        stroke(color, lineWidth: lineWidth)
             .overlay {
                 self
                     .stroke(color, lineWidth: lineWidth * 2)
@@ -30,6 +29,6 @@ extension Shape {
 
 extension View {
     func animatedBorder(isActive: Bool) -> some View {
-        self.modifier(AnimatedBorderModifier(isActive: isActive))
+        modifier(AnimatedBorderModifier(isActive: isActive))
     }
 }

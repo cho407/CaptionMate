@@ -4,16 +4,16 @@
 <dict>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.video</string>
-    
+
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2025 Harrison Cho. All rights reserved.</string>
-    
+
     <key>NSPrivacyAccessedAPITypes</key>
     <dict>
         <key>NSPrivacyAccessedAPIType</key>
         <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
     </dict>
-    
+
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
@@ -40,7 +40,7 @@
             <key>UTTypeReferenceURL</key>
             <string>https://developer.apple.com/documentation/professional_video_applications/fcpxml_reference/</string>
         </dict>
-        
+
         <dict>
             <key>UTTypeIdentifier</key>
             <string>com.WhisperCaptionPro.srtsubtitle</string>
@@ -62,7 +62,7 @@
                 </array>
             </dict>
         </dict>
-        
+
         <dict>
             <key>UTTypeIdentifier</key>
             <string>com.WhisperCaptionPro.vttsubtitle</string>
@@ -84,7 +84,7 @@
                 </array>
             </dict>
         </dict>
-        
+
         <dict>
             <key>UTTypeIdentifier</key>
             <string>com.WhisperCaptionPro.jsonsubtitle</string>
@@ -108,7 +108,7 @@
             </dict>
         </dict>
     </array>
-    
+
     <key>CFBundleDocumentTypes</key>
     <array>
         <dict>

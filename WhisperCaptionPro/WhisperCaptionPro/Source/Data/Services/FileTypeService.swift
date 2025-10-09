@@ -1,5 +1,5 @@
 //
-//  FileService.swift
+//  FileTypeService.swift
 //  WhisperCaptionPro
 //
 //  Created by 조형구 on 3/21/25.
@@ -23,11 +23,10 @@ public enum SubtitleFileType: String, CaseIterable {
             return UTType(filenameExtension: "vtt") ?? .plainText
         case .json:
             return UTType.json
-
         }
     }
-    
+
     public static func from(utType: UTType) -> SubtitleFileType? {
-        return self.allCases.first { $0.utType.identifier == utType.identifier }
+        return allCases.first { $0.utType.identifier == utType.identifier }
     }
 }

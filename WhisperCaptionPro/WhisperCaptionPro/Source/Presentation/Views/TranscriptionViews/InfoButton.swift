@@ -9,9 +9,9 @@ import SwiftUI
 
 struct InfoButton: View {
     @Environment(\.locale) private var locale
-    
+
     @State private var showInfo = false
-    
+
     var infoText: LocalizedStringKey
 
     init(_ infoText: LocalizedStringKey) {

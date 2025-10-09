@@ -43,8 +43,8 @@ struct SettingsView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-
                 // MARK: Header
+
                 HStack(alignment: .firstTextBaseline) {
                     HStack(spacing: 8) {
                         Image(systemName: "gearshape.fill")
@@ -70,6 +70,7 @@ struct SettingsView: View {
                     .padding(.horizontal, 16)
 
                 // MARK: 1. Output & Format
+
                 GroupBox {
                     VStack(spacing: 8) {
                         SettingRow(title: "Show Timestamps", infoKey: "info.show_timestamps") {
@@ -80,11 +81,15 @@ struct SettingsView: View {
                             Toggle("", isOn: $viewModel.enableWordTimestamp).labelsHidden()
                         }
                         Divider()
-                        SettingRow(title: "Special Characters", infoKey: "info.special_characters") {
+                        SettingRow(title: "Special Characters",
+                                   infoKey: "info.special_characters") {
                             Toggle("", isOn: $viewModel.enableSpecialCharacters).labelsHidden()
                         }
                         Divider()
-                        SettingRow(title: "Show Decoder Preview", infoKey: "info.show_decoder_preview") {
+                        SettingRow(
+                            title: "Show Decoder Preview",
+                            infoKey: "info.show_decoder_preview"
+                        ) {
                             Toggle("", isOn: $viewModel.enableDecoderPreview).labelsHidden()
                         }
                         Divider()
@@ -106,6 +111,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 16)
 
                 // MARK: 2. Decoding Quality
+
                 GroupBox {
                     VStack(spacing: 8) {
                         SettingRow(title: "Prompt Prefill", infoKey: "info.prompt_prefill") {
@@ -115,16 +121,16 @@ struct SettingsView: View {
                         SettingRow(title: "Cache Prefill", infoKey: "info.cache_prefill") {
                             Toggle("", isOn: $viewModel.enableCachePrefill).labelsHidden()
                         }
-                        
+
                         Divider()
-                        
+
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("Starting Temperature")
                                 InfoButton("info.starting_temperature")
                             }
                             HStack(spacing: 10) {
-                                Slider(value: $viewModel.temperatureStart, in: 0...1, step: 0.1)
+                                Slider(value: $viewModel.temperatureStart, in: 0 ... 1, step: 0.1)
                                 Text(viewModel.temperatureStart.formatted(.number))
                                     .monospacedDigit()
                                     .frame(width: 40, alignment: .trailing)
@@ -140,23 +146,27 @@ struct SettingsView: View {
                                 InfoButton("info.max_fallback_count")
                             }
                             HStack(spacing: 10) {
-                                Slider(value: $viewModel.fallbackCount, in: 0...5, step: 1)
+                                Slider(value: $viewModel.fallbackCount, in: 0 ... 5, step: 1)
                                 Text(viewModel.fallbackCount.formatted(.number))
                                     .monospacedDigit()
                                     .frame(width: 40, alignment: .trailing)
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        
+
                         Divider()
-                        
+
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("Compression Check Tokens")
                                 InfoButton("info.compression_check_tokens")
                             }
                             HStack(spacing: 10) {
-                                Slider(value: $viewModel.compressionCheckWindow, in: 0...100, step: 5)
+                                Slider(
+                                    value: $viewModel.compressionCheckWindow,
+                                    in: 0 ... 100,
+                                    step: 5
+                                )
                                 Text(viewModel.compressionCheckWindow.formatted(.number))
                                     .monospacedDigit()
                                     .frame(width: 40, alignment: .trailing)
@@ -173,6 +183,7 @@ struct SettingsView: View {
                 .padding(.horizontal, 16)
 
                 // MARK: 3. Performance
+
                 GroupBox {
                     VStack(spacing: 12) {
                         HStack(spacing: 10) {
@@ -193,16 +204,16 @@ struct SettingsView: View {
                             Text("Workers")
                             InfoButton("info.workers")
                             Spacer()
-                            Slider(value: $viewModel.concurrentWorkerCount, in: 0...32, step: 1)
+                            Slider(value: $viewModel.concurrentWorkerCount, in: 0 ... 32, step: 1)
                                 .frame(maxWidth: 240)
                             Text(viewModel.concurrentWorkerCount.formatted(.number))
                                 .monospacedDigit()
                                 .frame(width: 36, alignment: .trailing)
                                 .foregroundStyle(.secondary)
                         }
-                        
+
                         Divider()
-                        
+
                         VStack(alignment: .leading, spacing: 6) {
                             HStack {
                                 Text("Max Tokens Per Loop")
@@ -214,9 +225,9 @@ struct SettingsView: View {
                                         get: { Double(viewModel.sampleLength) },
                                         set: { viewModel.sampleLength = Int($0) }
                                     ),
-                                    in: 0...Double(min(
+                                    in: 0 ... Double(min(
                                         viewModel.whisperKit?.textDecoder.kvCacheMaxSequenceLength
-                                        ?? Constants.maxTokenContext,
+                                            ?? Constants.maxTokenContext,
                                         Constants.maxTokenContext
                                     )),
                                     step: 10

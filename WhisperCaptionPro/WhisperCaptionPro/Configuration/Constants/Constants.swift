@@ -31,15 +31,13 @@ struct SimpleButtonStyle: ButtonStyle {
 
 // 2) View에 붙이기 위한 extension
 extension View {
-    func simpleButtonStyle(
-        background: Color = .blue,
-        foreground: Color = .white,
-        cornerRadius: CGFloat = 6,
-        horizontalPadding: CGFloat = 12,
-        verticalPadding: CGFloat = 8,
-        pressedScale: CGFloat = 0.95
-    ) -> some View {
-        self.buttonStyle(
+    func simpleButtonStyle(background: Color = .blue,
+                           foreground: Color = .white,
+                           cornerRadius: CGFloat = 6,
+                           horizontalPadding: CGFloat = 12,
+                           verticalPadding: CGFloat = 8,
+                           pressedScale: CGFloat = 0.95) -> some View {
+        buttonStyle(
             SimpleButtonStyle(
                 background: background,
                 foreground: foreground,

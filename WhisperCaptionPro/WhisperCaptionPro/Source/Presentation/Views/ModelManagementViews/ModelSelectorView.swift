@@ -10,9 +10,10 @@ import WhisperKit
 
 struct ModelSelectorView: View {
     @ObservedObject var viewModel: ContentViewModel
-    
-    let filterWords: [String] = ["distil","MB", "2024"]
-    
+    @Environment(\.colorScheme) private var colorScheme
+
+    let filterWords: [String] = ["distil", "MB", "2024"]
+
     var body: some View {
         VStack {
             HStack {
@@ -31,38 +32,47 @@ struct ModelSelectorView: View {
                 Spacer()
 
                 if !viewModel.modelManagementState.availableModels.isEmpty {
-                    let filteredModels = viewModel.modelManagementState.availableModels.filter { model in
-                        !filterWords.contains { filter in
-                            model.lowercased().contains(filter.lowercased())
+                    let filteredModels = viewModel.modelManagementState.availableModels
+                        .filter { model in
+                            !filterWords.contains { filter in
+                                model.lowercased().contains(filter.lowercased())
+                            }
                         }
-                    }
-                    
+
                     Menu {
                         ForEach(filteredModels, id: \.self) { model in
-                            let isLocalModel = viewModel.modelManagementState.localModels.contains(model)
-                            let modelName = model.components(separatedBy: "_").dropFirst().joined(separator: " ")
-                            let modelSymbolName: String = model == viewModel.selectedModel ? "circle.fill" : "checkmark.circle"
-                            
+                            let isLocalModel = viewModel.modelManagementState.localModels
+                                .contains(model)
+                            let modelName = model.components(separatedBy: "_").dropFirst()
+                                .joined(separator: " ")
+                            let modelSymbolName: String = model == viewModel
+                                .selectedModel ? "circle.fill" : "checkmark.circle"
+
                             Button(action: {
-                           
-                                    viewModel.selectedModel = model
-                                    viewModel.loadModel(model)
-                
+                                viewModel.selectedModel = model
+                                viewModel.loadModel(model)
+
                             }) {
                                 HStack {
-                                    let loadingColor: Color = viewModel.modelManagementState.modelState == .loaded ? .green : .red
+                                    let loadingColor: Color = viewModel.modelManagementState
+                                        .modelState == .loaded ? .green : .red
                                     Text(modelName)
                                     Spacer()
-                                    Image(systemName: isLocalModel ? modelSymbolName : "arrow.down.circle.dotted")
+                                    Image(systemName: isLocalModel ? modelSymbolName :
+                                        "arrow.down.circle.dotted")
                                         .symbolRenderingMode(.palette)
-                                        .foregroundStyle(model == viewModel.selectedModel ? loadingColor : .black)
+                                        .foregroundStyle(model == viewModel
+                                            .selectedModel ? loadingColor : Color
+                                            .modelSelectorText(for: colorScheme))
                                 }
                             }
-                            .disabled((!isLocalModel && model != "openai_whisper-tiny") || viewModel.modelManagementState.isDownloading(model: model))
+                            .disabled((!isLocalModel && model != "openai_whisper-tiny") || viewModel
+                                .modelManagementState.isDownloading(model: model))
                         }
                     } label: {
                         HStack {
-                            let selectedModelName = viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " ")
+                            let selectedModelName = viewModel.selectedModel
+                                .components(separatedBy: "_").dropFirst().joined(separator: " ")
                             Text(selectedModelName)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
@@ -71,8 +81,10 @@ struct ModelSelectorView: View {
                         .padding(.vertical, 4)
                         .cornerRadius(6)
                     }
-                    .disabled(viewModel.modelManagementState.modelState == .loading || viewModel.modelManagementState.modelState == .downloading || viewModel.modelManagementState.modelState == .prewarming)
-                    
+                    .disabled(viewModel.modelManagementState.modelState == .loading || viewModel
+                        .modelManagementState.modelState == .downloading || viewModel
+                        .modelManagementState.modelState == .prewarming)
+
                 } else {
                     HStack {
                         Spacer()
@@ -84,7 +96,6 @@ struct ModelSelectorView: View {
                     .padding(.horizontal, 6)
                     .padding(.vertical, 4)
                     .cornerRadius(6)
-
                 }
 
                 Button {
@@ -98,9 +109,10 @@ struct ModelSelectorView: View {
 
             if viewModel.modelManagementState.modelState == .unloaded {
                 Divider()
-                
+
                 // 에러 메시지 표시
-                if viewModel.modelManagementState.hasModelLoadError, let errorMsg = viewModel.modelManagementState.modelLoadError {
+                if viewModel.modelManagementState.hasModelLoadError,
+                   let errorMsg = viewModel.modelManagementState.modelLoadError {
                     Text(errorMsg)
                         .font(.caption)
                         .foregroundColor(.red)
@@ -115,7 +127,6 @@ struct ModelSelectorView: View {
                             total: 1.0
                         )
                         .progressViewStyle(.linear)
-                        
 
                         Text(String(
                             format: "%.1f%%",
@@ -124,11 +135,11 @@ struct ModelSelectorView: View {
                         .font(.caption)
                         .foregroundColor(.middleDarkGray)
                         .monospacedDigit()
-                        
                     }
-                    
+
                     // 에러 메시지 표시 (로딩 중 에러)
-                    if viewModel.modelManagementState.hasModelLoadError, let errorMsg = viewModel.modelManagementState.modelLoadError {
+                    if viewModel.modelManagementState.hasModelLoadError,
+                       let errorMsg = viewModel.modelManagementState.modelLoadError {
                         Text(errorMsg)
                             .font(.caption)
                             .foregroundColor(.red)
@@ -136,24 +147,32 @@ struct ModelSelectorView: View {
                             .padding(.top, 2)
                     } else if viewModel.modelManagementState.modelState == .loading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "Loading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
-                            .font(.callout)
-                            .foregroundColor(.middleDarkGray)
+                        LoadingDotsView(
+                            text: "Loading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                        )
+                        .font(.callout)
+                        .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .prewarming {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "Specializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
-                            .font(.callout)
-                            .foregroundColor(.middleDarkGray)
+                        LoadingDotsView(
+                            text: "Specializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                        )
+                        .font(.callout)
+                        .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .unloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "Initializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
-                            .font(.callout)
-                            .foregroundColor(.middleDarkGray)
+                        LoadingDotsView(
+                            text: "Initializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                        )
+                        .font(.callout)
+                        .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .downloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
-                        LoadingDotsView(text: "Downloading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))")
-                            .font(.callout)
-                            .foregroundColor(.middleDarkGray)
+                        LoadingDotsView(
+                            text: "Downloading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                        )
+                        .font(.callout)
+                        .foregroundColor(.middleDarkGray)
                     }
                 }
             }
@@ -161,7 +180,7 @@ struct ModelSelectorView: View {
         .onAppear {
             // 모델 목록 갱신
             viewModel.fetchModels()
-            
+
             // 자동 로드 기능 - 선택된 모델이 로컬에 있으면 자동으로 로드
             if viewModel.modelManagementState.localModels.isEmpty {
                 // 모델이 없으면 자동으로 모델 관리 화면 표시

@@ -5,38 +5,23 @@
 //  Created by 조형구 on 2/22/25.
 //
 
-import SwiftData
 import SwiftUI
 
 @main
 struct WhisperCaptionProApp: App {
-    @StateObject var contentViewModel: ContentViewModel = ContentViewModel()
+    @StateObject var contentViewModel: ContentViewModel = .init()
     @State private var showLegalInfo = false
-
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
 
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: contentViewModel)
                 .frame(minWidth: 1000, minHeight: 700)
                 .environment(\.locale, Locale(identifier: contentViewModel.appLanguage))
+                .preferredColorScheme(contentViewModel.appTheme.colorScheme)
                 .sheet(isPresented: $showLegalInfo) {
                     LegalView()
                 }
         }
-        .modelContainer(sharedModelContainer)
-        // MARK: - 상단 툴바
         .commands {
             CommandMenu("Shortcuts") {
                 Button("Volume Up") {
@@ -51,30 +36,47 @@ struct WhisperCaptionProApp: App {
                 .keyboardShortcut(.downArrow, modifiers: []) // ↓ 키만 눌러도 실행
                 .disabled(contentViewModel.audioVolume == 0.0)
             }
-            
+
             CommandMenu("Settings") {
                 Menu("Language") {
                     Button("English") {
                         contentViewModel.changeAppLanguage(to: "en")
                     }
                     .disabled(contentViewModel.appLanguage == "en")
-                    
+
                     Button("한국어") {
                         contentViewModel.changeAppLanguage(to: "ko")
                     }
                     .disabled(contentViewModel.appLanguage == "ko")
                 }
                 .disabled(
-                    contentViewModel.uiState.isFilePickerPresented ||  // 파일 불러오기 창 열림
-                    contentViewModel.isExporting                       // 자막 내보내기 창 열림
+                    contentViewModel.uiState.isFilePickerPresented || // 파일 불러오기 창 열림
+                        contentViewModel.isExporting // 자막 내보내기 창 열림
                 )
-                
+
                 Divider()
-                
+
+                Menu("Theme") {
+                    ForEach(AppTheme.allCases, id: \.self) { theme in
+                        Button(action: {
+                            contentViewModel.appTheme = theme
+                        }) {
+                            HStack {
+                                Text(theme.localizedName)
+                                if contentViewModel.appTheme == theme {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
                 Text("Current Language: \(contentViewModel.getCurrentLanguageDisplayName())")
                     .disabled(true)
             }
-            
+
             CommandGroup(after: .help) {
                 Button("legal_information") {
                     showLegalInfo = true

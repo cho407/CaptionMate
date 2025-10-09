@@ -21,8 +21,9 @@ final class WhisperCaptionProUITestsLaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launch()
 
-        // Insert steps here to perform after app launch but before taking a screenshot,
-        // such as logging into a test account or navigating somewhere in the app
+        // 메인 윈도우가 나타날 때까지 대기 (빈 화면 캡처 방지)
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 5.0), "메인 윈도우가 로드되어야 합니다")
 
         let attachment = XCTAttachment(screenshot: app.screenshot())
         attachment.name = "Launch Screen"
