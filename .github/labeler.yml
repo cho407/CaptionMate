@@ -1,6 +1,15 @@
+# Configuration for PR labeler (actions/labeler@v5)
+# https://github.com/actions/labeler
+
 'status:awaiting review':
-- '**/*'
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*'
 
 'component:swift sdk':
-- '**/*'
-
+  - changed-files:
+      - any-glob-to-any-file:
+          - '**/*.swift'
+          - '**/*.xcodeproj/**'
+          - '**/Package.swift'
+          - '**/Package.resolved'

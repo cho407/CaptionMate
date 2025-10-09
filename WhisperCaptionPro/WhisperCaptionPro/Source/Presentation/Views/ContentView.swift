@@ -5,35 +5,23 @@
 //  Created by 조형구 on 2/22/25.
 //
 
+import AVFAudio
+import AVFoundation
 import SwiftUI
 import WhisperKit
 
 struct ContentView: View {
-    @StateObject var viewModel = ContentViewModel()
+    @ObservedObject var viewModel: ContentViewModel
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $viewModel.columnVisibility) {
+        NavigationSplitView(columnVisibility: $viewModel.uiState.columnVisibility) {
             VStack(alignment: .leading) {
                 ModelSelectorView(viewModel: viewModel)
                     .padding(.vertical)
                 ComputeUnitsView(viewModel: viewModel)
-                    .disabled(viewModel.modelState != .loaded && viewModel.modelState != .unloaded)
+                    .disabled(viewModel.modelManagementState.modelState != .loaded && viewModel
+                        .modelManagementState.modelState != .unloaded)
                     .padding(.bottom)
-
-                List(viewModel.menu, selection: $viewModel.selectedCategoryId) { item in
-                    HStack {
-                        Image(systemName: item.image)
-                        Text(item.name)
-                            .font(.title3)
-                            .bold()
-                    }
-                }
-                .onChange(of: viewModel.selectedCategoryId) { newValue, _ in
-                    viewModel.selectedTab = viewModel.menu.first(where: { $0.id == newValue })?
-                        .name ?? "Transcribe"
-                }
-                .disabled(viewModel.modelState != .loaded)
-                .foregroundColor(viewModel.modelState != .loaded ? .secondary : .primary)
 
                 Spacer()
 
@@ -44,89 +32,42 @@ struct ContentView: View {
                     let build = Bundle.main
                         .infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
                     Text("App Version: \(version) (\(build))")
-                    #if os(iOS)
-                        Text("Device Model: \(WhisperKit.deviceName())")
-                        Text("OS Version: \(UIDevice.current.systemVersion)")
-                    #elseif os(macOS)
-                        Text("Device Model: \(WhisperKit.deviceName())")
-                        Text("OS Version: \(ProcessInfo.processInfo.operatingSystemVersionString)")
-                    #endif
                 }
                 .font(.caption.monospaced())
                 .foregroundColor(.secondary)
                 .padding(.vertical)
             }
-            .navigationTitle("WhisperAX")
+            .navigationTitle("WhisperCaptionPro")
             .navigationSplitViewColumnWidth(min: 300, ideal: 350)
             .padding(.horizontal)
             Spacer()
         } detail: {
-            VStack {
-                #if os(iOS)
-                    ModelSelectorView(viewModel: viewModel)
-                        .padding()
-                    TranscriptionView(viewModel: viewModel)
-                #elseif os(macOS)
-                    VStack(alignment: .leading) {
-                        TranscriptionView(viewModel: viewModel)
-                    }
-                    .padding()
-                #endif
-                ControlsView(viewModel: viewModel)
+            NavigationStack {
+                AudioControlView(contentViewModel: viewModel)
             }
-            .toolbar {
-                ToolbarItem {
-                    Button {
-                        if !viewModel.enableEagerDecoding {
-                            let fullTranscript = formatSegments(
-                                viewModel.confirmedSegments + viewModel.unconfirmedSegments,
-                                withTimestamps: viewModel.enableTimestamps
-                            ).joined(separator: "\n")
-                            #if os(iOS)
-                                UIPasteboard.general.string = fullTranscript
-                            #elseif os(macOS)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(fullTranscript, forType: .string)
-                            #endif
-                        } else {
-                            #if os(iOS)
-                                UIPasteboard.general.string = viewModel.confirmedText + viewModel
-                                    .hypothesisText
-                            #elseif os(macOS)
-                                NSPasteboard.general.clearContents()
-                                NSPasteboard.general.setString(
-                                    viewModel.confirmedText + viewModel.hypothesisText,
-                                    forType: .string
-                                )
-                            #endif
-                        }
-                    } label: {
-                        Label("Copy Text", systemImage: "doc.on.doc")
-                    }
-                    .keyboardShortcut("c", modifiers: .command)
-                    .foregroundColor(.primary)
-                    .frame(maxWidth: .infinity)
-                }
-            }
+            .navigationBarBackButtonHidden(true)
+        }
+        .sheet(isPresented: $viewModel.uiState.isModelmanagerViewPresented) {
+            ModelManagerView(viewModel: viewModel)
+                .frame(minWidth: 600, minHeight: 500)
+                .environment(\.locale, .init(identifier: viewModel.appLanguage))
+        }
+        .alert("Language Changed", isPresented: $viewModel.uiState.isLanguageChanged) {
+            Button("OK") {}
+        } message: {
+            Text("The language has been changed.")
         }
         .onAppear {
-            #if os(macOS)
-                viewModel.selectedCategoryId = viewModel.menu
-                    .first(where: { $0.name == viewModel.selectedTab })?.id
-            #else
-                if UIDevice.current.userInterfaceIdiom == .pad {
-                    viewModel.selectedCategoryId = viewModel.menu
-                        .first(where: { $0.name == viewModel.selectedTab })?.id
-                }
-            #endif
             viewModel.fetchModels()
+            // 앱 시작 시 이전 세션의 모든 임시 파일 정리
+            Task {
+                await viewModel.performStartupCleanup()
+            }
         }
     }
 }
 
 #Preview {
-    ContentView()
-    #if os(macOS)
+    ContentView(viewModel: ContentViewModel())
         .frame(width: 800, height: 500)
-    #endif
 }
