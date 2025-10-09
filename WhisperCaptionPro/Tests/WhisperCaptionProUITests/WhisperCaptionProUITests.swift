@@ -58,8 +58,12 @@ final class BasicUITests: XCTestCase {
         XCTAssertTrue(importButton.waitForExistence(timeout: 5.0), "Import File 버튼이 존재해야 합니다")
 
         // Start Transcription 버튼 존재 확인
-        let transcribeButton = Self.app.buttons.matching(identifier: "Start Transcription").firstMatch
-        XCTAssertTrue(transcribeButton.waitForExistence(timeout: 5.0), "Start Transcription 버튼이 존재해야 합니다")
+        let transcribeButton = Self.app.buttons.matching(identifier: "Start Transcription")
+            .firstMatch
+        XCTAssertTrue(
+            transcribeButton.waitForExistence(timeout: 5.0),
+            "Start Transcription 버튼이 존재해야 합니다"
+        )
 
         // Reset 버튼 존재 확인
         let resetButton = Self.app.buttons.matching(identifier: "Reset").firstMatch
@@ -90,21 +94,31 @@ final class BasicUITests: XCTestCase {
     @MainActor
     func test05_ModelSelectorExists() throws {
         // Sidebar에 항상 있는 텍스트 기준으로 대기 (sleep 제거)
-        let appVersion = Self.app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'App Version' OR label CONTAINS[c] '앱 버전'")).firstMatch
+        let appVersion = Self.app.staticTexts
+            .matching(
+                NSPredicate(format: "label CONTAINS[c] 'App Version' OR label CONTAINS[c] '앱 버전'")
+            )
+            .firstMatch
         let appTitle = Self.app.staticTexts["WhisperCaptionPro"]
-        
+
         // waitForExistence로 안정적 대기
-        let exists = appVersion.waitForExistence(timeout: 8.0) || appTitle.waitForExistence(timeout: 8.0)
-        
+        let exists = appVersion.waitForExistence(timeout: 8.0) || appTitle
+            .waitForExistence(timeout: 8.0)
+
         XCTAssertTrue(exists, "Sidebar가 표시되어야 합니다 (모델 선택기 포함)")
     }
 
     @MainActor
     func test06_DragDropAreaExists() throws {
         // 드래그 앤 드롭 영역 확인
-        let dragDropText = Self.app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'drag' OR label CONTAINS[c] '드래그'")).firstMatch
+        let dragDropText = Self.app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS[c] 'drag' OR label CONTAINS[c] '드래그'"))
+            .firstMatch
         let exists = dragDropText.waitForExistence(timeout: 3.0)
-        XCTAssertTrue(exists || Self.app.windows.firstMatch.exists, "드래그 앤 드롭 영역 또는 오디오 UI가 존재해야 합니다")
+        XCTAssertTrue(
+            exists || Self.app.windows.firstMatch.exists,
+            "드래그 앤 드롭 영역 또는 오디오 UI가 존재해야 합니다"
+        )
     }
 }
 
@@ -133,11 +147,11 @@ final class InteractionTests: XCTestCase {
         // 메뉴 아이템의 존재 여부만 확인
         let settingsMenuEn = app.menuBarItems["Settings"]
         let settingsMenuKo = app.menuBarItems["설정"]
-        
+
         // 메뉴가 존재하는지만 확인 (클릭하지 않음)
         let menuExists = settingsMenuEn.exists || settingsMenuKo.exists
         XCTAssertTrue(menuExists, "Settings 메뉴가 존재해야 합니다")
-        
+
         // 실제 메뉴 상호작용은 수동 테스트로 확인
         // macOS 메뉴바는 화면 좌표 문제로 UI 테스트에서 클릭이 불안정함
     }
@@ -148,11 +162,11 @@ final class InteractionTests: XCTestCase {
         // Shortcuts 메뉴의 존재 여부만 확인
         let shortcutsMenuEn = app.menuBarItems["Shortcuts"]
         let shortcutsMenuKo = app.menuBarItems["단축키"]
-        
+
         // 메뉴가 존재하는지만 확인 (클릭하지 않음)
         let menuExists = shortcutsMenuEn.exists || shortcutsMenuKo.exists
         XCTAssertTrue(menuExists, "Shortcuts 메뉴가 존재해야 합니다")
-        
+
         // 실제 메뉴 상호작용은 수동 테스트로 확인
         // macOS 메뉴바는 화면 좌표 문제로 UI 테스트에서 클릭이 불안정함
     }
@@ -167,17 +181,23 @@ final class InteractionTests: XCTestCase {
         // 슬라이더/스위치/특정 텍스트 중 아무거나 나타날 때까지 대기 (sleep 제거)
         let sliderAppeared = app.sliders.firstMatch.waitForExistence(timeout: 6.0)
         let switchAppeared = app.switches.firstMatch.waitForExistence(timeout: 6.0)
-        let tempText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] '온도'")).firstMatch.waitForExistence(timeout: 6.0)
-        let promptText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Prompt' OR label CONTAINS[c] '프롬프트'")).firstMatch.waitForExistence(timeout: 6.0)
-        
+        let tempText = app.staticTexts
+            .matching(
+                NSPredicate(format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] '온도'")
+            )
+            .firstMatch.waitForExistence(timeout: 6.0)
+        let promptText = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Prompt' OR label CONTAINS[c] '프롬프트'"))
+            .firstMatch.waitForExistence(timeout: 6.0)
+
         let settingsViewOpened = sliderAppeared || switchAppeared || tempText || promptText
-        
+
         if !settingsViewOpened {
             // 디버깅: 현재 표시된 요소 확인
             print("Sliders: \(app.sliders.count), Switches: \(app.switches.count)")
             print("All text elements: \(app.staticTexts.allElementsBoundByIndex.map { $0.label })")
         }
-        
+
         XCTAssertTrue(settingsViewOpened, "Settings View가 열려야 합니다")
 
         // Settings 닫기 (ESC 키 사용)
@@ -187,14 +207,23 @@ final class InteractionTests: XCTestCase {
     @MainActor
     func testModelManagerViewOpens() throws {
         // Manage Models 버튼 찾기
-        let manageModelsButton = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Manage' OR label CONTAINS[c] '관리'")).firstMatch
+        let manageModelsButton = app.buttons
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Manage' OR label CONTAINS[c] '관리'"))
+            .firstMatch
 
         if manageModelsButton.waitForExistence(timeout: 5.0) {
             manageModelsButton.click()
 
             // Model Manager View가 열리는지 확인
-            let modelManagerView = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] 'Model' OR label CONTAINS[c] '모델'")).firstMatch
-            XCTAssertTrue(modelManagerView.waitForExistence(timeout: 3.0), "Model Manager View가 열려야 합니다")
+            let modelManagerView = app.staticTexts
+                .matching(
+                    NSPredicate(format: "label CONTAINS[c] 'Model' OR label CONTAINS[c] '모델'")
+                )
+                .firstMatch
+            XCTAssertTrue(
+                modelManagerView.waitForExistence(timeout: 3.0),
+                "Model Manager View가 열려야 합니다"
+            )
 
             // 닫기
             app.typeKey(.escape, modifierFlags: [])

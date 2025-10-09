@@ -5,9 +5,9 @@
 //  Created by 조형구 on 2/22/25.
 //
 
-import Testing
 import Foundation
 import SwiftUI
+import Testing
 import UniformTypeIdentifiers
 @testable import WhisperCaptionPro
 
@@ -81,7 +81,7 @@ struct ContentViewModelTests {
         // 언어 변경이 그대로 적용되는지 확인 (폴백 로직 없음)
         viewModel.changeAppLanguage(to: "ja")
         #expect(viewModel.appLanguage == "ja")
-        
+
         // 다시 영어로 변경
         viewModel.changeAppLanguage(to: "en")
         #expect(viewModel.appLanguage == "en")
@@ -105,15 +105,17 @@ struct SubtitleFileTypeTests {
     func testSubtitleFileTypeUTType() throws {
         // SRT - UTType 생성하여 비교
         let expectedSRT = UTType(filenameExtension: "srt")
-        #expect(SubtitleFileType.srt.utType == expectedSRT || SubtitleFileType.srt.utType == .plainText)
+        #expect(SubtitleFileType.srt.utType == expectedSRT || SubtitleFileType.srt
+            .utType == .plainText)
 
         // JSON - 시스템 정의 UTType과 비교
         #expect(SubtitleFileType.json.utType == .json)
 
         // VTT - UTType 생성하여 비교
         let expectedVTT = UTType(filenameExtension: "vtt")
-        #expect(SubtitleFileType.vtt.utType == expectedVTT || SubtitleFileType.vtt.utType == .plainText)
-        
+        #expect(SubtitleFileType.vtt.utType == expectedVTT || SubtitleFileType.vtt
+            .utType == .plainText)
+
         // FCPXML - 커스텀 UTType 확인
         let fcpxmlType = SubtitleFileType.fcpxml.utType
         #expect(fcpxmlType == .fcpxml)
