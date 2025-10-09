@@ -32,7 +32,8 @@ enum AppTheme: String, CaseIterable {
         case .dark:
             return .dark
         case .auto:
-            return nil // 시스템 테마 따름
+            let appearance = NSApp.effectiveAppearance
+            return appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light
         }
     }
 }

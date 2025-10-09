@@ -57,10 +57,11 @@ struct ContentViewModelTests {
         #expect(viewModel.appTheme == .dark)
         #expect(viewModel.appTheme.colorScheme == .dark)
 
-        // 자동 모드로 변경
+        // 자동 모드로 변경 (시스템 테마를 따름)
         viewModel.appTheme = .auto
         #expect(viewModel.appTheme == .auto)
-        #expect(viewModel.appTheme.colorScheme == nil)
+        // auto는 현재 시스템 테마를 반환하므로 .light 또는 .dark 중 하나
+        #expect(viewModel.appTheme.colorScheme == .light || viewModel.appTheme.colorScheme == .dark)
     }
 
     @Test("언어 표시명 테스트") @MainActor
@@ -248,7 +249,9 @@ struct ThemeTests {
     func testAppThemeCases() throws {
         #expect(AppTheme.light.colorScheme == .light)
         #expect(AppTheme.dark.colorScheme == .dark)
-        #expect(AppTheme.auto.colorScheme == nil)
+        // auto는 현재 시스템 테마를 반환하므로 .light 또는 .dark 중 하나
+        let autoScheme = AppTheme.auto.colorScheme
+        #expect(autoScheme == .light || autoScheme == .dark)
     }
 
     @Test("AppTheme 로컬라이제이션 키 테스트")

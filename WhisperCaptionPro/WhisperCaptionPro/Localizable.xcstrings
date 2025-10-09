@@ -4,17 +4,6 @@
     "" : {
 
     },
-    "(Total: %@)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "(총: %@ 개)"
-          }
-        }
-      }
-    },
     "**%@** / %@" : {
       "localizations" : {
         "en" : {
@@ -121,17 +110,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "언어 자동 감지"
-          }
-        }
-      }
-    },
-    "Available Models" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 가능한 모델"
           }
         }
       }
@@ -252,17 +230,6 @@
         }
       }
     },
-    "Decoding Options" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "디코딩 옵션"
-          }
-        }
-      }
-    },
     "decoding_options" : {
       "localizations" : {
         "en" : {
@@ -315,17 +282,6 @@
         }
       }
     },
-    "Done" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "완료"
-          }
-        }
-      }
-    },
     "Download Model" : {
       "localizations" : {
         "ko" : {
@@ -351,28 +307,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "다운로드 완료"
-          }
-        }
-      }
-    },
-    "Downloaded Models" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 된 모델"
-          }
-        }
-      }
-    },
-    "Downloaded Models Count: %lld" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 된 모델 수: %lld"
           }
         }
       }
@@ -425,23 +359,6 @@
         }
       }
     },
-    "Downloading: %lld Models (%@)" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Downloading: %1$lld Models (%2$@)"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : " %1$lld 개 모델 다운로드 중 (%2$@)"
-          }
-        }
-      }
-    },
     "Downloading..." : {
       "localizations" : {
         "ko" : {
@@ -468,17 +385,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "English"
-          }
-        }
-      }
-    },
-    "Enter frame rate" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "프레임 레이트를 입력하세요"
           }
         }
       }
@@ -836,39 +742,6 @@
     "Loading" : {
 
     },
-    "Loading Model" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 로딩"
-          }
-        }
-      }
-    },
-    "Loading Model Info..." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 정보 불러오는 중…"
-          }
-        }
-      }
-    },
-    "Loading Model List..." : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 목록 불러오는 중…"
-          }
-        }
-      }
-    },
     "loading_model_info" : {
       "localizations" : {
         "en" : {
@@ -953,17 +826,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "최대 동시 다운로드 수에 도달했습니다"
-          }
-        }
-      }
-    },
-    "Model Info" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 정보"
           }
         }
       }
@@ -1079,17 +941,6 @@
         }
       }
     },
-    "Realtime Delay Interval" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "지연 간격"
-          }
-        }
-      }
-    },
     "Replace with New File" : {
       "localizations" : {
         "ko" : {
@@ -1106,17 +957,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "초기화"
-          }
-        }
-      }
-    },
-    "Search Models" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 검색"
           }
         }
       }
@@ -1166,70 +1006,6 @@
         }
       }
     },
-    "Theme" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Theme"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "테마"
-          }
-        }
-      }
-    },
-    "theme.light" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Light"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "라이트"
-          }
-        }
-      }
-    },
-    "theme.dark" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dark"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다크"
-          }
-        }
-      }
-    },
-    "theme.auto" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Auto"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "자동"
-          }
-        }
-      }
-    },
     "Shortcut: Space (Play/Pause), ←/→(Navigate), ↑/↓(Volume), ⌘ + ↑/↓(Playback Speed)" : {
       "localizations" : {
         "ko" : {
@@ -1266,17 +1042,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "타임스탬프 표시"
-          }
-        }
-      }
-    },
-    "Silence Threshold" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "침묵 구간"
           }
         }
       }
@@ -1324,44 +1089,6 @@
         }
       }
     },
-    "task.transcribe" : {
-      "comment" : "Key for the task name \"Transcribe\"",
-      "extractionState" : "stale",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Transcribe"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "전사"
-          }
-        }
-      }
-    },
-    "task.translate" : {
-      "comment" : "Localized key for displaying a task in UI.",
-      "extractionState" : "stale",
-      "isCommentAutoGenerated" : true,
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Translate"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "needs_review",
-            "value" : "번역"
-          }
-        }
-      }
-    },
     "Text Decoder" : {
       "localizations" : {
         "ko" : {
@@ -1393,6 +1120,70 @@
         }
       }
     },
+    "Theme" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Theme"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "테마"
+          }
+        }
+      }
+    },
+    "theme.auto" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Auto"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동"
+          }
+        }
+      }
+    },
+    "theme.dark" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dark"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다크"
+          }
+        }
+      }
+    },
+    "theme.light" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Light"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "라이트"
+          }
+        }
+      }
+    },
     "Third Party Notices" : {
 
     },
@@ -1408,17 +1199,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "오픈소스 라이선스"
-          }
-        }
-      }
-    },
-    "Total Models Count: %lld" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "전체 모델 갯수: %lld"
           }
         }
       }
@@ -1439,47 +1219,8 @@
         }
       }
     },
-    "total_size:" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Total:"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "총 용량:"
-          }
-        }
-      }
-    },
     "total_size: %@" : {
 
-    },
-    "Transcribe" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "전사"
-          }
-        }
-      }
-    },
-    "Translate" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "번역"
-          }
-        }
-      }
     },
     "Unload Model" : {
       "localizations" : {
@@ -1493,17 +1234,6 @@
     },
     "Unloading" : {
 
-    },
-    "Unloading Model" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "모델 해제중"
-          }
-        }
-      }
     },
     "VAD" : {
       "localizations" : {
@@ -1572,17 +1302,6 @@
     },
     "Workers" : {
 
-    },
-    "Workers:" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "동시 작업 수:"
-          }
-        }
-      }
     },
     "You must unload the model before deleting it" : {
       "localizations" : {
