@@ -3,11 +3,13 @@
 
 'status:awaiting review':
   - changed-files:
-      - any-glob-to-any-file: '**/*'
+      - any-glob-to-any-file:
+          - '**/*'
 
 'component:swift sdk':
   - changed-files:
-      - any-glob-to-any-file: '**/*.swift'
-      - any-glob-to-any-file: '**/*.xcodeproj/**'
-      - any-glob-to-any-file: '**/Package.swift'
-      - any-glob-to-any-file: '**/Package.resolved'
+      - any-glob-to-any-file:
+          - '**/*.swift'
+          - '**/*.xcodeproj/**'
+          - '**/Package.swift'
+          - '**/Package.resolved'
