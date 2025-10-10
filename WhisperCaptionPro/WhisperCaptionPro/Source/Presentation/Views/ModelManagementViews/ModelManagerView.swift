@@ -339,6 +339,20 @@ struct ModelManagerView: View {
             // 뷰가 나타날 때 모델 목록 갱신
             viewModel.fetchModels()
         }
+        .alert(
+            "Download Failed",
+            isPresented: $viewModel.uiState.showDownloadErrorAlert
+        ) {
+            Button("OK") {
+                viewModel.uiState.showDownloadErrorAlert = false
+                viewModel.uiState.downloadError = nil
+            }
+            .keyboardShortcut(.defaultAction)
+        } message: {
+            if let error = viewModel.uiState.downloadError {
+                Text(error.localizedKey)
+            }
+        }
     }
 }
 
