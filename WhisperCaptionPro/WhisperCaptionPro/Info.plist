@@ -8,6 +8,9 @@
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2025 Harrison Cho. All rights reserved.</string>
 
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
     <key>NSPrivacyAccessedAPITypes</key>
     <dict>
         <key>NSPrivacyAccessedAPIType</key>
