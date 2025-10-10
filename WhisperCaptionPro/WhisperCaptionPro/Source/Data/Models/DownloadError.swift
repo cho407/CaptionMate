@@ -18,17 +18,17 @@ enum DownloadError: Equatable {
     case permissionDenied
     case fileNotFound
     case unknown(String)
-    
+
     /// 에러로부터 DownloadError 생성
     static func from(_ error: Error) -> DownloadError? {
         let nsError = error as NSError
-        
+
         // 파일 이동 에러 (취소 시 발생) - 무시
         if nsError.domain == NSCocoaErrorDomain,
            nsError.code == NSFileNoSuchFileError || nsError.code == NSFileWriteFileExistsError {
             return nil // 취소로 인한 에러는 무시
         }
-        
+
         // URL 에러
         if nsError.domain == NSURLErrorDomain {
             switch nsError.code {
@@ -44,7 +44,7 @@ enum DownloadError: Equatable {
                 return .unknown(error.localizedDescription)
             }
         }
-        
+
         // 파일 시스템 에러
         if nsError.domain == NSCocoaErrorDomain {
             switch nsError.code {
@@ -58,11 +58,11 @@ enum DownloadError: Equatable {
                 return .unknown(error.localizedDescription)
             }
         }
-        
+
         // 기타 에러
         return .unknown(error.localizedDescription)
     }
-    
+
     /// LocalizedStringKey 반환
     var localizedKey: LocalizedStringKey {
         switch self {

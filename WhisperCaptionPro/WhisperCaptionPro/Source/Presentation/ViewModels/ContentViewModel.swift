@@ -1030,10 +1030,10 @@ class ContentViewModel: ObservableObject {
                 }
             } catch {
                 print("Model download failed: \(error.localizedDescription)")
-                
+
                 // DownloadError로 변환 (취소로 인한 파일 이동 에러는 nil 반환)
                 let downloadError = DownloadError.from(error)
-                
+
                 await MainActor.run {
                     self.modelManagementState
                         .downloadErrors[model] = "Download failed: \(error.localizedDescription)"
