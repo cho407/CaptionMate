@@ -1030,6 +1030,10 @@ class ContentViewModel: ObservableObject {
                 }
             } catch {
                 print("Model download failed: \(error.localizedDescription)")
+                
+                // DownloadError로 변환 (취소로 인한 파일 이동 에러는 nil 반환)
+                let downloadError = DownloadError.from(error)
+                
                 await MainActor.run {
                     self.modelManagementState
                         .downloadErrors[model] = "Download failed: \(error.localizedDescription)"
@@ -1042,6 +1046,12 @@ class ContentViewModel: ObservableObject {
                     if self.modelManagementState.currentDownloadingModels.isEmpty {
                         self.modelManagementState.isDownloading = false
                     }
+
+                    // 다운로드 실패 알림 표시 (취소로 인한 에러가 아닌 경우만)
+                    if let downloadError = downloadError {
+                        self.uiState.downloadError = downloadError
+                        self.uiState.showDownloadErrorAlert = true
+                    }
                 }
                 await cleanupPartialDownload(model)
             }
@@ -1051,7 +1061,7 @@ class ContentViewModel: ObservableObject {
         modelManagementState.downloadTasks[model] = task
     }
 
-    /// 부분 다운로드 파일 정리 헬퍼 메서드 (파일 삭제만)
+    /// 부분 다운로드 파일 정리 헬퍼 메서드
     private func cleanupPartialDownload(_ model: String) async {
         // 부분적으로 다운로드된 파일 삭제
         let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)

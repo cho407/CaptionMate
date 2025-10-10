@@ -131,4 +131,6 @@ struct UIState {
     var isModelmanagerViewPresented: Bool = false
     var isTargeted: Bool = false
     var isLanguageChanged: Bool = false
+    var showDownloadErrorAlert: Bool = false
+    var downloadError: DownloadError? = nil
 }
