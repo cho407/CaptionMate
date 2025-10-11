@@ -10,7 +10,13 @@ import SwiftUI
 // 오디오 파형을 시각화하는 뷰
 struct WaveFormView: View {
     @ObservedObject var contentViewModel: ContentViewModel
+    @ObservedObject var playbackState: AudioPlaybackState
     @Environment(\.colorScheme) private var colorScheme
+
+    init(contentViewModel: ContentViewModel) {
+        self.contentViewModel = contentViewModel
+        self.playbackState = contentViewModel.audioPlaybackState
+    }
 
     @State private var hoverLocation: CGFloat? = nil
     @State private var isDragging: Bool = false
@@ -34,17 +40,18 @@ struct WaveFormView: View {
                                             .totalDuration / calculatedLineTime))),
                             id: \.self
                         ) { lineIndex in
-                            WaveformLineView(
-                                contentViewModel: contentViewModel,
-                                lineIndex: lineIndex,
-                                secondsPerLine: calculatedLineTime,
-                                availableWidth: geometry.size.width - 40,
-                                waveformHeight: waveformHeight,
-                                colorScheme: colorScheme,
-                                hoveredLineIndex: $hoveredLineIndex,
-                                hoverLocation: $hoverLocation,
-                                isDragging: $isDragging
-                            )
+                                WaveformLineView(
+                                    contentViewModel: contentViewModel,
+                                    playbackState: playbackState,
+                                    lineIndex: lineIndex,
+                                    secondsPerLine: calculatedLineTime,
+                                    availableWidth: geometry.size.width - 40,
+                                    waveformHeight: waveformHeight,
+                                    colorScheme: colorScheme,
+                                    hoveredLineIndex: $hoveredLineIndex,
+                                    hoverLocation: $hoverLocation,
+                                    isDragging: $isDragging
+                                )
                             .id("line-\(lineIndex)")
                             .frame(width: geometry.size.width - 40)
                             .padding(.vertical, verticalPadding)
@@ -69,8 +76,7 @@ struct WaveFormView: View {
                         }
                     }
                 }
-                .onChange(of: contentViewModel.audioPlayer?
-                    .currentTime ?? 0) { oldValue, newValue in
+                .onChange(of: playbackState.currentPlayerTime) { oldValue, newValue in
                         // 재생 위치가 바뀌면 해당 라인으로 스크롤
                         if contentViewModel.audioState.totalDuration > 0 {
                             let oldLineIndex = Int(oldValue / calculatedLineTime)
@@ -139,8 +145,7 @@ struct WaveFormView: View {
     // 현재 재생 시간에 해당하는 라인으로 스크롤
     private func scrollToCurrentLine(proxy: ScrollViewProxy) {
         if contentViewModel.audioState.totalDuration > 0 {
-            let currentLineIndex = Int(contentViewModel.audioPlayer?
-                .currentTime ?? 0 / calculatedLineTime)
+            let currentLineIndex = Int(playbackState.currentPlayerTime / calculatedLineTime)
             proxy.scrollTo("line-\(currentLineIndex)", anchor: .top)
         }
     }
@@ -149,6 +154,7 @@ struct WaveFormView: View {
 // 한 줄의 파형을 표시하는 뷰
 struct WaveformLineView: View {
     @ObservedObject var contentViewModel: ContentViewModel
+    @ObservedObject var playbackState: AudioPlaybackState
 
     let lineIndex: Int
     let secondsPerLine: Double
@@ -169,12 +175,11 @@ struct WaveformLineView: View {
         contentViewModel.audioState.totalDuration
     ) }
     private var isCurrentLine: Bool {
-        contentViewModel.audioPlayer?.currentTime ?? 0 >= startTime && contentViewModel.audioPlayer?
-            .currentTime ?? 0 < endTime
+        playbackState.currentPlayerTime >= startTime && playbackState.currentPlayerTime < endTime
     }
 
     private var isPreviouslyPlayed: Bool {
-        contentViewModel.audioPlayer?.currentTime ?? 0 >= endTime
+        playbackState.currentPlayerTime >= endTime
     }
 
     var body: some View {
@@ -196,7 +201,7 @@ struct WaveformLineView: View {
                     if isCurrentLine {
                         // 현재 재생 중인 라인: 현재 시간까지 파란색 표시
                         PositionIndicatorView(
-                            currentTime: contentViewModel.audioPlayer?.currentTime ?? 0,
+                            currentTime: playbackState.currentPlayerTime,
                             startTime: startTime,
                             endTime: endTime,
                             availableWidth: availableWidth,
@@ -216,7 +221,7 @@ struct WaveformLineView: View {
 
                 // 재생 위치 표시선 - 현재 재생 중인 라인에만 표시
                 if isCurrentLine {
-                    let currentTime = contentViewModel.audioPlayer?.currentTime ?? 0
+                    let currentTime = playbackState.currentPlayerTime
                     let lineDuration = endTime - startTime
                     let positionInLine = currentTime - startTime
                     let positionRatio = lineDuration > 0 ? min(

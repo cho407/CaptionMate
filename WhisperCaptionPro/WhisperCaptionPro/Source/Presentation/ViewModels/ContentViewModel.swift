@@ -22,33 +22,32 @@ class ContentViewModel: ObservableObject {
 
     @Published var whisperKit: WhisperKit?
 
-    // 현재 실제로 로드된 모델 추적 (selectedModel과 구분)
+    // 현재 실제로 로드된 모델 추적
     @Published var currentLoadedModel: String = ""
 
     // Model 및 전사 관련 상태
     @Published var transcriptionState = TranscriptionState()
-    @Published var modelManagementState = ModelManagementState()
+    let modelManagementState = ModelManagementState()
     @Published var audioState = AudioState()
     @Published var uiState = UIState()
 
-    /// 전사 결과 (전사 완료 후 업데이트)
+    /// 전사 결과
     @Published var transcriptionResult: TranscriptionResult?
 
     /// Export 진행 여부
     @Published var isExporting: Bool = false
 
     @Published var audioPlayer: AVAudioPlayer?
-    @Published var normalizedVolumeFactor: Float = 1.0 // 노멀라이제이션 계수 저장용
-    @Published var currentPlayerTime: Double = 0.0 // currentTime publish 위한 트리거
+    @Published var normalizedVolumeFactor: Float = 1.0
 
-    // 재생 속도 상태 추가
+    let audioPlaybackState = AudioPlaybackState()
+
     let playbackRates: [Float] = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-    @Published var currentPlaybackRateIndex: Int = 3 // 기본값은 1.0x (인덱스 3)
+    @Published var currentPlaybackRateIndex: Int = 3
 
-    // 볼륨 상태 (AppStorage로 관리)
-    @AppStorage("audioVolume") var audioVolume: Double = 1.0 // 0.0 ~ 1.0
-    @AppStorage("stagingVolume") var stagingVolume: Double = 1.0 // 음소거 전 볼륨 저장용
-    @AppStorage("isMuted") var isMuted: Bool = false // 음소거 상태
+    @AppStorage("audioVolume") var audioVolume: Double = 1.0
+    @AppStorage("stagingVolume") var stagingVolume: Double = 1.0
+    @AppStorage("isMuted") var isMuted: Bool = false
 
     // Combine 관련
     private var playbackTimerCancellable: AnyCancellable?
@@ -60,30 +59,29 @@ class ContentViewModel: ObservableObject {
     @AppStorage("selectedLanguage") var selectedLanguage: String = "english"
     @AppStorage("repoName") var repoName: String = "argmaxinc/whisperkit-coreml"
 
-    // 전사 설정 - DecodingOptions에 적용됨
-    @AppStorage("enableTimestamps") var enableTimestamps: Bool = true // ✓ 적용됨 (withoutTimestamps)
+    @AppStorage("enableTimestamps") var enableTimestamps: Bool = true
     @AppStorage("enablePromptPrefill") var enablePromptPrefill: Bool =
-        true // ✓ 적용됨 (usePrefillPrompt)
-    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true // ✓ 적용됨 (usePrefillCache)
+        true
+    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true
     @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool =
         false // ✓ 적용됨 (skipSpecialTokens)
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool =
         false // ✓ 적용됨 (wordTimestamps)
-    @AppStorage("temperatureStart") var temperatureStart: Double = 0.0 // ✓ 적용됨 (temperature)
-    @AppStorage("fallbackCount") var fallbackCount: Double = 5.0 // ✓ 적용됨 (temperatureFallbackCount)
+    @AppStorage("temperatureStart") var temperatureStart: Double = 0.0
+    @AppStorage("fallbackCount") var fallbackCount: Double = 5.0
     @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double =
-        60.0 // ✓ 적용됨 (decodingCallback에서 사용)
+        60.0
     @AppStorage("sampleLength") var sampleLength: Int = 224 // ✓ 적용됨 (sampleLength)
     @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double =
-        4.0 // ✓ 적용됨 (concurrentWorkerCount)
+        4.0
     @AppStorage("chunkingStrategy") var chunkingStrategy: ChunkingStrategy =
-        .vad // ✓ 적용됨 (chunkingStrategy)
+        .vad
 
     // UI 전용 설정 - 전사 로직에 적용되지 않음
-    @AppStorage("enableDecoderPreview") var enableDecoderPreview: Bool = true // UI 표시용
+    @AppStorage("enableDecoderPreview") var enableDecoderPreview: Bool = true
 
     // Export 전용 설정
-    @AppStorage("frameRate") var frameRate: Double = 30.0 // Export 시에만 사용 (FCPXML 등)
+    @AppStorage("frameRate") var frameRate: Double = 30.0
 
     // 기타 설정
     @AppStorage("encoderComputeUnits") var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
@@ -1526,9 +1524,16 @@ class ContentViewModel: ObservableObject {
         playbackTimerCancellable = Timer.publish(every: 0.033, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
-                guard let self = self, let player = self.audioPlayer else { return }
+                guard let self = self, let player = self.audioPlayer else {
+                    // 플레이어가 없으면 타이머 정리
+                    self?.playbackTimerCancellable?.cancel()
+                    return
+                }
 
-                self.currentPlayerTime = player.currentTime
+                // 재생 중일 때만 업데이트
+                if self.audioState.isPlaying {
+                    self.audioPlaybackState.currentPlayerTime = player.currentTime
+                }
 
                 // 재생이 끝났는지 확인
                 if !player.isPlaying && self.audioState.isPlaying {
@@ -1536,8 +1541,10 @@ class ContentViewModel: ObservableObject {
                     // 재생이 끝났을 때만 처음 위치로 리셋
                     if player.currentTime >= player.duration - 0.1 {
                         player.currentTime = 0.0
-                        self.currentPlayerTime = 0.0
+                        self.audioPlaybackState.currentPlayerTime = 0.0
                     }
+                    // 재생이 멈췄으므로 타이머 정리
+                    self.playbackTimerCancellable?.cancel()
                 }
             }
     }
@@ -1589,6 +1596,7 @@ class ContentViewModel: ObservableObject {
     func stopImportedAudio() {
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
+        audioPlaybackState.currentPlayerTime = 0
         audioState.isPlaying = false
 
         // 타이머 정리
@@ -1601,13 +1609,13 @@ class ContentViewModel: ObservableObject {
         guard let player = audioPlayer else { return }
         player.currentTime = position
 
+        // currentPlayerTime 즉시 업데이트
+        audioPlaybackState.currentPlayerTime = position
+
         // 재생 중이었다면 계속 재생
         if audioState.isPlaying {
             player.play()
         }
-
-        // 다음 UI 업데이트 사이클에서 모든 View에 변경 사항 알림
-        objectWillChange.send()
     }
 
     /// 라인 내에서 특정 비율 위치로 이동 (WaveFormView에서 사용)
@@ -1671,6 +1679,8 @@ class ContentViewModel: ObservableObject {
         audioState.importedAudioURL = nil
         audioState.audioFileName = ""
         audioState.waveformSamples = []
+        audioState.totalDuration = 0
+        audioPlaybackState.currentPlayerTime = 0
         print("Imported audio removed from app.")
     }
 

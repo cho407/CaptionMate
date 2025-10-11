@@ -38,7 +38,6 @@ struct AudioPlaceholderView: View {
                         Color.blue.opacity(0.05) : Color
                         .audioPlaceholderBackground(for: colorScheme))
 
-                // 추가 글로우 효과 (드래그 중일 때만)
                 if isTargeted {
                     RoundedRectangle(cornerRadius: 12)
                         .glow(

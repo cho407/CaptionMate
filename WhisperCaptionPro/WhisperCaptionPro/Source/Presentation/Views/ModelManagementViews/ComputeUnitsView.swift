@@ -11,6 +11,12 @@ import WhisperKit
 
 struct ComputeUnitsView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject var modelState: ModelManagementState
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        self.modelState = viewModel.modelManagementState
+    }
 
     var body: some View {
         DisclosureGroup(isExpanded: $viewModel.uiState.showComputeUnits) {

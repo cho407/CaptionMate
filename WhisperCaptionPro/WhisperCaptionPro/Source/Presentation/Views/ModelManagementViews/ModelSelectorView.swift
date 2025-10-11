@@ -10,9 +10,15 @@ import WhisperKit
 
 struct ModelSelectorView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject var modelState: ModelManagementState
     @Environment(\.colorScheme) private var colorScheme
 
     let filterWords: [String] = ["distil", "MB", "2024"]
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        self.modelState = viewModel.modelManagementState
+    }
 
     var body: some View {
         VStack {

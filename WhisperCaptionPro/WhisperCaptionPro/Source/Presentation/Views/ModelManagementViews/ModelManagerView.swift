@@ -10,11 +10,17 @@ import WhisperKit
 
 struct ModelManagerView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject var modelState: ModelManagementState
     @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
 
     // 필터링할 단어 목록
     let filterWords: [String] = ["distil", "MB", "2024"]
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        self.modelState = viewModel.modelManagementState
+    }
 
     // 다운로드 진행 상황 - 가중 평균 (모델 크기 고려)
     private var totalDownloadProgress: Double {

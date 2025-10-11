@@ -10,7 +10,13 @@ import UniformTypeIdentifiers
 
 struct AudioControlView: View {
     @ObservedObject var contentViewModel: ContentViewModel
+    @ObservedObject var playbackState: AudioPlaybackState
     @Environment(\.colorScheme) private var colorScheme
+
+    init(contentViewModel: ContentViewModel) {
+        self.contentViewModel = contentViewModel
+        self.playbackState = contentViewModel.audioPlaybackState
+    }
 
     // 시간 포맷팅 함수 (소수점 둘째자리까지 포함)
     private func formatTimeDetailed(_ timeInSeconds: Double) -> String {
@@ -156,7 +162,7 @@ struct AudioControlView: View {
 
                                         // 시간 표시 (HH:MM:SS.ss / HH:MM:SS.ss 형식)
                                         Text(
-                                            "**\(formatTimeDetailed(contentViewModel.audioPlayer?.currentTime ?? 0))** / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))"
+                                            "**\(formatTimeDetailed(playbackState.currentPlayerTime))** / \(formatTimeDetailed(contentViewModel.audioState.totalDuration))"
                                         )
                                         .font(.system(size: 20, design: .monospaced))
                                         .foregroundColor(.secondary)
@@ -218,7 +224,6 @@ struct AudioControlView: View {
                         }
                     }
 
-                    // 추가 정보 표시 영역 (현재 재생 속도)
                     HStack {
                         // 음량 조절
                         HStack(spacing: 6) {

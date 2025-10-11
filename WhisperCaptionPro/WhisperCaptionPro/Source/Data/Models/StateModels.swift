@@ -35,46 +35,49 @@ struct TranscriptionState {
     var totalInferenceTime: TimeInterval = 0
 }
 
-struct ModelManagementState {
-    var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
-    var appStartTime: Date = .init()
-    var modelState: ModelState = .unloaded
-    var localModels: [String] = []
-    var localModelPath: String = ""
-    var availableModels: [String] = []
-    var availableLanguages: [String] = []
-    var disabledModels: [String] = WhisperKit.recommendedModels().disabled
+// MARK: - Model Management State
+
+@MainActor
+class ModelManagementState: ObservableObject {
+    @Published var modelStorage: String = "huggingface/models/argmaxinc/whisperkit-coreml"
+    @Published var appStartTime: Date = .init()
+    @Published var modelState: ModelState = .unloaded
+    @Published var localModels: [String] = []
+    @Published var localModelPath: String = ""
+    @Published var availableModels: [String] = []
+    @Published var availableLanguages: [String] = []
+    @Published var disabledModels: [String] = WhisperKit.recommendedModels().disabled
 
     // 에러 관련 상태
-    var modelLoadError: String? = nil
-    var hasModelLoadError: Bool = false
+    @Published var modelLoadError: String? = nil
+    @Published var hasModelLoadError: Bool = false
 
-    // 다운로드/로딩 진행률
-    var loadingProgressValue: Float = 0.0
-    var specializationProgressRatio: Float = 0.2
-    var downloadProgress: [String: Float] = [:]
-    var downloadTasks: [String: Task<Void, Never>] = [:]
+    // 다운로드/로딩 진행률 - 자주 업데이트되는 값들
+    @Published var loadingProgressValue: Float = 0.0
+    @Published var specializationProgressRatio: Float = 0.2
+    @Published var downloadProgress: [String: Float] = [:]
+    @Published var downloadTasks: [String: Task<Void, Never>] = [:]
 
     // 모델 크기 정보
-    var modelSizes: [String: Int64] = [:]
-    var totalDownloadSize: Int64 = 0
-    var downloadedSize: Int64 = 0
+    @Published var modelSizes: [String: Int64] = [:]
+    @Published var totalDownloadSize: Int64 = 0
+    @Published var downloadedSize: Int64 = 0
 
     // 다운로드 상태
-    var isDownloading: Bool = false
-    var currentDownloadingModels: Set<String> = []
-    var downloadErrors: [String: String] = [:]
-    var cancellingModels: Set<String> = [] // 취소 중인 모델들
-    var lastProgressCallbackTime: [String: Date] = [:] // Progress 콜백 마지막 활동 시간
-    var downloadProgressObjects: [String: Progress] = [:] // NSProgress 객체 저장
+    @Published var isDownloading: Bool = false
+    @Published var currentDownloadingModels: Set<String> = []
+    @Published var downloadErrors: [String: String] = [:]
+    @Published var cancellingModels: Set<String> = [] // 취소 중인 모델들
+    @Published var lastProgressCallbackTime: [String: Date] = [:] // Progress 콜백 마지막 활동 시간
+    @Published var downloadProgressObjects: [String: Progress] = [:] // NSProgress 객체 저장
 
     // 다운로드 관리 - 제한 해제
-    var maxConcurrentDownloads: Int = .max
+    @Published var maxConcurrentDownloads: Int = .max
 
     // UI 상태
-    var modelFilter: String = ""
+    @Published var modelFilter: String = ""
 
-    var folder: URL?
+    @Published var folder: URL?
 
     // 모델 정보 포맷 헬퍼 함수들
     func formattedModelSize(for model: String) -> String {
@@ -133,4 +136,11 @@ struct UIState {
     var isLanguageChanged: Bool = false
     var showDownloadErrorAlert: Bool = false
     var downloadError: DownloadError? = nil
+}
+
+// MARK: - Audio Playback State
+
+@MainActor
+class AudioPlaybackState: ObservableObject {
+    @Published var currentPlayerTime: Double = 0.0
 }
