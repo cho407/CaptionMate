@@ -320,7 +320,7 @@ struct ModelManagerView: View {
                                         .foregroundStyle(.blue)
                                     Spacer()
                                     Text(
-                                        "total_size: \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file))"
+                                        "total size: \(ByteCountFormatter.string(fromByteCount: totalRemoteSize, countStyle: .file))"
                                     )
                                     .font(.caption)
                                     .foregroundStyle(.secondary)

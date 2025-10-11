@@ -2,7 +2,7 @@
   "sourceLanguage" : "en",
   "strings" : {
     "" : {
-
+      "shouldTranslate" : false
     },
     "**%@** / %@" : {
       "localizations" : {
@@ -61,22 +61,64 @@
       }
     },
     "%lld" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        }
+      }
     },
     "•" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        }
+      }
     },
     "© 2025 Harrison Cho. All rights reserved." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© 2025 Harrison Cho. All rights reserved."
+          }
+        }
+      }
     },
     "30" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30"
+          }
+        }
+      }
     },
     "Apache License 2.0" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apache License 2.0"
+          }
+        }
+      }
     },
     "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device."
+          }
+        }
+      }
     },
     "App Version: %@ (%@)" : {
       "localizations" : {
@@ -303,7 +345,14 @@
       }
     },
     "Download Site: %@" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download Site: %@"
+          }
+        }
+      }
     },
     "downloaded" : {
       "localizations" : {
@@ -399,6 +448,125 @@
         }
       }
     },
+    "error.cannot_connect_to_server" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cannot connect to the server. Please try again later."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서버에 연결할 수 없습니다. 나중에 다시 시도해주세요."
+          }
+        }
+      }
+    },
+    "error.disk_space_full" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Insufficient disk space. Please free up some space and try again."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "디스크 공간이 부족합니다. 공간을 확보한 후 다시 시도해주세요."
+          }
+        }
+      }
+    },
+    "error.file_not_found" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "File not found on the server."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "서버에서 파일을 찾을 수 없습니다."
+          }
+        }
+      }
+    },
+    "error.network_lost" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network connection was lost during download."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 중 네트워크 연결이 끊어졌습니다."
+          }
+        }
+      }
+    },
+    "error.network_offline" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No internet connection. Please check your network settings."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "인터넷 연결이 없습니다. 네트워크 설정을 확인해주세요."
+          }
+        }
+      }
+    },
+    "error.permission_denied" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permission denied. Cannot write to the download folder."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "권한이 거부되었습니다. 다운로드 폴더에 쓸 수 없습니다."
+          }
+        }
+      }
+    },
+    "error.timeout" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Download timed out. Please check your network connection."
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다운로드 시간이 초과되었습니다. 네트워크 연결을 확인해주세요."
+          }
+        }
+      }
+    },
     "Export Subtitle" : {
       "localizations" : {
         "ko" : {
@@ -456,7 +624,14 @@
       }
     },
     "If you have any questions about this Privacy Policy, please contact: parfume407@gmail.com" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If you have any questions about this Privacy Policy, please contact: parfume407@gmail.com"
+          }
+        }
+      }
     },
     "Import File" : {
       "localizations" : {
@@ -712,7 +887,14 @@
       }
     },
     "Last Updated: January 2025" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last Updated: January 2025"
+          }
+        }
+      }
     },
     "legal_information" : {
       "localizations" : {
@@ -747,10 +929,24 @@
       }
     },
     "License: %@" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "License: %@"
+          }
+        }
+      }
     },
     "Loading" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로드 중"
+          }
+        }
+      }
     },
     "loading_model_info" : {
       "localizations" : {
@@ -857,7 +1053,14 @@
       }
     },
     "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted."
+          }
+        }
+      }
     },
     "Neural Engine" : {
       "localizations" : {
@@ -880,7 +1083,14 @@
       }
     },
     "of" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "of"
+          }
+        }
+      }
     },
     "OK" : {
       "comment" : "OK button title",
@@ -920,10 +1130,24 @@
       }
     },
     "Please use parfume407@gmail.com to report security vulnerabilities." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Please use parfume407@gmail.com to report security vulnerabilities."
+          }
+        }
+      }
     },
     "Privacy Policy" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        }
+      }
     },
     "privacy_policy" : {
       "localizations" : {
@@ -988,7 +1212,14 @@
       }
     },
     "Security Policy" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Security Policy"
+          }
+        }
+      }
     },
     "security_policy" : {
       "localizations" : {
@@ -1057,7 +1288,14 @@
       }
     },
     "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles."
+          }
+        }
+      }
     },
     "Source Language" : {
       "localizations" : {
@@ -1110,13 +1348,34 @@
       }
     },
     "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action."
+          }
+        }
+      }
     },
     "The following components are licensed under the MIT license reproduced below." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The following components are licensed under the MIT license reproduced below."
+          }
+        }
+      }
     },
     "The following sets forth attribution notices for third party software that may be contained in portions of this WhisperCaptionPro product." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The following sets forth attribution notices for third party software that may be contained in portions of this WhisperCaptionPro product."
+          }
+        }
+      }
     },
     "The language has been changed." : {
       "comment" : "The message displayed when the user changes the language.",
@@ -1195,7 +1454,14 @@
       }
     },
     "Third Party Notices" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Third Party Notices"
+          }
+        }
+      }
     },
     "third_party_notices" : {
       "localizations" : {
@@ -1209,6 +1475,16 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "오픈소스 라이선스"
+          }
+        }
+      }
+    },
+    "total size: %@" : {
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전체 크기: %@"
           }
         }
       }
@@ -1229,8 +1505,39 @@
         }
       }
     },
-    "total_size: %@" : {
-
+    "Transcribe" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "전사"
+          }
+        }
+      }
+    },
+    "Translate" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "번역"
+          }
+        }
+      }
     },
     "Unload Model" : {
       "localizations" : {
@@ -1243,7 +1550,14 @@
       }
     },
     "Unloading" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "해제 중"
+          }
+        }
+      }
     },
     "VAD" : {
       "localizations" : {
@@ -1276,13 +1590,34 @@
       }
     },
     "We release security updates for the latest version of WhisperCaptionPro. Please ensure you're using the most recent version available on the App Store." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We release security updates for the latest version of WhisperCaptionPro. Please ensure you're using the most recent version available on the App Store."
+          }
+        }
+      }
     },
     "We use parfume407@gmail.com for our intake and triage. For valid issues we will do coordination and disclosure here on GitHub (including using a GitHub Security Advisory when necessary)." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We use parfume407@gmail.com for our intake and triage. For valid issues we will do coordination and disclosure here on GitHub (including using a GitHub Security Advisory when necessary)."
+          }
+        }
+      }
     },
     "We will process your report within a day, and respond within a week (although it will depend on the severity of your report)." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "We will process your report within a day, and respond within a week (although it will depend on the severity of your report)."
+          }
+        }
+      }
     },
     "WhisperCaptionPro" : {
       "localizations" : {
@@ -1295,10 +1630,24 @@
       }
     },
     "WhisperCaptionPro does not collect, store, or transmit any personal data. All processing is done locally on your device." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WhisperCaptionPro does not collect, store, or transmit any personal data. All processing is done locally on your device."
+          }
+        }
+      }
     },
     "WhisperCaptionPro uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription." : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "WhisperCaptionPro uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription."
+          }
+        }
+      }
     },
     "Word Timestamps" : {
       "localizations" : {
@@ -1311,7 +1660,14 @@
       }
     },
     "Workers" : {
-
+      "localizations" : {
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동시 작업 수"
+          }
+        }
+      }
     },
     "You must unload the model before deleting it" : {
       "localizations" : {
@@ -1329,125 +1685,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "한국어"
-          }
-        }
-      }
-    },
-    "error.network_offline" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No internet connection. Please check your network settings."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "인터넷 연결이 없습니다. 네트워크 설정을 확인해주세요."
-          }
-        }
-      }
-    },
-    "error.network_lost" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Network connection was lost during download."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 중 네트워크 연결이 끊어졌습니다."
-          }
-        }
-      }
-    },
-    "error.cannot_connect_to_server" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cannot connect to the server. Please try again later."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "서버에 연결할 수 없습니다. 나중에 다시 시도해주세요."
-          }
-        }
-      }
-    },
-    "error.timeout" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download timed out. Please check your network connection."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다운로드 시간이 초과되었습니다. 네트워크 연결을 확인해주세요."
-          }
-        }
-      }
-    },
-    "error.disk_space_full" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Insufficient disk space. Please free up some space and try again."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "디스크 공간이 부족합니다. 공간을 확보한 후 다시 시도해주세요."
-          }
-        }
-      }
-    },
-    "error.permission_denied" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Permission denied. Cannot write to the download folder."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "권한이 거부되었습니다. 다운로드 폴더에 쓸 수 없습니다."
-          }
-        }
-      }
-    },
-    "error.file_not_found" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "File not found on the server."
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "서버에서 파일을 찾을 수 없습니다."
           }
         }
       }
