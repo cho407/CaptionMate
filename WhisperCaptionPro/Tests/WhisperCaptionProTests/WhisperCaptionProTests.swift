@@ -204,7 +204,7 @@ struct StateModelsTests {
         #expect(state.effectiveSpeedFactor == 0)
     }
 
-    @Test("ModelManagementState 초기화 테스트")
+    @Test("ModelManagementState 초기화 테스트") @MainActor
     func testModelManagementStateInitialization() throws {
         let state = ModelManagementState()
 
