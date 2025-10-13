@@ -1,6 +1,6 @@
 # 사용하지 않는 변수 및 설정 분석
 
-이 문서는 WhisperCaptionPro에서 **실시간 전사(Real-time Streaming)** 기능을 사용하지 않기 때문에 실제로 적용되지 않거나 불필요한 변수들을 정리합니다.
+이 문서는 CaptionMate에서 **실시간 전사(Real-time Streaming)** 기능을 사용하지 않기 때문에 실제로 적용되지 않거나 불필요한 변수들을 정리합니다.
 
 ## 📋 현재 앱의 동작 방식
 
@@ -213,7 +213,7 @@ VStack {
 
 ## 📝 결론
 
-현재 WhisperCaptionPro는 **파일 전사만 사용**하므로:
+현재 CaptionMate는 **파일 전사만 사용**하므로:
 
 - ✅ **즉시 삭제 가능**: `selectedAudioInput`, `tokenConfirmationsNeeded`, TranscriptionState의 버퍼 관련 필드들
 - ⚠️ **검토 후 삭제**: `silenceThreshold`, `realtimeDelayInterval`, `useVAD`, `enableEagerDecoding`
