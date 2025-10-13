@@ -1455,7 +1455,7 @@ class ContentViewModel: ObservableObject {
             let checkWindow = Int(self.compressionCheckWindow)
             if currentTokens.count > checkWindow {
                 let checkTokens: [Int] = Array(currentTokens.suffix(checkWindow))
-                let compressionRatio = compressionRatio(of: checkTokens)
+                let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
                 if compressionRatio > options.compressionRatioThreshold! {
                     Logging.debug("Early stopping due to compression threshold")
                     return false
@@ -1473,7 +1473,7 @@ class ContentViewModel: ObservableObject {
             decodeOptions: options,
             callback: decodingCallback
         )
-        let mergedResults = mergeTranscriptionResults(transcriptionResults)
+        let mergedResults = TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults, confirmedWords: [])
         return mergedResults
     }
 
@@ -1975,7 +1975,7 @@ class ContentViewModel: ObservableObject {
             }
         }
 
-        modelManagementState.localModels = WhisperKit
+        modelManagementState.localModels = ModelUtilities
             .formatModelFiles(modelManagementState.localModels)
         for model in modelManagementState.localModels
             where !modelManagementState.availableModels.contains(model) {

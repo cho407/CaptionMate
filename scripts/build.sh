@@ -23,7 +23,7 @@ if [[ $# -lt 1 ]]; then
   cat 1>&2 <<EOF
 USAGE: $0 product [platform] [method]
 product can be one of:
-  whisper-caption-pro
+  CaptionMate
 platform can be one of:
   iOS (default)
   iOS-device
@@ -63,7 +63,9 @@ case "$system" in
 esac
 
 # Source secrets-check script, if any.
-source "${scripts_dir}/check_secrets.sh"
+if [[ -f "${scripts_dir}/check_secrets.sh" ]]; then
+  source "${scripts_dir}/check_secrets.sh"
+fi
 
 # Runs xcodebuild with given flags, piping output to xcpretty.
 function RunXcodebuild() {

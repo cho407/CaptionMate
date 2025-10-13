@@ -122,3 +122,6 @@ __pycache__/
 thumbs.db
 .idea
 
+# Temporary files
+*.tmp
+

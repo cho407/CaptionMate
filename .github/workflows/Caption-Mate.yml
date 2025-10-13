@@ -1,4 +1,4 @@
-name: WhisperCaptionPro Build, Test & Archive
+name: CaptionMate Build, Test & Archive
 
 on:
   pull_request:
@@ -20,13 +20,13 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Initialize xcodebuild
-        run: xcodebuild -list -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj
+        run: xcodebuild -list -project CaptionMate/CaptionMate.xcodeproj
 
-      - name: Test the Whisper Caption Pro
+      - name: Test the CaptionMate
         run: |
           xcodebuild \
-            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
-            -scheme "WhisperCaptionPro" \
+            -project CaptionMate/CaptionMate.xcodeproj \
+            -scheme "CaptionMate" \
             -sdk macosx \
             -destination 'platform=macOS' \
             test \
@@ -34,11 +34,11 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY=""
 
-      - name: Build the Whisper Caption Pro
+      - name: Build the CaptionMate
         run: |
           xcodebuild \
-            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
-            -scheme "WhisperCaptionPro" \
+            -project CaptionMate/CaptionMate.xcodeproj \
+            -scheme "CaptionMate" \
             -sdk macosx \
             -destination 'platform=macOS' \
             build \
@@ -46,11 +46,11 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY=""
 
-      - name: Archive the Whisper Caption Pro
+      - name: Archive the CaptionMate
         run: |
           xcodebuild \
-            -project WhisperCaptionPro/WhisperCaptionPro.xcodeproj \
-            -scheme "WhisperCaptionPro" \
+            -project CaptionMate/CaptionMate.xcodeproj \
+            -scheme "CaptionMate" \
             -sdk macosx \
             -destination 'platform=macOS' \
             archive \

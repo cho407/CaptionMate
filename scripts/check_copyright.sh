@@ -23,7 +23,7 @@ options=(
   'Copyright [0-9]{4}.*Harrison Cho'
 )
 
-list=$(git grep "${options[@]}" -- \
+result=$(git grep "${options[@]}" -- \
     '*.'{c,cc,cmake,h,js,m,mm,py,rb,sh,swift} \
     CMakeLists.txt '**/CMakeLists.txt' \
     ':(exclude)**/third_party/**')
