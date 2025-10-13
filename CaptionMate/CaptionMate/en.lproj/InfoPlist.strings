@@ -1,0 +1,19 @@
+/*
+  InfoPlist.strings
+  CaptionMate
+
+  English localization for Info.plist
+*/
+
+/* Copyright */
+"NSHumanReadableCopyright" = "Copyright © 2025 Harrison Cho. All rights reserved.";
+
+/* File Type Descriptions */
+"Final Cut Pro XML" = "Final Cut Pro XML";
+"SRT" = "SRT Subtitle";
+"webVTT" = "WebVTT Subtitle";
+"JSON" = "JSON Subtitle";
+
+/* Document Type Name */
+"Final Cut Pro XML Subtitle" = "Final Cut Pro XML Subtitle";
+

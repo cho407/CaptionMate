@@ -1,4 +1,4 @@
-# WhisperCaptionPro
+# CaptionMate
 
 <p align="center">
 
@@ -58,4 +58,4 @@
 </div>
 
 ## 라이센스
-WhisperCaptionPro is released under the Apache License 2.0. See [LICENSE](https://github.com/cho407/WhisperCaptionPro/blob/main/LICENSE) for details.
+CaptionMate is released under the Apache License 2.0. See [LICENSE](https://github.com/cho407/CaptionMate/blob/main/LICENSE) for details.
