@@ -48,31 +48,31 @@ print_error() {
 # 시스템 요구사항 확인
 check_system_requirements() {
     print_status "시스템 요구사항을 확인합니다..."
-    
+
     # macOS 버전 확인
     if [[ "$OSTYPE" != "darwin"* ]]; then
         print_error "이 프로젝트는 macOS에서만 실행됩니다."
         exit 1
     fi
-    
+
     macos_version=$(sw_vers -productVersion)
     print_success "macOS 버전: $macos_version"
-    
+
     # Xcode 확인
     if ! command -v xcodebuild &> /dev/null; then
         print_error "Xcode가 설치되어 있지 않습니다. App Store에서 Xcode를 설치해주세요."
         exit 1
     fi
-    
+
     xcode_version=$(xcodebuild -version | head -n 1)
     print_success "Xcode 버전: $xcode_version"
-    
+
     # Swift 버전 확인
     if ! command -v swift &> /dev/null; then
         print_error "Swift가 설치되어 있지 않습니다."
         exit 1
     fi
-    
+
     swift_version=$(swift --version | head -n 1)
     print_success "Swift 버전: $swift_version"
 }
@@ -84,13 +84,13 @@ check_homebrew() {
         print_warning "Homebrew가 설치되어 있지 않습니다."
         print_status "Homebrew를 설치합니다..."
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-        
+
         # PATH 업데이트 (Apple Silicon Mac의 경우)
         if [[ $(uname -m) == "arm64" ]]; then
             echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
             eval "$(/opt/homebrew/bin/brew shellenv)"
         fi
-        
+
         print_success "Homebrew가 설치되었습니다."
     else
         print_success "Homebrew가 이미 설치되어 있습니다."
