@@ -26,12 +26,14 @@ cd CaptionMate
 ```
 
 이 스크립트가 다음을 자동으로 처리합니다:
+- 시스템 요구사항 확인 (macOS, Xcode, Swift)
 - Homebrew 설치 (없는 경우)
 - Mint 설치
 - 프로젝트 의존성 설치
 - 스크립트 권한 설정
+- Xcode 프로젝트 검증
+- SwiftFormat 테스트
 - 빌드 테스트
-- 코드 품질 검사
 
 ### 3. Xcode 프로젝트 열기
 ```bash

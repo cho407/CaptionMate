@@ -173,29 +173,6 @@ test_build() {
     fi
 }
 
-# 코드 품질 체크
-run_code_quality_checks() {
-    print_status "코드 품질을 확인합니다..."
-    
-    if [[ -f "scripts/check_copyright.sh" ]]; then
-        print_status "카피라이트 확인 중..."
-        if scripts/check_copyright.sh &> /dev/null; then
-            print_success "카피라이트 검사 통과"
-        else
-            print_warning "카피라이트 검사에서 문제가 발견되었습니다."
-        fi
-    fi
-    
-    if [[ -f "scripts/check_whitespace.sh" ]]; then
-        print_status "Whitespace 확인 중..."
-        if scripts/check_whitespace.sh &> /dev/null; then
-            print_success "Whitespace 검사 통과"
-        else
-            print_warning "Whitespace 검사에서 문제가 발견되었습니다."
-        fi
-    fi
-}
-
 # 메인 실행 함수
 main() {
     echo "=========================================="
@@ -211,18 +188,13 @@ main() {
     check_xcode_project
     test_swiftformat
     test_build
-    run_code_quality_checks
 
     echo ""
     echo "=========================================="
     print_success "🎉 개발 환경 설정이 완료되었습니다!"
     echo "=========================================="
     echo ""
-    echo "다음 명령어들을 사용할 수 있습니다:"
-    echo "  • scripts/style.sh          - Swift 코드 포맷팅"
-    echo "  • scripts/build.sh          - 프로젝트 빌드"
-    echo "  • scripts/check_copyright.sh - 저작권 확인"
-    echo "  • scripts/check_whitespace.sh - Whitespace 확인"
+    echo "🎯 개발 준비 완료!"
     echo ""
     echo "Xcode에서 프로젝트를 열려면:"
     echo "  open CaptionMate/CaptionMate.xcodeproj"
@@ -231,6 +203,12 @@ main() {
     echo "  Command + B: 빌드"
     echo "  Command + U: 테스트 실행"
     echo "  Command + R: 앱 실행"
+    echo ""
+    echo "📝 개발 도구:"
+    echo "  • scripts/style.sh          - Swift 코드 포맷팅"
+    echo "  • scripts/build.sh          - 프로젝트 빌드"
+    echo "  • scripts/check_copyright.sh - 저작권 확인"
+    echo "  • scripts/check_whitespace.sh - Whitespace 확인"
     echo ""
     echo "자세한 정보는 SETUP.md를 참고하세요."
     echo ""
