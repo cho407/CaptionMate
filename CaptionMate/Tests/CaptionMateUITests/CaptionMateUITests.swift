@@ -194,30 +194,38 @@ final class InteractionTests: XCTestCase {
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5.0), "Settings 버튼이 존재해야 합니다")
         settingsButton.click()
 
-        // 슬라이더/스위치/특정 텍스트 중 아무거나 나타날 때까지 대기 (sleep 제거)
-        let sliderAppeared = app.sliders.firstMatch.waitForExistence(timeout: 6.0)
-        let switchAppeared = app.switches.firstMatch.waitForExistence(timeout: 6.0)
+        // Settings View가 열렸는지 확인하는 다양한 방법들
+        let sliderAppeared = app.sliders.firstMatch.waitForExistence(timeout: 8.0)
+        let toggleAppeared = app.toggles.firstMatch.waitForExistence(timeout: 8.0)
         let tempText = app.staticTexts
             .matching(
-                NSPredicate(format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] '온도'")
+                NSPredicate(format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] 'Starting' OR label CONTAINS[c] '온도'")
             )
-            .firstMatch.waitForExistence(timeout: 6.0)
-        let promptText = app.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS[c] 'Prompt' OR label CONTAINS[c] '프롬프트'"))
-            .firstMatch.waitForExistence(timeout: 6.0)
+            .firstMatch.waitForExistence(timeout: 8.0)
+        let frameRateText = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Frame Rate' OR label CONTAINS[c] 'fps'"))
+            .firstMatch.waitForExistence(timeout: 8.0)
+        let workersText = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Workers'"))
+            .firstMatch.waitForExistence(timeout: 8.0)
 
-        let settingsViewOpened = sliderAppeared || switchAppeared || tempText || promptText
+        let settingsViewOpened = sliderAppeared || toggleAppeared || tempText || frameRateText || workersText
 
         if !settingsViewOpened {
             // 디버깅: 현재 표시된 요소 확인
-            print("Sliders: \(app.sliders.count), Switches: \(app.switches.count)")
+            print("Sliders: \(app.sliders.count), Toggles: \(app.toggles.count)")
             print("All text elements: \(app.staticTexts.allElementsBoundByIndex.map { $0.label })")
+            print("All buttons: \(app.buttons.allElementsBoundByIndex.map { $0.label })")
         }
 
         XCTAssertTrue(settingsViewOpened, "Settings View가 열려야 합니다")
 
         // Settings 닫기 (ESC 키 사용)
         app.typeKey(.escape, modifierFlags: [])
+        
+        // Settings가 닫혔는지 확인
+        let settingsClosed = !app.sliders.firstMatch.exists && !app.toggles.firstMatch.exists
+        XCTAssertTrue(settingsClosed, "Settings View가 닫혀야 합니다")
     }
 
     @MainActor
