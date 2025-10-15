@@ -222,7 +222,7 @@ final class InteractionTests: XCTestCase {
 
         // Settings 닫기 (ESC 키 사용)
         app.typeKey(.escape, modifierFlags: [])
-        
+
         // Settings가 닫혔는지 확인
         let settingsClosed = !app.sliders.firstMatch.exists && !app.toggles.firstMatch.exists
         XCTAssertTrue(settingsClosed, "Settings View가 닫혀야 합니다")

@@ -41,7 +41,7 @@ jobs:
             -project CaptionMate.xcodeproj \
             -scheme "CaptionMate"
           echo "Dependencies resolved successfully!"
-          
+
           # Check resolved packages
           echo "Checking resolved packages..."
           xcodebuild -showBuildSettings \
@@ -115,10 +115,10 @@ jobs:
               echo "Build failed, showing detailed error:"
               cat build_output.log
               echo "Checking specific Swift files for syntax errors..."
-              
+
               # Check for common Swift syntax issues
               find CaptionMate -name "*.swift" -exec echo "Checking {}" \; -exec swift -frontend -parse {} \; 2>&1 | head -50
-              
+
               exit 1
             }
 
@@ -138,6 +138,6 @@ jobs:
             -verbose
 
           echo "Archive completed successfully!"
-          
+
           # List archive contents for verification
           ls -la ./CaptionMate.xcarchive/
