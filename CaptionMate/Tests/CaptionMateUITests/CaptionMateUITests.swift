@@ -199,17 +199,22 @@ final class InteractionTests: XCTestCase {
         let toggleAppeared = app.toggles.firstMatch.waitForExistence(timeout: 8.0)
         let tempText = app.staticTexts
             .matching(
-                NSPredicate(format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] 'Starting' OR label CONTAINS[c] '온도'")
+                NSPredicate(
+                    format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] 'Starting' OR label CONTAINS[c] '온도'"
+                )
             )
             .firstMatch.waitForExistence(timeout: 8.0)
         let frameRateText = app.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS[c] 'Frame Rate' OR label CONTAINS[c] 'fps'"))
+            .matching(
+                NSPredicate(format: "label CONTAINS[c] 'Frame Rate' OR label CONTAINS[c] 'fps'")
+            )
             .firstMatch.waitForExistence(timeout: 8.0)
         let workersText = app.staticTexts
             .matching(NSPredicate(format: "label CONTAINS[c] 'Workers'"))
             .firstMatch.waitForExistence(timeout: 8.0)
 
-        let settingsViewOpened = sliderAppeared || toggleAppeared || tempText || frameRateText || workersText
+        let settingsViewOpened = sliderAppeared || toggleAppeared || tempText || frameRateText ||
+            workersText
 
         if !settingsViewOpened {
             // 디버깅: 현재 표시된 요소 확인
