@@ -35,7 +35,7 @@ struct ModelManagerView: View {
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        self.modelState = viewModel.modelManagementState
+        modelState = viewModel.modelManagementState
     }
 
     // 다운로드 진행 상황 - 가중 평균 (모델 크기 고려)

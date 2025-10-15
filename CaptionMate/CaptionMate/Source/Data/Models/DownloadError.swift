@@ -96,9 +96,8 @@ enum DownloadError: Equatable {
             return "error.permission_denied"
         case .fileNotFound:
             return "error.file_not_found"
-        case .unknown(let message):
+        case let .unknown(message):
             return LocalizedStringKey(message)
         }
     }
 }
-

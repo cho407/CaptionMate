@@ -67,7 +67,7 @@ struct CaptionMateApp: App {
                 }
                 .disabled(
                     contentViewModel.uiState.isFilePickerPresented ||
-                    contentViewModel.isExporting
+                        contentViewModel.isExporting
                 )
 
                 Divider()
@@ -97,4 +97,3 @@ struct CaptionMateApp: App {
         }
     }
 }
-

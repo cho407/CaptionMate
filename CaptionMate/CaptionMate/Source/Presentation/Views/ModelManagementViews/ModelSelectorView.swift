@@ -33,7 +33,7 @@ struct ModelSelectorView: View {
 
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
-        self.modelState = viewModel.modelManagementState
+        modelState = viewModel.modelManagementState
     }
 
     var body: some View {

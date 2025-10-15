@@ -264,4 +264,3 @@ final class PerformanceTests: XCTestCase {
         }
     }
 }
-

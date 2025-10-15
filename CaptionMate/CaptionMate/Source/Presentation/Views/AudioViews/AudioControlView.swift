@@ -31,7 +31,7 @@ struct AudioControlView: View {
 
     init(contentViewModel: ContentViewModel) {
         self.contentViewModel = contentViewModel
-        self.playbackState = contentViewModel.audioPlaybackState
+        playbackState = contentViewModel.audioPlaybackState
     }
 
     // 시간 포맷팅 함수 (소수점 둘째자리까지 포함)

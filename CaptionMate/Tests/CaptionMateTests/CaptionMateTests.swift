@@ -21,11 +21,11 @@
 //  Created by 조형구 on 2/22/25.
 //
 
+@testable import CaptionMate
 import Foundation
 import SwiftUI
 import Testing
 import UniformTypeIdentifiers
-@testable import CaptionMate
 
 // MARK: - ContentViewModel Tests
 
@@ -347,4 +347,3 @@ struct StringExtensionTests {
         #expect(invalid3 == nil)
     }
 }
-

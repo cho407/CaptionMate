@@ -47,4 +47,3 @@ final class CaptionMateUITestsLaunchTests: XCTestCase {
         add(attachment)
     }
 }
-

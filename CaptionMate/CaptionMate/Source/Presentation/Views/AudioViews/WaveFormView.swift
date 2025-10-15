@@ -31,7 +31,7 @@ struct WaveFormView: View {
 
     init(contentViewModel: ContentViewModel) {
         self.contentViewModel = contentViewModel
-        self.playbackState = contentViewModel.audioPlaybackState
+        playbackState = contentViewModel.audioPlaybackState
     }
 
     @State private var hoverLocation: CGFloat? = nil
@@ -56,18 +56,18 @@ struct WaveFormView: View {
                                             .totalDuration / calculatedLineTime))),
                             id: \.self
                         ) { lineIndex in
-                                WaveformLineView(
-                                    contentViewModel: contentViewModel,
-                                    playbackState: playbackState,
-                                    lineIndex: lineIndex,
-                                    secondsPerLine: calculatedLineTime,
-                                    availableWidth: geometry.size.width - 40,
-                                    waveformHeight: waveformHeight,
-                                    colorScheme: colorScheme,
-                                    hoveredLineIndex: $hoveredLineIndex,
-                                    hoverLocation: $hoverLocation,
-                                    isDragging: $isDragging
-                                )
+                            WaveformLineView(
+                                contentViewModel: contentViewModel,
+                                playbackState: playbackState,
+                                lineIndex: lineIndex,
+                                secondsPerLine: calculatedLineTime,
+                                availableWidth: geometry.size.width - 40,
+                                waveformHeight: waveformHeight,
+                                colorScheme: colorScheme,
+                                hoveredLineIndex: $hoveredLineIndex,
+                                hoverLocation: $hoverLocation,
+                                isDragging: $isDragging
+                            )
                             .id("line-\(lineIndex)")
                             .frame(width: geometry.size.width - 40)
                             .padding(.vertical, verticalPadding)
@@ -93,16 +93,16 @@ struct WaveFormView: View {
                     }
                 }
                 .onChange(of: playbackState.currentPlayerTime) { oldValue, newValue in
-                        // 재생 위치가 바뀌면 해당 라인으로 스크롤
-                        if contentViewModel.audioState.totalDuration > 0 {
-                            let oldLineIndex = Int(oldValue / calculatedLineTime)
-                            let newLineIndex = Int(newValue / calculatedLineTime)
-                            if oldLineIndex != newLineIndex {
-                                withAnimation {
-                                    proxy.scrollTo("line-\(newLineIndex)", anchor: .top)
-                                }
+                    // 재생 위치가 바뀌면 해당 라인으로 스크롤
+                    if contentViewModel.audioState.totalDuration > 0 {
+                        let oldLineIndex = Int(oldValue / calculatedLineTime)
+                        let newLineIndex = Int(newValue / calculatedLineTime)
+                        if oldLineIndex != newLineIndex {
+                            withAnimation {
+                                proxy.scrollTo("line-\(newLineIndex)", anchor: .top)
                             }
                         }
+                    }
                 }
                 .onChange(of: geometry.size.width) { _, newWidth in
                     // 화면 너비가 변경될 때 파형 크기 조정

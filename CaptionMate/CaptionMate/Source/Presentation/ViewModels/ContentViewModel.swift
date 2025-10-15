@@ -80,14 +80,14 @@ class ContentViewModel: ObservableObject {
         true
     @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true
     @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool =
-        false // ✓ 적용됨 (skipSpecialTokens)
+        false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool =
-        false // ✓ 적용됨 (wordTimestamps)
+        false
     @AppStorage("temperatureStart") var temperatureStart: Double = 0.0
     @AppStorage("fallbackCount") var fallbackCount: Double = 5.0
     @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double =
         60.0
-    @AppStorage("sampleLength") var sampleLength: Int = 224 // ✓ 적용됨 (sampleLength)
+    @AppStorage("sampleLength") var sampleLength: Int = 224
     @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double =
         4.0
     @AppStorage("chunkingStrategy") var chunkingStrategy: ChunkingStrategy =
@@ -1489,7 +1489,10 @@ class ContentViewModel: ObservableObject {
             decodeOptions: options,
             callback: decodingCallback
         )
-        let mergedResults = TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults, confirmedWords: [])
+        let mergedResults = TranscriptionUtilities.mergeTranscriptionResults(
+            transcriptionResults,
+            confirmedWords: []
+        )
         return mergedResults
     }
 
