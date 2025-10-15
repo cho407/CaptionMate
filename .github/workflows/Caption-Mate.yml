@@ -28,7 +28,7 @@ jobs:
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             test \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -40,7 +40,7 @@ jobs:
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             build \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
@@ -52,7 +52,7 @@ jobs:
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS' \
+            -destination 'platform=macOS,arch=arm64' \
             archive \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
