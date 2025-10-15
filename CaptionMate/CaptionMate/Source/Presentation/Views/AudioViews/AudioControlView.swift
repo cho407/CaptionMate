@@ -277,7 +277,7 @@ struct AudioControlView: View {
                                         contentViewModel.setVolume(newVolume)
                                     }
                                 ),
-                                in: 0 ... 1,
+                                in: 0 ... 1
                             )
                             .frame(width: 100)
                         }
