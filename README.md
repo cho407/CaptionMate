@@ -1,10 +1,6 @@
 # CaptionMate 🎬
 
 <p align="center">
-<img width="800" alt="CaptionMate Screenshot" src="https://github.com/user-attachments/assets/c16ea6f8-ceee-4f97-894e-ec3b36a3fa2a">
-</p>
-
-<p align="center">
 <img src="https://img.shields.io/badge/macOS-15.0+-blue?style=flat-square&logo=apple&logoColor=white">
 <img src="https://img.shields.io/badge/Swift-6.0.3-orange?style=flat-square&logo=swift&logoColor=white">
 <img src="https://img.shields.io/badge/SwiftUI-5.0-blue?style=flat-square&logo=swift&logoColor=white">
@@ -39,7 +35,7 @@
 
 | 메인 인터페이스 | 모델 관리 | 전사 설정 |
 |-------|-------|-------|
-| <img src="https://github.com/user-attachments/assets/c16ea6f8-ceee-4f97-894e-ec3b36a3fa2a" alt="메인 인터페이스" width="250" height="400">| <img src="https://github.com/user-attachments/assets/5ff7a473-e12c-45b3-8046-754742df4efe" alt="모델 관리" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/a1f14a02-602d-46a0-9ddd-46f0541f88fe" alt="전사 설정" width="250" height="400"> |
+| <img src="https://github.com/user-attachments/assets/4e8589bc-1c8c-4331-920e-8f833303f829" alt="메인 인터페이스" width="250" height="400">| <img src="https://github.com/user-attachments/assets/c2f23ed3-6203-4fb0-9936-d3eb2549f19f" alt="모델 관리" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/9ee00eb1-f480-4976-b99b-1e56108a3a55" alt="전사 설정" width="250" height="400"> |
 
 </div>
 
@@ -52,7 +48,7 @@
 
 | 전사 결과 | 자막 내보내기 | 파이널 컷 프로 연동 |
 |-------|-------|-------|
-| <img src="https://github.com/user-attachments/assets/c2f23ed3-6203-4fb0-9936-d3eb2549f19f" alt="전사 결과" width="250" height="400">| <img src="https://github.com/user-attachments/assets/9ee00eb1-f480-4976-b99b-1e56108a3a55" alt="자막 내보내기" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/5699150e-39a7-4c83-9c42-f4c254a66b84" alt="파이널 컷 프로 연동" width="250" height="400"> |
+| <img src="https://github.com/user-attachments/assets/c16ea6f8-ceee-4f97-894e-ec3b36a3fa2a" alt="전사 결과" width="250" height="400">| <img src="https://github.com/user-attachments/assets/0ba88f70-f56b-4938-859c-274aaaaf0803" alt="자막 내보내기" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/5699150e-39a7-4c83-9c42-f4c254a66b84" alt="파이널 컷 프로 연동" width="250" height="400"> |
 
 </div>
 
@@ -66,9 +62,9 @@
 
 <div align="center">
 
-| 다크 모드 | 처리 상태 표시 | 고급 설정 |
+| 다크 모드 | 다국어 지원 | 고급 설정 |
 |-------|-------|-------|
-| <img src="https://github.com/user-attachments/assets/c16ea6f8-ceee-4f97-894e-ec3b36a3fa2a" alt="다크 모드" width="250" height="400">| <img src="https://github.com/user-attachments/assets/5ff7a473-e12c-45b3-8046-754742df4efe" alt="성능 모니터링" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/a1f14a02-602d-46a0-9ddd-46f0541f88fe" alt="고급 설정" width="250" height="400"> |
+| <img src="https://github.com/user-attachments/assets/5ff7a473-e12c-45b3-8046-754742df4efe" alt="다크 모드" width="250" height="400">| <img src="https://github.com/user-attachments/assets/95a0abb3-6b33-4c11-a637-ec966df0cadd" alt="다국어 지원" width="250" height="400"> | <img src="https://github.com/user-attachments/assets/9ee00eb1-f480-4976-b99b-1e56108a3a55" alt="고급 설정" width="250" height="400"> |
 
 </div>
 
@@ -111,7 +107,7 @@ open CaptionMate/CaptionMate.xcodeproj
 <img src="https://img.shields.io/badge/macOS-15.0-blue?style=flat-square&logo=apple&logoColor=white">
 
 ### 사용 기술
-<img src="https://img.shields.io/badge/Swift-F05138?style=flat-square&logo=Swift&logoColor=white"> <img src="https://img.shields.io/badge/v6.0.3-F05138?style=flat-square">
+<img src="https://img.shields.io/badge/Swift-F05138?style=flat-square&logo=Swift&logoColor=white"> <img src="https://img.shields.io/badge/v6.0.3-F05138?style=flat-square"> 
 <img src="https://img.shields.io/badge/SwiftUI-0d42a0?style=flat-square&logo=swift&logoColor=white">
 <img src="https://img.shields.io/badge/Combine-FF6B6B?style=flat-square&logo=swift&logoColor=white">
 
@@ -121,7 +117,7 @@ open CaptionMate/CaptionMate.xcodeproj
 <img src="https://img.shields.io/badge/AVFoundation-FF6B6B?style=flat-square&logo=apple&logoColor=white">
 <img src="https://img.shields.io/badge/UniformTypeIdentifiers-FF6B6B?style=flat-square&logo=apple&logoColor=white">
 
-> Powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit) and OpenAI Whisper.
+> Powered by [WhisperKit](https://github.com/argmaxinc/WhisperKit) and [OpenAI Whisper](https://github.com/openai/whisper).
 
 ### 개발 도구
 <img src="https://img.shields.io/badge/SwiftFormat-000000?style=flat-square&logo=swift&logoColor=white">
