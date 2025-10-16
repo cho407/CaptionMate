@@ -107,7 +107,7 @@ open CaptionMate/CaptionMate.xcodeproj
 <img src="https://img.shields.io/badge/macOS-15.0-blue?style=flat-square&logo=apple&logoColor=white">
 
 ### 사용 기술
-<img src="https://img.shields.io/badge/Swift-F05138?style=flat-square&logo=Swift&logoColor=white"> <img src="https://img.shields.io/badge/v6.0.3-F05138?style=flat-square"> 
+<img src="https://img.shields.io/badge/Swift-F05138?style=flat-square&logo=Swift&logoColor=white"> <img src="https://img.shields.io/badge/v6.0.3-F05138?style=flat-square">
 <img src="https://img.shields.io/badge/SwiftUI-0d42a0?style=flat-square&logo=swift&logoColor=white">
 <img src="https://img.shields.io/badge/Combine-FF6B6B?style=flat-square&logo=swift&logoColor=white">
 
