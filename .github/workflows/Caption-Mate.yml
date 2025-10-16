@@ -16,9 +16,9 @@ jobs:
   build-archive-test:
     runs-on: macos-15
     env:
-      APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
-      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-      APPLE_PROVISION_PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}
+      CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
@@ -156,9 +156,9 @@ jobs:
     needs: build-archive-test
     if: github.ref == 'refs/heads/develop'
     env:
-      APPLE_CERT_P12_BASE64: ${{ secrets.APPLE_CERT_P12_BASE64 }}
-      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-      APPLE_PROVISION_PROFILE_BASE64: ${{ secrets.APPLE_PROVISION_PROFILE_BASE64 }}
+      CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
       APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
@@ -176,21 +176,21 @@ jobs:
 
           # Restore files from GitHub Secrets (Base64)
           echo "Checking certificate secret..."
-          if [ -z "$APPLE_CERT_P12_BASE64" ]; then
-            echo "Error: APPLE_CERT_P12_BASE64 secret is empty or not set"
+          if [ -z "$CERTIFICATE_BASE64" ]; then
+            echo "Error: CERTIFICATE_BASE64 secret is empty or not set"
             exit 1
           fi
-          echo "Certificate secret length: ${#APPLE_CERT_P12_BASE64} characters"
+          echo "Certificate secret length: ${#CERTIFICATE_BASE64} characters"
 
           echo "Checking provisioning profile secret..."
-          if [ -z "$APPLE_PROVISION_PROFILE_BASE64" ]; then
-            echo "Error: APPLE_PROVISION_PROFILE_BASE64 secret is empty or not set"
+          if [ -z "$PROVISIONING_PROFILE_BASE64" ]; then
+            echo "Error: PROVISIONING_PROFILE_BASE64 secret is empty or not set"
             exit 1
           fi
-          echo "Provisioning profile secret length: ${#APPLE_PROVISION_PROFILE_BASE64} characters"
+          echo "Provisioning profile secret length: ${#PROVISIONING_PROFILE_BASE64} characters"
 
           echo "Decoding certificate..."
-          if ! echo "$APPLE_CERT_P12_BASE64" | base64 --decode > signing.p12; then
+          if ! echo "$CERTIFICATE_BASE64" | base64 --decode > signing.p12; then
             echo "Error: Failed to decode certificate from base64"
             exit 1
           fi
@@ -201,7 +201,7 @@ jobs:
           echo "Certificate decoded successfully (size: $(stat -f%z signing.p12) bytes)"
 
           echo "Decoding provisioning profile..."
-          if ! echo "$APPLE_PROVISION_PROFILE_BASE64" | base64 --decode > signing.provisionprofile; then
+          if ! echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > signing.provisionprofile; then
             echo "Error: Failed to decode provisioning profile from base64"
             exit 1
           fi
@@ -212,15 +212,16 @@ jobs:
           echo "Provisioning profile decoded successfully (size: $(stat -f%z signing.provisionprofile) bytes)"
 
           # Create and unlock a temporary keychain
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          KEYCHAIN_PASS="${KEYCHAIN_PASSWORD:-}"
+          security create-keychain -p "$KEYCHAIN_PASS" build.keychain
           security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
 
           # Import the p12 certificate with broader permissions
-          security import signing.p12 -k build.keychain -P "$APPLE_CERT_PASSWORD" -A
+          security import signing.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
           security list-keychains -d user -s build.keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" build.keychain
 
           # Verify the certificate was imported correctly
           security find-identity -v -p codesigning build.keychain
