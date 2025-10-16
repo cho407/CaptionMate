@@ -228,7 +228,15 @@ jobs:
 
           # Install the provisioning profile
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(/usr/bin/security cms -D -i signing.provisionprofile)")
+          
+          # Extract and verify provisioning profile info
+          PROVISION_INFO=$(/usr/bin/security cms -D -i signing.provisionprofile)
+          UUID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
+          BUNDLE_ID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin 2>/dev/null || echo "Not found")
+          
+          echo "Provisioning profile UUID: $UUID"
+          echo "Bundle ID in profile: $BUNDLE_ID"
+          
           cp signing.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
           echo "Installed provisioning profile UUID: $UUID"
 
@@ -253,7 +261,9 @@ jobs:
             -configuration Release \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$UUID"
+            PROVISIONING_PROFILE_SPECIFIER="$UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY_APPLE="Apple Distribution"
 
       - name: Export for TestFlight (macOS .pkg)
         run: |
