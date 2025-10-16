@@ -158,38 +158,20 @@ jobs:
         with:
           xcode-version: '16.2'
 
-      - name: Import Code Signing Certificate
+      - name: Setup Automatic Code Signing
         run: |
-          echo "🔐 코드 서명 인증서 가져오기..."
+          echo "🔐 자동 코드 서명 설정..."
 
-          # Create temporary directory
-          mkdir -p /tmp/certs
-
-          # Decode certificate from base64
-          echo "${{ secrets.CERTIFICATE_BASE64 }}" | base64 --decode > /tmp/certs/certificate.p12
-
-          # Create keychain
+          # Create keychain for automatic signing
           security create-keychain -p "" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
-
-          # Import certificate
-          security import /tmp/certs/certificate.p12 -k build.keychain -P "${{ secrets.CERTIFICATE_PASSWORD }}" -T /usr/bin/codesign
-
-          # Set partition list
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" build.keychain
 
-          # Verify certificate
-          security find-identity -v -p codesigning build.keychain
-
-      - name: Setup Automatic Provisioning
-        run: |
-          echo "📋 자동 프로비저닝 설정..."
-
-          # Create directory for provisioning profiles (자동 생성용)
+          # Create directory for provisioning profiles
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
 
-          echo "자동 프로비저닝이 활성화되었습니다."
+          echo "자동 코드 서명이 활성화되었습니다."
 
       - name: Build and Archive for TestFlight
         run: |
@@ -201,7 +183,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive for TestFlight (자동 서명 사용)
+          # Archive for TestFlight (완전 자동 서명)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -210,8 +192,7 @@ jobs:
             -archivePath ./CaptionMate.xcarchive \
             -configuration Release \
             -allowProvisioningUpdates \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_IDENTITY="Apple Distribution"
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
 
       - name: Export IPA for TestFlight
         run: |
