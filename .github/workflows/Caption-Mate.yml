@@ -169,7 +169,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive for TestFlight
+          # Archive for TestFlight (코드 서명 필요)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -177,6 +177,7 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -archivePath ./CaptionMate.xcarchive \
             -configuration Release \
+            -allowProvisioningUpdates \
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
