@@ -3,7 +3,7 @@
 <p align="center">
 <img src="https://img.shields.io/badge/macOS-15.0+-blue?style=flat-square&logo=apple&logoColor=white">
 <img src="https://img.shields.io/badge/Swift-6.0.3-orange?style=flat-square&logo=swift&logoColor=white">
-<img src="https://img.shields.io/badge/SwiftUI-5.0-blue?style=flat-square&logo=swift&logoColor=white">
+<img src="https://img.shields.io/badge/SwiftUI-Latest-blue?style=flat-square&logo=swift&logoColor=white">
 <img src="https://img.shields.io/badge/License-Apache%202.0-green?style=flat-square&logo=apache&logoColor=white">
 </p>
 
