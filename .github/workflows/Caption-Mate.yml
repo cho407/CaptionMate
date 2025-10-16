@@ -226,19 +226,8 @@ jobs:
           # Verify the certificate was imported correctly
           security find-identity -v -p codesigning build.keychain
 
-          # Install the provisioning profile
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-          
-          # Extract and verify provisioning profile info
-          PROVISION_INFO=$(/usr/bin/security cms -D -i signing.provisionprofile)
-          UUID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
-          BUNDLE_ID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /dev/stdin 2>/dev/null || echo "Not found")
-          
-          echo "Provisioning profile UUID: $UUID"
-          echo "Bundle ID in profile: $BUNDLE_ID"
-          
-          cp signing.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
-          echo "Installed provisioning profile UUID: $UUID"
+          echo "⚠️  iOS 프로비저닝 프로필은 macOS 앱에 사용할 수 없습니다."
+          echo "macOS 앱은 프로비저닝 프로필이 필요하지 않습니다."
 
       - name: Build and Archive for TestFlight
         run: |
@@ -251,7 +240,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive (use manual signing with installed cert/profile)
+          # Archive (macOS 앱은 프로비저닝 프로필 불필요)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -259,11 +248,8 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -archivePath ./CaptionMate.xcarchive \
             -configuration Release \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE_SPECIFIER="$UUID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            CODE_SIGN_IDENTITY_APPLE="Apple Distribution"
+            -allowProvisioningUpdates \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}"
 
       - name: Export for TestFlight (macOS .pkg)
         run: |
@@ -278,12 +264,7 @@ jobs:
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>com.cho407.CaptionMate</key>
-              <string>$UUID</string>
-            </dict>
+            <string>automatic</string>
             <key>destination</key>
             <string>export</string>
             <key>uploadSymbols</key>
