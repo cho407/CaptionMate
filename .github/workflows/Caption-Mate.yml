@@ -157,6 +157,7 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     env:
       CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+      CERTIFICATE_MAC_BASE64: ${{ secrets.CERTIFICATE_MAC_BASE64 }}
       CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
       PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
@@ -175,12 +176,19 @@ jobs:
           echo "🔑 Importing signing assets..."
 
           # Restore files from GitHub Secrets (Base64)
-          echo "Checking certificate secret..."
+          echo "Checking Apple Distribution certificate secret..."
           if [ -z "$CERTIFICATE_BASE64" ]; then
             echo "Error: CERTIFICATE_BASE64 secret is empty or not set"
             exit 1
           fi
-          echo "Certificate secret length: ${#CERTIFICATE_BASE64} characters"
+          echo "Apple Distribution certificate secret length: ${#CERTIFICATE_BASE64} characters"
+
+          echo "Checking Mac Installer Distribution certificate secret..."
+          if [ -z "$CERTIFICATE_MAC_BASE64" ]; then
+            echo "Error: CERTIFICATE_MAC_BASE64 secret is empty or not set"
+            exit 1
+          fi
+          echo "Mac Installer Distribution certificate secret length: ${#CERTIFICATE_MAC_BASE64} characters"
 
           echo "Checking provisioning profile secret..."
           if [ -z "$PROVISIONING_PROFILE_BASE64" ]; then
@@ -189,16 +197,27 @@ jobs:
           fi
           echo "Provisioning profile secret length: ${#PROVISIONING_PROFILE_BASE64} characters"
 
-          echo "Decoding certificate..."
-          if ! echo "$CERTIFICATE_BASE64" | base64 --decode > signing.p12; then
-            echo "Error: Failed to decode certificate from base64"
+          echo "Decoding Apple Distribution certificate..."
+          if ! echo "$CERTIFICATE_BASE64" | base64 --decode > apple_distribution.p12; then
+            echo "Error: Failed to decode Apple Distribution certificate from base64"
             exit 1
           fi
-          if [ ! -f signing.p12 ] || [ ! -s signing.p12 ]; then
-            echo "Error: Certificate file is empty or not created"
+          if [ ! -f apple_distribution.p12 ] || [ ! -s apple_distribution.p12 ]; then
+            echo "Error: Apple Distribution certificate file is empty or not created"
             exit 1
           fi
-          echo "Certificate decoded successfully (size: $(stat -f%z signing.p12) bytes)"
+          echo "Apple Distribution certificate decoded successfully (size: $(stat -f%z apple_distribution.p12) bytes)"
+
+          echo "Decoding Mac Installer Distribution certificate..."
+          if ! echo "$CERTIFICATE_MAC_BASE64" | base64 --decode > mac_installer_distribution.p12; then
+            echo "Error: Failed to decode Mac Installer Distribution certificate from base64"
+            exit 1
+          fi
+          if [ ! -f mac_installer_distribution.p12 ] || [ ! -s mac_installer_distribution.p12 ]; then
+            echo "Error: Mac Installer Distribution certificate file is empty or not created"
+            exit 1
+          fi
+          echo "Mac Installer Distribution certificate decoded successfully (size: $(stat -f%z mac_installer_distribution.p12) bytes)"
 
           echo "Decoding provisioning profile..."
           if ! echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > signing.provisionprofile; then
@@ -218,8 +237,13 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
 
-          # Import the p12 certificate with broader permissions
-          security import signing.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
+          # Import both certificates with broader permissions
+          echo "Importing Apple Distribution certificate..."
+          security import apple_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
+
+          echo "Importing Mac Installer Distribution certificate..."
+          security import mac_installer_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
+
           security list-keychains -d user -s build.keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" build.keychain
 
