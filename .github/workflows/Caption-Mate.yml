@@ -224,7 +224,11 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" build.keychain
 
           # Verify the certificate was imported correctly
+          echo "Available certificates:"
           security find-identity -v -p codesigning build.keychain
+          echo ""
+          echo "Available installer certificates:"
+          security find-identity -v -p basic build.keychain
 
           # macOS용 프로비저닝 프로필 설치
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
@@ -272,11 +276,11 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key>
-            <string>manual</string>
+            <string>automatic</string>
             <key>destination</key>
             <string>export</string>
             <key>uploadSymbols</key>
