@@ -175,18 +175,38 @@ jobs:
           echo "🔑 Importing signing assets..."
 
           # Restore files from GitHub Secrets (Base64)
+          echo "Checking certificate secret..."
+          if [ -z "$APPLE_CERT_P12_BASE64" ]; then
+            echo "Error: APPLE_CERT_P12_BASE64 secret is empty or not set"
+            exit 1
+          fi
+          echo "Certificate secret length: ${#APPLE_CERT_P12_BASE64} characters"
+
+          echo "Checking provisioning profile secret..."
+          if [ -z "$APPLE_PROVISION_PROFILE_BASE64" ]; then
+            echo "Error: APPLE_PROVISION_PROFILE_BASE64 secret is empty or not set"
+            exit 1
+          fi
+          echo "Provisioning profile secret length: ${#APPLE_PROVISION_PROFILE_BASE64} characters"
+
           echo "Decoding certificate..."
-          echo "$APPLE_CERT_P12_BASE64" | base64 --decode > signing.p12
-          if [ ! -f signing.p12 ]; then
-            echo "Error: Failed to create signing.p12"
+          if ! echo "$APPLE_CERT_P12_BASE64" | base64 --decode > signing.p12; then
+            echo "Error: Failed to decode certificate from base64"
+            exit 1
+          fi
+          if [ ! -f signing.p12 ] || [ ! -s signing.p12 ]; then
+            echo "Error: Certificate file is empty or not created"
             exit 1
           fi
           echo "Certificate decoded successfully (size: $(stat -f%z signing.p12) bytes)"
 
           echo "Decoding provisioning profile..."
-          echo "$APPLE_PROVISION_PROFILE_BASE64" | base64 --decode > signing.provisionprofile
-          if [ ! -f signing.provisionprofile ]; then
-            echo "Error: Failed to create signing.provisionprofile"
+          if ! echo "$APPLE_PROVISION_PROFILE_BASE64" | base64 --decode > signing.provisionprofile; then
+            echo "Error: Failed to decode provisioning profile from base64"
+            exit 1
+          fi
+          if [ ! -f signing.provisionprofile ] || [ ! -s signing.provisionprofile ]; then
+            echo "Error: Provisioning profile file is empty or not created"
             exit 1
           fi
           echo "Provisioning profile decoded successfully (size: $(stat -f%z signing.provisionprofile) bytes)"
