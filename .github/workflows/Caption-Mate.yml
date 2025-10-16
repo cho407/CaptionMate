@@ -156,7 +156,6 @@ jobs:
     needs: build-archive-test
     if: github.ref == 'refs/heads/develop'
     env:
-      CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
       CERTIFICATE_MAC_BASE64: ${{ secrets.CERTIFICATE_MAC_BASE64 }}
       CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
       PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
@@ -175,60 +174,42 @@ jobs:
           set -e
           echo "🔑 Importing signing assets..."
 
-          # Restore files from GitHub Secrets (Base64)
-          echo "Checking Apple Distribution certificate secret..."
-          if [ -z "$CERTIFICATE_BASE64" ]; then
-            echo "Error: CERTIFICATE_BASE64 secret is empty or not set"
-            exit 1
-          fi
-          echo "Apple Distribution certificate secret length: ${#CERTIFICATE_BASE64} characters"
-
-          echo "Checking Mac Installer Distribution certificate secret..."
+          # Restore files from GitHub Secrets (Base64) - macOS 전용
+          echo "Checking Mac Distribution certificate secret..."
           if [ -z "$CERTIFICATE_MAC_BASE64" ]; then
             echo "Error: CERTIFICATE_MAC_BASE64 secret is empty or not set"
             exit 1
           fi
-          echo "Mac Installer Distribution certificate secret length: ${#CERTIFICATE_MAC_BASE64} characters"
+          echo "Mac Distribution certificate secret length: ${#CERTIFICATE_MAC_BASE64} characters"
 
-          echo "Checking provisioning profile secret..."
+          echo "Checking macOS provisioning profile secret..."
           if [ -z "$PROVISIONING_PROFILE_BASE64" ]; then
             echo "Error: PROVISIONING_PROFILE_BASE64 secret is empty or not set"
             exit 1
           fi
-          echo "Provisioning profile secret length: ${#PROVISIONING_PROFILE_BASE64} characters"
+          echo "macOS provisioning profile secret length: ${#PROVISIONING_PROFILE_BASE64} characters"
 
-          echo "Decoding Apple Distribution certificate..."
-          if ! echo "$CERTIFICATE_BASE64" | base64 --decode > apple_distribution.p12; then
-            echo "Error: Failed to decode Apple Distribution certificate from base64"
+          echo "Decoding Mac Distribution certificate..."
+          if ! echo "$CERTIFICATE_MAC_BASE64" | base64 --decode > mac_distribution.p12; then
+            echo "Error: Failed to decode Mac Distribution certificate from base64"
             exit 1
           fi
-          if [ ! -f apple_distribution.p12 ] || [ ! -s apple_distribution.p12 ]; then
-            echo "Error: Apple Distribution certificate file is empty or not created"
+          if [ ! -f mac_distribution.p12 ] || [ ! -s mac_distribution.p12 ]; then
+            echo "Error: Mac Distribution certificate file is empty or not created"
             exit 1
           fi
-          echo "Apple Distribution certificate decoded successfully (size: $(stat -f%z apple_distribution.p12) bytes)"
+          echo "Mac Distribution certificate decoded successfully (size: $(stat -f%z mac_distribution.p12) bytes)"
 
-          echo "Decoding Mac Installer Distribution certificate..."
-          if ! echo "$CERTIFICATE_MAC_BASE64" | base64 --decode > mac_installer_distribution.p12; then
-            echo "Error: Failed to decode Mac Installer Distribution certificate from base64"
+          echo "Decoding macOS provisioning profile..."
+          if ! echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > macos.provisionprofile; then
+            echo "Error: Failed to decode macOS provisioning profile from base64"
             exit 1
           fi
-          if [ ! -f mac_installer_distribution.p12 ] || [ ! -s mac_installer_distribution.p12 ]; then
-            echo "Error: Mac Installer Distribution certificate file is empty or not created"
+          if [ ! -f macos.provisionprofile ] || [ ! -s macos.provisionprofile ]; then
+            echo "Error: macOS provisioning profile file is empty or not created"
             exit 1
           fi
-          echo "Mac Installer Distribution certificate decoded successfully (size: $(stat -f%z mac_installer_distribution.p12) bytes)"
-
-          echo "Decoding provisioning profile..."
-          if ! echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > signing.provisionprofile; then
-            echo "Error: Failed to decode provisioning profile from base64"
-            exit 1
-          fi
-          if [ ! -f signing.provisionprofile ] || [ ! -s signing.provisionprofile ]; then
-            echo "Error: Provisioning profile file is empty or not created"
-            exit 1
-          fi
-          echo "Provisioning profile decoded successfully (size: $(stat -f%z signing.provisionprofile) bytes)"
+          echo "macOS provisioning profile decoded successfully (size: $(stat -f%z macos.provisionprofile) bytes)"
 
           # Create and unlock a temporary keychain
           KEYCHAIN_PASS="${KEYCHAIN_PASSWORD:-}"
@@ -237,12 +218,9 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
 
-          # Import both certificates with broader permissions
-          echo "Importing Apple Distribution certificate..."
-          security import apple_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
-
-          echo "Importing Mac Installer Distribution certificate..."
-          security import mac_installer_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
+          # Import macOS certificate with broader permissions
+          echo "Importing Mac Distribution certificate..."
+          security import mac_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
 
           security list-keychains -d user -s build.keychain
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" build.keychain
@@ -258,14 +236,14 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
 
           # Extract and verify macOS provisioning profile info
-          PROVISION_INFO=$(/usr/bin/security cms -D -i signing.provisionprofile)
+          PROVISION_INFO=$(/usr/bin/security cms -D -i macos.provisionprofile)
           UUID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
-          PLATFORM=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :Platform' /dev/stdin 2>/dev/null || echo "Unknown")
+          PLATFORM=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :Platform' /dev/stdin 2>/dev/null || echo "macOS")
 
           echo "Provisioning profile UUID: $UUID"
           echo "Platform: $PLATFORM"
 
-          cp signing.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
+          cp macos.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
           echo "Installed macOS provisioning profile UUID: $UUID"
 
       - name: Build and Archive for TestFlight
@@ -279,7 +257,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive (macOS 앱 - 프로비저닝 프로필 완전 비활성화)
+          # Archive (macOS 앱 - 프로비저닝 프로필 사용)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -288,8 +266,11 @@ jobs:
             -archivePath ./CaptionMate.xcarchive \
             -configuration Release \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            PROVISIONING_PROFILE_SPECIFIER="$UUID" \
+            -allowProvisioningUpdates
 
       - name: Export for TestFlight (macOS .pkg)
         run: |
@@ -304,13 +285,18 @@ jobs:
             <key>teamID</key>
             <string>${{ secrets.APPLE_TEAM_ID }}</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
             <key>destination</key>
             <string>export</string>
             <key>uploadSymbols</key>
             <true/>
             <key>compileBitcode</key>
             <false/>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.cho407.CaptionMate</key>
+              <string>$UUID</string>
+            </dict>
           </dict>
           </plist>
           EOF
