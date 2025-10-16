@@ -182,18 +182,14 @@ jobs:
           # Verify certificate
           security find-identity -v -p codesigning build.keychain
 
-      - name: Import Provisioning Profile
+      - name: Setup Automatic Provisioning
         run: |
-          echo "📋 프로비저닝 프로필 가져오기..."
+          echo "📋 자동 프로비저닝 설정..."
 
-          # Create directory for provisioning profiles
+          # Create directory for provisioning profiles (자동 생성용)
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
 
-          # Decode provisioning profile from base64
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
-
-          # Verify provisioning profile
-          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
+          echo "자동 프로비저닝이 활성화되었습니다."
 
       - name: Build and Archive for TestFlight
         run: |
@@ -205,7 +201,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive for TestFlight (직접 주입된 인증서 사용)
+          # Archive for TestFlight (자동 서명 사용)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -213,8 +209,9 @@ jobs:
             -destination 'platform=macOS,arch=arm64' \
             -archivePath ./CaptionMate.xcarchive \
             -configuration Release \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="profile"
+            -allowProvisioningUpdates \
+            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            CODE_SIGN_IDENTITY="Apple Distribution"
 
       - name: Export IPA for TestFlight
         run: |
