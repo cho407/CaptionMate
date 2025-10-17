@@ -22,13 +22,14 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.0.0
+          ruby-version: 3.1.0
 
       - name: Install dependencies
         run: |
           gem install bundler
           cd CaptionMate
-          bundle install --deployment
+          bundle config set --local deployment 'true'
+          bundle install
 
       - name: Setup App Store Connect API Key
         env:
@@ -44,6 +45,11 @@ jobs:
         run: |
           cd CaptionMate
           bundle exec fastlane develop_deploy
+          
+      - name: Clean up temporary files
+        run: |
+          rm -rf /tmp/fastlane_output /tmp/fastlane_test_output
+          rm -f CaptionMate/fastlane/*.xml CaptionMate/fastlane/*.html
 
   main_archive:
     runs-on: macos-latest
@@ -55,15 +61,21 @@ jobs:
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 3.0.0
+          ruby-version: 3.1.0
 
       - name: Install dependencies
         run: |
           gem install bundler
           cd CaptionMate
-          bundle install --deployment
+          bundle config set --local deployment 'true'
+          bundle install
 
       - name: Build Archive Only
         run: |
           cd CaptionMate
           bundle exec fastlane main_archive
+          
+      - name: Clean up temporary files
+        run: |
+          rm -rf /tmp/fastlane_output /tmp/fastlane_test_output
+          rm -f CaptionMate/fastlane/*.xml CaptionMate/fastlane/*.html

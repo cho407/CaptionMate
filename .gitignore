@@ -90,11 +90,22 @@ Dependencies/
 # For more information about the recommended setup visit:
 # https://docs.fastlane.tools/best-practices/source-control/#source-control
 
+# Fastlane reports and outputs
 fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 fastlane/test_results
+fastlane/output
+fastlane/scan
+fastlane/gym
+fastlane/*.html
+fastlane/*.xml
+fastlane/*.junit
+fastlane/*.json
+fastlane/*.plist
+fastlane/logs/
+fastlane/reports/
 
 # Fastlane certificates and provisioning profiles
 fastlane/certs/
