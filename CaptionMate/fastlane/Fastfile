@@ -14,19 +14,7 @@ platform :mac do
   lane :develop_deploy do
     UI.message "🚀 Develop 브랜치 배포 시작..."
 
-    # 1. 테스트 실행
-    UI.message "📋 테스트 실행 중..."
-    run_tests(
-      scheme: "CaptionMate",
-      destination: "platform=macOS,arch=arm64",
-      skip_slack: true,
-      disable_concurrent_testing: true,
-      open_report: false,
-      output_directory: "/tmp/fastlane_test_results",
-      output_types: "junit"
-    )
-
-    # 2. 인증서 및 프로비저닝 프로필 자동 관리
+    # 1. 인증서 및 프로비저닝 프로필 자동 관리
     UI.message "🔐 인증서 및 프로비저닝 프로필 설정 중..."
     cert(
       development: false,
@@ -36,6 +24,19 @@ platform :mac do
     sigh(
       app_identifier: "com.cho407.CaptionMate",
       output_path: "./profiles"
+    )
+
+    # 2. 테스트 실행 (인증서 설정 후)
+    UI.message "📋 테스트 실행 중..."
+    run_tests(
+      scheme: "CaptionMate",
+      destination: "platform=macOS,arch=arm64",
+      skip_slack: true,
+      disable_concurrent_testing: true,
+      open_report: false,
+      output_directory: "/tmp/fastlane_test_results",
+      output_types: "junit",
+      skip_codesigning: true
     )
 
     # 3. 아카이브 빌드
@@ -59,23 +60,11 @@ platform :mac do
     UI.success "✅ TestFlight 배포 완료!"
   end
 
-  desc "Main 브랜치: 빌드 + 테스트 + 아카이브만"
+  desc "Main 브랜치: 빌드 + 아카이브만 (테스트 제외)"
   lane :main_archive do
     UI.message "📦 Main 브랜치 아카이브 시작..."
 
-    # 1. 테스트 실행
-    UI.message "📋 테스트 실행 중..."
-    run_tests(
-      scheme: "CaptionMate",
-      destination: "platform=macOS,arch=arm64",
-      skip_slack: true,
-      disable_concurrent_testing: true,
-      open_report: false,
-      output_directory: "/tmp/fastlane_test_results",
-      output_types: "junit"
-    )
-
-    # 2. 코드 서명 없는 아카이브
+    # 코드 서명 없는 아카이브만 생성
     UI.message "🏗️ 아카이브 빌드 중..."
     build_app(
       scheme: "CaptionMate",
@@ -110,7 +99,8 @@ platform :mac do
       disable_concurrent_testing: true,
       open_report: false,
       output_directory: "/tmp/fastlane_test_results",
-      output_types: "junit"
+      output_types: "junit",
+      skip_codesigning: true
     )
 
     UI.success "✅ 테스트 완료!"
