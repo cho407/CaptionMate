@@ -1,6 +1,12 @@
 # fastlane/Fastfile
 opt_out_usage
 
+# Fastlane report 생성 완전 비활성화
+ENV["FL_OUTPUT_DIR"] = "/tmp/fastlane_output"
+ENV["FL_TEST_OUTPUT_DIR"] = "/tmp/fastlane_test_output"
+ENV["FL_SCAN_OUTPUT_DIRECTORY"] = "/tmp/fastlane_scan_output"
+ENV["FL_GYM_OUTPUT_DIRECTORY"] = "/tmp/fastlane_gym_output"
+
 default_platform(:mac)
 
 platform :mac do
@@ -13,10 +19,11 @@ platform :mac do
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64",
-      output_directory: "./test_results",
-      output_types: "junit",
       skip_slack: true,
-      disable_concurrent_testing: true
+      disable_concurrent_testing: true,
+      open_report: false,
+      output_directory: "/tmp/fastlane_test_results",
+      output_types: "junit"
     )
 
     # 2. 인증서 및 프로비저닝 프로필 자동 관리
@@ -61,10 +68,11 @@ platform :mac do
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64",
-      output_directory: "./test_results",
-      output_types: "junit",
       skip_slack: true,
-      disable_concurrent_testing: true
+      disable_concurrent_testing: true,
+      open_report: false,
+      output_directory: "/tmp/fastlane_test_results",
+      output_types: "junit"
     )
 
     # 2. 코드 서명 없는 아카이브
@@ -98,10 +106,11 @@ platform :mac do
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64",
-      output_directory: "./test_results",
-      output_types: "junit",
       skip_slack: true,
-      disable_concurrent_testing: true
+      disable_concurrent_testing: true,
+      open_report: false,
+      output_directory: "/tmp/fastlane_test_results",
+      output_types: "junit"
     )
 
     UI.success "✅ 테스트 완료!"
