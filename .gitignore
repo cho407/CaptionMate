@@ -94,6 +94,7 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+fastlane/test_results
 
 # Fastlane certificates and provisioning profiles
 fastlane/certs/

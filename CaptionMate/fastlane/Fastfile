@@ -12,7 +12,11 @@ platform :mac do
     UI.message "📋 테스트 실행 중..."
     run_tests(
       scheme: "CaptionMate",
-      destination: "platform=macOS,arch=arm64"
+      destination: "platform=macOS,arch=arm64",
+      output_directory: "./test_results",
+      output_types: "junit",
+      skip_slack: true,
+      disable_concurrent_testing: true
     )
 
     # 2. 인증서 및 프로비저닝 프로필 자동 관리
@@ -56,7 +60,11 @@ platform :mac do
     UI.message "📋 테스트 실행 중..."
     run_tests(
       scheme: "CaptionMate",
-      destination: "platform=macOS,arch=arm64"
+      destination: "platform=macOS,arch=arm64",
+      output_directory: "./test_results",
+      output_types: "junit",
+      skip_slack: true,
+      disable_concurrent_testing: true
     )
 
     # 2. 코드 서명 없는 아카이브
@@ -89,7 +97,11 @@ platform :mac do
 
     run_tests(
       scheme: "CaptionMate",
-      destination: "platform=macOS,arch=arm64"
+      destination: "platform=macOS,arch=arm64",
+      output_directory: "./test_results",
+      output_types: "junit",
+      skip_slack: true,
+      disable_concurrent_testing: true
     )
 
     UI.success "✅ 테스트 완료!"

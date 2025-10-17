@@ -27,7 +27,8 @@ jobs:
       - name: Install dependencies
         run: |
           gem install bundler
-          bundle install
+          cd CaptionMate
+          bundle install --deployment
 
       - name: Setup App Store Connect API Key
         env:
@@ -59,7 +60,8 @@ jobs:
       - name: Install dependencies
         run: |
           gem install bundler
-          bundle install
+          cd CaptionMate
+          bundle install --deployment
 
       - name: Build Archive Only
         run: |
