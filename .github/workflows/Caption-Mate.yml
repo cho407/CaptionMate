@@ -15,12 +15,6 @@ concurrency:
 jobs:
   build-archive-test:
     runs-on: macos-15
-    env:
-      CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
-      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -147,7 +141,7 @@ jobs:
 
       - name: Import Certificate
         env:
-          CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_MAC_BASE64 }}
+          CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
