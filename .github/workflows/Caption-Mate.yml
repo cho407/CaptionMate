@@ -257,7 +257,7 @@ jobs:
             -sdk macosx \
             -destination 'platform=macOS,arch=arm64'
 
-          # Archive (macOS 앱 - 프로비저닝 프로필 사용)
+          # Archive (macOS 앱 - Swift Package는 자동, 메인 앱만 수동 서명)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -270,7 +270,8 @@ jobs:
             CODE_SIGNING_REQUIRED=YES \
             CODE_SIGNING_ALLOWED=YES \
             PROVISIONING_PROFILE_SPECIFIER="$UUID" \
-            -allowProvisioningUpdates
+            -allowProvisioningUpdates \
+            CODE_SIGN_IDENTITY_FOR_SWIFT_PACKAGES="Apple Development"
 
       - name: Export for TestFlight (macOS .pkg)
         run: |
