@@ -7,26 +7,26 @@ platform :mac do
   desc "Develop 브랜치: 빌드 + 테스트 + TestFlight 배포"
   lane :develop_deploy do
     UI.message "🚀 Develop 브랜치 배포 시작..."
-    
+
     # 1. 테스트 실행
     UI.message "📋 테스트 실행 중..."
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64"
     )
-    
+
     # 2. 인증서 및 프로비저닝 프로필 자동 관리
     UI.message "🔐 인증서 및 프로비저닝 프로필 설정 중..."
     cert(
       development: false,
       output_path: "./certs"
     )
-    
+
     sigh(
       app_identifier: "com.cho407.CaptionMate",
       output_path: "./profiles"
     )
-    
+
     # 3. 아카이브 빌드
     UI.message "🏗️ 아카이브 빌드 중..."
     build_app(
@@ -37,28 +37,28 @@ platform :mac do
         teamID: "H6P789M74Y"
       }
     )
-    
+
     # 4. TestFlight 업로드
     UI.message "📤 TestFlight 업로드 중..."
     upload_to_testflight(
       ipa: lane_context[SharedValues::IPA_OUTPUT_PATH],
       skip_waiting_for_build_processing: true
     )
-    
+
     UI.success "✅ TestFlight 배포 완료!"
   end
 
   desc "Main 브랜치: 빌드 + 테스트 + 아카이브만"
   lane :main_archive do
     UI.message "📦 Main 브랜치 아카이브 시작..."
-    
+
     # 1. 테스트 실행
     UI.message "📋 테스트 실행 중..."
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64"
     )
-    
+
     # 2. 코드 서명 없는 아카이브
     UI.message "🏗️ 아카이브 빌드 중..."
     build_app(
@@ -66,32 +66,32 @@ platform :mac do
       export_method: "development",
       skip_codesigning: true
     )
-    
+
     UI.success "✅ 아카이브 생성 완료!"
   end
 
   desc "빌드만 실행 (테스트 제외)"
   lane :build_only do
     UI.message "🏗️ 빌드만 실행 중..."
-    
+
     build_app(
       scheme: "CaptionMate",
       export_method: "development",
       skip_codesigning: true
     )
-    
+
     UI.success "✅ 빌드 완료!"
   end
 
   desc "테스트만 실행"
   lane :test_only do
     UI.message "📋 테스트만 실행 중..."
-    
+
     run_tests(
       scheme: "CaptionMate",
       destination: "platform=macOS,arch=arm64"
     )
-    
+
     UI.success "✅ 테스트 완료!"
   end
 end

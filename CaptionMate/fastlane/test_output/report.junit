@@ -8,7 +8,7 @@
       <failure message='XCTAssertTrue failed - 메인 윈도우가 존재해야 합니다'>Tests/CaptionMateUITests/CaptionMateUITests.swift:62</failure>
     </testcase>
     <testcase classname='CaptionMateUITests.BasicUITests' name='test02_WindowMinimumSize'>
-      <failure message='Failed to get matching snapshot: No matches found for first query match sequence: `Descendants matching type Window`, given input App element pid: 10560'>Tests/CaptionMateUITests/CaptionMateUITests.swift:65</failure>
+      <failure message='Failed to get matching snapshot: No matches found for first query match sequence: `Descendants matching type Window`, given input App element pid: 12038'>Tests/CaptionMateUITests/CaptionMateUITests.swift:65</failure>
     </testcase>
     <testcase classname='CaptionMateUITests.BasicUITests' name='test03_MainUIElementsExist'>
       <failure message='XCTAssertTrue failed - Import File 버튼이 존재해야 합니다'>Tests/CaptionMateUITests/CaptionMateUITests.swift:74</failure>
@@ -22,7 +22,7 @@
     <testcase classname='CaptionMateUITests.BasicUITests' name='test03_MainUIElementsExist'>
       <failure message='XCTAssertTrue failed - Settings 버튼이 존재해야 합니다'>Tests/CaptionMateUITests/CaptionMateUITests.swift:90</failure>
     </testcase>
-    <testcase classname='CaptionMateUITests.BasicUITests' name='test04_MenuBarExists' time='1.323'/>
+    <testcase classname='CaptionMateUITests.BasicUITests' name='test04_MenuBarExists' time='1.395'/>
     <testcase classname='CaptionMateUITests.BasicUITests' name='test05_ModelSelectorExists'>
       <failure message='XCTAssertTrue failed - Sidebar가 표시되어야 합니다 (모델 선택기 포함)'>Tests/CaptionMateUITests/CaptionMateUITests.swift:124</failure>
     </testcase>
@@ -45,13 +45,13 @@
     </testcase>
   </testsuite>
   <testsuite name='CaptionMateUITests.InteractionTests' tests='3' failures='1'>
-    <testcase classname='CaptionMateUITests.InteractionTests' name='testLanguageMenuInteraction' time='13.047'/>
+    <testcase classname='CaptionMateUITests.InteractionTests' name='testLanguageMenuInteraction' time='13.033'/>
     <testcase classname='CaptionMateUITests.InteractionTests' name='testSettingsViewOpensAndCloses'>
       <failure message='XCTAssertTrue failed - Settings 버튼이 존재해야 합니다'>Tests/CaptionMateUITests/CaptionMateUITests.swift:194</failure>
     </testcase>
-    <testcase classname='CaptionMateUITests.InteractionTests' name='testThemeMenuInteraction' time='12.018'/>
+    <testcase classname='CaptionMateUITests.InteractionTests' name='testThemeMenuInteraction' time='11.858'/>
   </testsuite>
   <testsuite name='CaptionMateUITests.PerformanceTests' tests='1' failures='0'>
-    <testcase classname='CaptionMateUITests.PerformanceTests' name='testLaunchPerformance' time='13.910'/>
+    <testcase classname='CaptionMateUITests.PerformanceTests' name='testLaunchPerformance' time='13.851'/>
   </testsuite>
 </testsuites>

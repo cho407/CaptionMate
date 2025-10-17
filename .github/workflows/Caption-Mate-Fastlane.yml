@@ -15,20 +15,20 @@ jobs:
   develop_deploy:
     runs-on: macos-latest
     if: github.ref == 'refs/heads/develop'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.0.0
-          
+
       - name: Install dependencies
         run: |
           gem install bundler
           bundle install
-          
+
       - name: Setup App Store Connect API Key
         env:
           APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
@@ -38,7 +38,7 @@ jobs:
           echo "$APPSTORE_CONNECT_API_KEY_CONTENT" | base64 --decode > AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
           # API 키 파일 권한 설정 (보안)
           chmod 600 AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
-          
+
       - name: Deploy to TestFlight
         run: |
           cd CaptionMate
@@ -47,20 +47,20 @@ jobs:
   main_archive:
     runs-on: macos-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: 3.0.0
-          
+
       - name: Install dependencies
         run: |
           gem install bundler
           bundle install
-          
+
       - name: Build Archive Only
         run: |
           cd CaptionMate
