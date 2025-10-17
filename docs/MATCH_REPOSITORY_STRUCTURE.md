@@ -8,35 +8,33 @@ Match 초기화 후 생성되는 프라이빗 저장소의 구조:
 captionmate-certificates/
 ├── README.md
 ├── certs/
-│   ├── development/
-│   │   └── Mac Development: com.cho407.CaptionMate.p12
 │   └── distribution/
 │       └── Mac App Distribution: com.cho407.CaptionMate.p12
 ├── profiles/
-│   ├── development/
-│   │   └── Mac Development_com.cho407.CaptionMate.mobileprovision
 │   └── appstore/
 │       └── Mac App Store_com.cho407.CaptionMate.mobileprovision
 └── Matchfile
 ```
 
+> **💡 참고**: 개발용 인증서는 Xcode에서 자동 관리되므로 Match 저장소에 저장되지 않습니다. 배포용 인증서만 저장됩니다.
+
 ## 🔐 파일 설명
 
 ### 인증서 파일 (certs/)
-- **development/**: 개발용 인증서
-  - `Mac Development: com.cho407.CaptionMate.p12`
-  - 로컬 개발 및 테스트용
-- **distribution/**: 배포용 인증서
+- ~~**development/**: 개발용 인증서~~ (Match에 저장하지 않음)
+  - ~~`Mac Development: com.cho407.CaptionMate.p12`~~ (로컬에서 자동 관리)
+  - ~~로컬 개발 및 테스트용~~ (Xcode에서 자동 생성)
+- **distribution/**: 배포용 인증서 (Match에 저장됨)
   - `Mac App Distribution: com.cho407.CaptionMate.p12`
-  - App Store 배포용
+  - App Store 배포용 (TestFlight 포함)
 
 ### 프로비저닝 프로필 (profiles/)
-- **development/**: 개발용 프로필
-  - `Mac Development_com.cho407.CaptionMate.mobileprovision`
-  - 개발 환경에서 앱 실행용
-- **appstore/**: App Store용 프로필
+- ~~**development/**: 개발용 프로필~~ (Match에 저장하지 않음)
+  - ~~`Mac Development_com.cho407.CaptionMate.mobileprovision`~~ (로컬에서 자동 관리)
+  - ~~개발 환경에서 앱 실행용~~ (Xcode에서 자동 생성)
+- **appstore/**: App Store용 프로필 (Match에 저장됨)
   - `Mac App Store_com.cho407.CaptionMate.mobileprovision`
-  - App Store 제출용
+  - App Store 제출용 (TestFlight 포함)
 
 ## 🔒 암호화 특징
 

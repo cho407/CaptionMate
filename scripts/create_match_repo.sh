@@ -119,15 +119,18 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 
 echo ""
-echo -e "${BLUE}Match 초기화 실행 중...${NC}"
+echo -e "${BLUE}Match 초기화 실행 중... (배포용 인증서만)${NC}"
 echo "Apple ID 비밀번호를 입력하라는 프롬프트가 나타날 수 있습니다."
+echo ""
+echo "💡 참고: 개발용 인증서는 로컬에서 자동 관리되므로 Match에 저장하지 않습니다."
+echo "   배포용 인증서만 저장됩니다 (App Store 제출용)."
 echo ""
 
 # Match 초기화 실행
 bundle exec fastlane match_init
 
 echo ""
-echo -e "${GREEN}✅ Match 초기화 완료!${NC}"
+echo -e "${GREEN}✅ Match 초기화 완료! (배포용 인증서만 저장됨)${NC}"
 echo ""
 
 # 9. GitHub Secrets 설정 안내

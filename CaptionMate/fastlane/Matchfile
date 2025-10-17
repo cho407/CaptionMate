@@ -1,5 +1,5 @@
 # Matchfile
-# Fastlane Match 설정 파일
+# Fastlane Match 설정 파일 - 배포용 인증서만 관리
 
 # Git 저장소 URL (프라이빗 저장소 필요)
 git_url("https://github.com/cho407/captionmate-certificates.git")
@@ -13,7 +13,7 @@ app_identifier("com.cho407.CaptionMate")
 # Apple Developer Portal 팀 ID
 team_id("H6P789M74Y")
 
-# 인증서 타입 (appstore, development, adhoc)
+# 인증서 타입 (appstore만 사용 - 개발용은 로컬에서 자동 관리)
 type("appstore")
 
 # 읽기 전용 모드 (CI/CD에서 사용)

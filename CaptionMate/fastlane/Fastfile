@@ -112,11 +112,12 @@ platform :mac do
     UI.success "✅ 테스트 완료!"
   end
 
-  desc "Match 초기화 (최초 1회만 실행)"
+  desc "Match 초기화 (배포용 인증서만 - 최초 1회만 실행)"
   lane :match_init do
-    UI.message "🔧 Match 초기화 시작..."
+    UI.message "🔧 Match 초기화 시작 (배포용 인증서만)..."
+    UI.message "💡 개발용 인증서는 로컬에서 자동 관리됩니다."
 
-    # Match 초기화
+    # Match 초기화 (appstore 타입만)
     match(
       type: "appstore",
       app_identifier: "com.cho407.CaptionMate",
@@ -126,12 +127,12 @@ platform :mac do
       force_for_new_devices: true
     )
 
-    UI.success "✅ Match 초기화 완료!"
+    UI.success "✅ Match 초기화 완료! (배포용 인증서만 저장됨)"
   end
 
-  desc "Match 인증서 갱신"
+  desc "Match 인증서 갱신 (배포용만)"
   lane :match_renew do
-    UI.message "🔄 Match 인증서 갱신 시작..."
+    UI.message "🔄 Match 인증서 갱신 시작 (배포용만)..."
 
     match(
       type: "appstore",
@@ -142,6 +143,6 @@ platform :mac do
       force_for_new_devices: true
     )
 
-    UI.success "✅ Match 인증서 갱신 완료!"
+    UI.success "✅ Match 인증서 갱신 완료! (배포용만)"
   end
 end

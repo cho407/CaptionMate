@@ -53,14 +53,16 @@ bundle exec fastlane match_init
 ### 4. Match 초기화 시 수행되는 작업
 
 1. **Apple Developer Portal에 로그인**
-2. **인증서 생성/확인**:
-   - Mac Development Certificate
-   - Mac App Distribution Certificate
-3. **프로비저닝 프로필 생성/확인**:
-   - Mac Development Profile
-   - Mac App Store Profile
+2. **배포용 인증서 생성/확인**:
+   - ~~Mac Development Certificate~~ (로컬에서 자동 관리)
+   - **Mac App Distribution Certificate** (App Store 제출용)
+3. **배포용 프로비저닝 프로필 생성/확인**:
+   - ~~Mac Development Profile~~ (로컬에서 자동 관리)
+   - **Mac App Store Profile** (App Store 제출용)
 4. **파일 암호화 및 Git 저장소에 업로드**
 5. **Git 커밋 및 푸시**
+
+> **💡 중요**: 개발용 인증서는 Xcode에서 자동으로 생성/관리되므로 Match에 저장하지 않습니다. 배포용 인증서만 저장합니다.
 
 ### 5. GitHub Actions에서 사용
 
