@@ -117,14 +117,19 @@ platform :mac do
     UI.message "🔧 Match 초기화 시작 (배포용 인증서만)..."
     UI.message "💡 개발용 인증서는 로컬에서 자동 관리됩니다."
 
-    # Match 초기화 (appstore 타입만)
+    # Match 초기화 (appstore 타입만, API 키 사용)
     match(
       type: "appstore",
       app_identifier: "com.cho407.CaptionMate",
       git_url: MATCH_GIT_URL,
       git_basic_authorization: ENV["MATCH_GIT_AUTH"],
       readonly: false,
-      force_for_new_devices: true
+      force_for_new_devices: true,
+      api_key_path: "AuthKey_#{ENV['APPSTORE_CONNECT_API_KEY_ID']}.p8",
+      api_key: {
+        key_id: ENV['APPSTORE_CONNECT_API_KEY_ID'],
+        issuer_id: ENV['APPSTORE_CONNECT_ISSUER_ID']
+      }
     )
 
     UI.success "✅ Match 초기화 완료! (배포용 인증서만 저장됨)"
@@ -140,7 +145,12 @@ platform :mac do
       git_url: MATCH_GIT_URL,
       git_basic_authorization: ENV["MATCH_GIT_AUTH"],
       readonly: false,
-      force_for_new_devices: true
+      force_for_new_devices: true,
+      api_key_path: "AuthKey_#{ENV['APPSTORE_CONNECT_API_KEY_ID']}.p8",
+      api_key: {
+        key_id: ENV['APPSTORE_CONNECT_API_KEY_ID'],
+        issuer_id: ENV['APPSTORE_CONNECT_ISSUER_ID']
+      }
     )
 
     UI.success "✅ Match 인증서 갱신 완료! (배포용만)"
