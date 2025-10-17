@@ -29,7 +29,7 @@ Develop 브랜치: 빌드 + 테스트 + TestFlight 배포
 [bundle exec] fastlane mac main_archive
 ```
 
-Main 브랜치: 빌드 + 아카이브만 (테스트 제외)
+Main 브랜치: 빌드만 실행 (아카이브 및 export 제외)
 
 ### mac build_only
 
