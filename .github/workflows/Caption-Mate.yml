@@ -123,6 +123,3 @@ jobs:
 
               exit 1
             }
-
-          echo "✅ Build completed successfully!"
-          echo "📦 Ready for manual archive and deployment"

@@ -123,7 +123,6 @@ open CaptionMate/CaptionMate.xcodeproj
 <img src="https://img.shields.io/badge/SwiftFormat-000000?style=flat-square&logo=swift&logoColor=white">
 <img src="https://img.shields.io/badge/GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white">
 <img src="https://img.shields.io/badge/Mint-000000?style=flat-square&logo=swift&logoColor=white">
-<img src="https://img.shields.io/badge/Pre--commit-FAB040?style=flat-square&logo=pre-commit&logoColor=white">
 
 <br>
 
