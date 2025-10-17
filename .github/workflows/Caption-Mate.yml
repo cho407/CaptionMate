@@ -137,7 +137,7 @@ jobs:
       - name: Set up Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.4'
+          xcode-version: '16.2'
 
       - name: Import Certificate
         env:
@@ -161,9 +161,15 @@ jobs:
           PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
         run: |
           echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > profile.provisionprofile
+          # macOS용 프로비저닝 프로필 경로
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$(/usr/bin/security cms -D -i profile.provisionprofile)")
           cp profile.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
+          
+          # 프로비저닝 프로필 정보 출력 (디버깅용)
+          echo "Provisioning Profile UUID: $UUID"
+          /usr/bin/security cms -D -i profile.provisionprofile | grep -A 5 -B 5 "com.cho407.CaptionMate" || echo "Bundle ID not found in profile"
+          
           echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
 
       - name: Build and Archive for TestFlight
@@ -171,6 +177,15 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           echo "🚀 TestFlight 배포용 빌드 시작..."
+          
+          # 인증서 및 프로비저닝 프로필 확인
+          echo "=== 인증서 확인 ==="
+          security find-identity -v -p codesigning build.keychain || echo "No code signing identities found"
+          
+          echo "=== 프로비저닝 프로필 확인 ==="
+          ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || echo "No provisioning profiles found"
+          
+          # 아카이브 빌드 (상세 로그 포함)
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
@@ -180,8 +195,14 @@ jobs:
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY_FOR_SWIFT_PACKAGES="Apple Development" \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/build.keychain"
+            OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/build.keychain" \
+            -verbose 2>&1 | tee archive_output.log || {
+              echo "Archive failed, showing detailed error:"
+              cat archive_output.log
+              exit 1
+            }
 
       - name: Export Archive
         env:
