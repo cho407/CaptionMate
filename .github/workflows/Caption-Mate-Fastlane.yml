@@ -36,7 +36,8 @@ jobs:
           APPSTORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
         run: |
           echo "$APPSTORE_CONNECT_API_KEY_CONTENT" | base64 --decode > AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
-          ls -la AuthKey_*.p8
+          # API 키 파일 권한 설정 (보안)
+          chmod 600 AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
           
       - name: Deploy to TestFlight
         run: |

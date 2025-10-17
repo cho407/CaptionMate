@@ -95,6 +95,17 @@ fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
 
+# Fastlane certificates and provisioning profiles
+fastlane/certs/
+fastlane/profiles/
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile
+*.cer
+*.certSigningRequest
+AuthKey_*.p8
+
 # Code Injection
 #
 # After new code Injection tools there's a generated folder /iOSInjectionProject
