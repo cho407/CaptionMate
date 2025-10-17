@@ -155,6 +155,14 @@ jobs:
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
           security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+          
+          # 인증서 설치 확인
+          echo "=== 인증서 설치 확인 ==="
+          security find-identity -v -p codesigning build.keychain || echo "No identities found"
+          
+          # 인증서 상세 정보 확인
+          echo "=== 인증서 상세 정보 ==="
+          security find-identity -v build.keychain | grep -E "(Mac App Distribution|Apple Distribution|Developer)" || echo "No relevant certificates found"
 
       - name: Import Provisioning Profile
         env:
@@ -213,9 +221,10 @@ jobs:
             -configuration Release \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
+            CODE_SIGN_IDENTITY="Mac App Distribution" \
             CODE_SIGN_IDENTITY_FOR_SWIFT_PACKAGES="Apple Development" \
             PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
+            PROVISIONING_PROFILE_SPECIFIER_FOR_SWIFT_PACKAGES="Automatic" \
             OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/build.keychain" \
             -verbose 2>&1 | tee archive_output.log || {
               echo "=== 아카이브 실패 - 상세 에러 ==="
@@ -255,6 +264,8 @@ jobs:
               <key>com.cho407.CaptionMate</key>
               <string>$PROVISIONING_PROFILE_UUID</string>
             </dict>
+            <key>signingCertificate</key>
+            <string>Mac App Distribution</string>
           </dict>
           </plist>
           EOF
