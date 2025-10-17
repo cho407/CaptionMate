@@ -1,0 +1,66 @@
+name: CaptionMate Fastlane Build & Deploy
+
+on:
+  push:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 14 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  develop_deploy:
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0.0
+          
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install
+          
+      - name: Setup App Store Connect API Key
+        env:
+          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+        run: |
+          echo "$APPSTORE_CONNECT_API_KEY_CONTENT" | base64 --decode > AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
+          ls -la AuthKey_*.p8
+          
+      - name: Deploy to TestFlight
+        run: |
+          cd CaptionMate
+          bundle exec fastlane develop_deploy
+
+  main_archive:
+    runs-on: macos-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: 3.0.0
+          
+      - name: Install dependencies
+        run: |
+          gem install bundler
+          bundle install
+          
+      - name: Build Archive Only
+        run: |
+          cd CaptionMate
+          bundle exec fastlane main_archive

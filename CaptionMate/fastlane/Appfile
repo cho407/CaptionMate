@@ -1,0 +1,7 @@
+# fastlane/Appfile
+app_identifier("com.cho407.CaptionMate")
+itc_team_id("H6P789M74Y")
+team_id("H6P789M74Y")
+
+# Apple ID는 선택사항 (API Key 사용 시 불필요)
+# apple_id("your-apple-id@example.com")
