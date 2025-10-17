@@ -45,7 +45,7 @@ jobs:
         run: |
           cd CaptionMate
           bundle exec fastlane develop_deploy
-          
+
       - name: Clean up temporary files
         run: |
           rm -rf /tmp/fastlane_output /tmp/fastlane_test_output
@@ -74,7 +74,7 @@ jobs:
         run: |
           cd CaptionMate
           bundle exec fastlane main_archive
-          
+
       - name: Clean up temporary files
         run: |
           rm -rf /tmp/fastlane_output /tmp/fastlane_test_output
