@@ -1,0 +1,29 @@
+# Matchfile
+# Fastlane Match 설정 파일
+
+# Git 저장소 URL (프라이빗 저장소 필요)
+git_url("https://github.com/cho407/captionmate-certificates.git")
+
+# 저장소 타입 (프라이빗 저장소)
+storage_mode("git")
+
+# 앱 식별자
+app_identifier("com.cho407.CaptionMate")
+
+# Apple Developer Portal 팀 ID
+team_id("H6P789M74Y")
+
+# 인증서 타입 (appstore, development, adhoc)
+type("appstore")
+
+# 읽기 전용 모드 (CI/CD에서 사용)
+readonly(true)
+
+# 새로운 기기 추가 시 강제 갱신
+force_for_new_devices(false)
+
+# 키체인 이름
+keychain_name("login.keychain")
+
+# 키체인 비밀번호 (빈 문자열 = 시스템 키체인 사용)
+keychain_password("")

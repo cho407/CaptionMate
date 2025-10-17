@@ -9,21 +9,25 @@ ENV["FL_GYM_OUTPUT_DIRECTORY"] = "/tmp/fastlane_gym_output"
 
 default_platform(:mac)
 
+# Match 설정
+MATCH_GIT_URL = ENV["MATCH_GIT_URL"] || "https://github.com/cho407/captionmate-certificates.git"
+MATCH_PASSWORD = ENV["MATCH_PASSWORD"]
+
 platform :mac do
   desc "Develop 브랜치: 빌드 + 테스트 + TestFlight 배포"
   lane :develop_deploy do
     UI.message "🚀 Develop 브랜치 배포 시작..."
 
-    # 1. 인증서 및 프로비저닝 프로필 자동 관리
-    UI.message "🔐 인증서 및 프로비저닝 프로필 설정 중..."
-    cert(
-      development: false,
-      output_path: "./certs"
-    )
-
-    sigh(
+    # 1. Fastlane Match로 인증서 및 프로비저닝 프로필 관리
+    UI.message "🔐 Match를 통한 인증서 및 프로비저닝 프로필 설정 중..."
+    match(
+      type: "appstore",
       app_identifier: "com.cho407.CaptionMate",
-      output_path: "./profiles"
+      git_url: MATCH_GIT_URL,
+      git_basic_authorization: ENV["MATCH_GIT_AUTH"],
+      readonly: true,
+      keychain_name: "login.keychain",
+      keychain_password: ""
     )
 
     # 2. 테스트 실행 (인증서 설정 후)
@@ -106,5 +110,38 @@ platform :mac do
     )
 
     UI.success "✅ 테스트 완료!"
+  end
+
+  desc "Match 초기화 (최초 1회만 실행)"
+  lane :match_init do
+    UI.message "🔧 Match 초기화 시작..."
+
+    # Match 초기화
+    match(
+      type: "appstore",
+      app_identifier: "com.cho407.CaptionMate",
+      git_url: MATCH_GIT_URL,
+      git_basic_authorization: ENV["MATCH_GIT_AUTH"],
+      readonly: false,
+      force_for_new_devices: true
+    )
+
+    UI.success "✅ Match 초기화 완료!"
+  end
+
+  desc "Match 인증서 갱신"
+  lane :match_renew do
+    UI.message "🔄 Match 인증서 갱신 시작..."
+
+    match(
+      type: "appstore",
+      app_identifier: "com.cho407.CaptionMate",
+      git_url: MATCH_GIT_URL,
+      git_basic_authorization: ENV["MATCH_GIT_AUTH"],
+      readonly: false,
+      force_for_new_devices: true
+    )
+
+    UI.success "✅ Match 인증서 갱신 완료!"
   end
 end

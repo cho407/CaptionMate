@@ -31,15 +31,25 @@ jobs:
           bundle config set --local deployment 'true'
           bundle install
 
-      - name: Setup App Store Connect API Key
-        env:
-          APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-          APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          APPSTORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-        run: |
-          echo "$APPSTORE_CONNECT_API_KEY_CONTENT" | base64 --decode > AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
-          # API 키 파일 권한 설정 (보안)
-          chmod 600 AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
+            - name: Setup App Store Connect API Key
+              env:
+                APPSTORE_CONNECT_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+                APPSTORE_CONNECT_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+                APPSTORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+              run: |
+                echo "$APPSTORE_CONNECT_API_KEY_CONTENT" | base64 --decode > AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
+                # API 키 파일 권한 설정 (보안)
+                chmod 600 AuthKey_$APPSTORE_CONNECT_API_KEY_ID.p8
+
+            - name: Setup Match Environment
+              env:
+                MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+                MATCH_GIT_AUTH: ${{ secrets.MATCH_GIT_AUTH }}
+                MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+              run: |
+                echo "MATCH_GIT_URL=$MATCH_GIT_URL" >> $GITHUB_ENV
+                echo "MATCH_GIT_AUTH=$MATCH_GIT_AUTH" >> $GITHUB_ENV
+                echo "MATCH_PASSWORD=$MATCH_PASSWORD" >> $GITHUB_ENV
 
       - name: Deploy to TestFlight
         run: |
