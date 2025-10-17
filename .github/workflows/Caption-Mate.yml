@@ -3,7 +3,7 @@ name: CaptionMate Build & Archive
 on:
   pull_request:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   schedule:
     - cron: '0 14 * * *'
   workflow_dispatch:
