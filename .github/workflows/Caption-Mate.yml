@@ -1,271 +1,101 @@
-name: CaptionMate Build, Test & Archive
+name: CaptionMate CI/CD
 
 on:
   pull_request:
   push:
     branches: [ main, develop ]
-  schedule:
-    - cron: '0 14 * * *'
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-archive-test:
+  test-and-build:
     runs-on: macos-15
-    env:
-      CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
-      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set Xcode Version
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+
+      - name: Test
         run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
-          xcodebuild -version
-          swift --version
-          echo "Xcode and Swift versions verified"
-
-      - name: Clear DerivedData
-        run: |
-          rm -rf ~/Library/Developer/Xcode/DerivedData
-          mkdir -p ~/Library/Developer/Xcode/DerivedData
-
-      - name: Initialize xcodebuild
-        run: |
-          xcodebuild -list -project CaptionMate/CaptionMate.xcodeproj
-          echo "Project structure verified"
-
-      - name: Resolve Swift Package Dependencies
-        run: |
-          echo "Resolving Swift Package Manager dependencies..."
-          cd CaptionMate
-          xcodebuild -resolvePackageDependencies \
-            -project CaptionMate.xcodeproj \
-            -scheme "CaptionMate"
-          echo "Dependencies resolved successfully!"
-
-          # Check resolved packages
-          echo "Checking resolved packages..."
-          xcodebuild -showBuildSettings \
-            -project CaptionMate.xcodeproj \
-            -scheme "CaptionMate" | grep -i package || echo "No package settings found"
-
-      - name: Test the CaptionMate (Unit Tests Only)
-        run: |
-          echo "Starting unit tests..."
-          set -e
-
-          # Run tests with detailed error output
-          xcodebuild \
-            -project CaptionMate/CaptionMate.xcodeproj \
-            -scheme "CaptionMate" \
-            -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
-            test \
-            -only-testing:CaptionMateTests \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            -verbose 2>&1 | tee test_output.log || {
-              echo "Test failed, showing detailed error:"
-              cat test_output.log
-              exit 1
-            }
-
-      - name: UI Tests (Optional)
-        continue-on-error: true
-        run: |
-          xcodebuild \
-            -project CaptionMate/CaptionMate.xcodeproj \
-            -scheme "CaptionMate" \
-            -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
-            test \
-            -only-testing:CaptionMateUITests \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=""
-
-      - name: Build the CaptionMate
-        run: |
-          echo "Starting build process..."
-          set -e
-
-          # First, clean the build folder
-          echo "Cleaning build folder..."
-          xcodebuild clean \
-            -project CaptionMate/CaptionMate.xcodeproj \
-            -scheme "CaptionMate" \
-            -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=""
-
-          # Build with detailed error output
-          echo "Building project..."
-          xcodebuild \
-            -project CaptionMate/CaptionMate.xcodeproj \
-            -scheme "CaptionMate" \
-            -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
-            build \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
-            -verbose 2>&1 | tee build_output.log || {
-              echo "Build failed, showing detailed error:"
-              cat build_output.log
-              echo "Checking specific Swift files for syntax errors..."
-
-              # Check for common Swift syntax issues
-              find CaptionMate -name "*.swift" -exec echo "Checking {}" \; -exec swift -frontend -parse {} \; 2>&1 | head -50
-
-              exit 1
-            }
-
-          echo "Build completed successfully!"
-
-  # develop 브랜치일 때만 TestFlight 배포
-  deploy-testflight:
-    runs-on: macos-15
-    needs: build-archive-test
-    if: github.ref == 'refs/heads/develop'
-    env:
-      CERTIFICATE_MAC_BASE64: ${{ secrets.CERTIFICATE_MAC_BASE64 }}
-      CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
-      PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-      APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
-      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set Xcode Version
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
-          xcodebuild -version
-          swift --version
-
-      - name: Install signing assets (p12 & provisionprofile)
-        shell: bash
-        run: |
-          set -e
-          echo "🔑 Importing signing assets..."
-
-          # Restore files from GitHub Secrets (Base64) - macOS 전용
-          echo "Checking Mac Distribution certificate secret..."
-          if [ -z "$CERTIFICATE_MAC_BASE64" ]; then
-            echo "Error: CERTIFICATE_MAC_BASE64 secret is empty or not set"
-            exit 1
-          fi
-          echo "Mac Distribution certificate secret length: ${#CERTIFICATE_MAC_BASE64} characters"
-
-          echo "Checking macOS provisioning profile secret..."
-          if [ -z "$PROVISIONING_PROFILE_BASE64" ]; then
-            echo "Error: PROVISIONING_PROFILE_BASE64 secret is empty or not set"
-            exit 1
-          fi
-          echo "macOS provisioning profile secret length: ${#PROVISIONING_PROFILE_BASE64} characters"
-
-          echo "Decoding Mac Distribution certificate..."
-          if ! echo "$CERTIFICATE_MAC_BASE64" | base64 --decode > mac_distribution.p12; then
-            echo "Error: Failed to decode Mac Distribution certificate from base64"
-            exit 1
-          fi
-          if [ ! -f mac_distribution.p12 ] || [ ! -s mac_distribution.p12 ]; then
-            echo "Error: Mac Distribution certificate file is empty or not created"
-            exit 1
-          fi
-          echo "Mac Distribution certificate decoded successfully (size: $(stat -f%z mac_distribution.p12) bytes)"
-
-          echo "Decoding macOS provisioning profile..."
-          if ! echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > macos.provisionprofile; then
-            echo "Error: Failed to decode macOS provisioning profile from base64"
-            exit 1
-          fi
-          if [ ! -f macos.provisionprofile ] || [ ! -s macos.provisionprofile ]; then
-            echo "Error: macOS provisioning profile file is empty or not created"
-            exit 1
-          fi
-          echo "macOS provisioning profile decoded successfully (size: $(stat -f%z macos.provisionprofile) bytes)"
-
-          # Create and unlock a temporary keychain
-          KEYCHAIN_PASS="${KEYCHAIN_PASSWORD:-}"
-          security create-keychain -p "$KEYCHAIN_PASS" build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASS" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-
-          # Import macOS certificate with broader permissions
-          echo "Importing Mac Distribution certificate..."
-          security import mac_distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
-
-          security list-keychains -d user -s build.keychain
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASS" build.keychain
-
-          # Verify the certificate was imported correctly
-          echo "Available certificates:"
-          security find-identity -v -p codesigning build.keychain
-          echo ""
-          echo "Available installer certificates:"
-          security find-identity -v -p basic build.keychain
-
-          # macOS용 프로비저닝 프로필 설치 (자동 서명용)
-          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
-
-          # Extract and verify macOS provisioning profile info
-          PROVISION_INFO=$(/usr/bin/security cms -D -i macos.provisionprofile)
-          UUID=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin)
-          echo "PP_UUID=$UUID" >> "$GITHUB_ENV"
-          PLATFORM=$(echo "$PROVISION_INFO" | /usr/libexec/PlistBuddy -c 'Print :Platform' /dev/stdin 2>/dev/null || echo "macOS")
-
-          echo "Provisioning profile UUID: $UUID"
-          echo "Platform: $PLATFORM"
-
-          cp macos.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
-          echo "Installed macOS provisioning profile UUID: $UUID"
-          echo "자동 서명을 위해 프로비저닝 프로필이 키체인에 설치되었습니다."
-
-      - name: Build and Archive for TestFlight
-        run: |
-          echo "🚀 TestFlight 배포용 빌드 시작..."
-          set -e
-          # Clean build
-          xcodebuild clean \
+          xcodebuild test \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
-            -sdk macosx \
-            -destination 'platform=macOS,arch=arm64'
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGNING_REQUIRED=NO
 
-          # Archive (macOS 앱 - 자동 서명, 인증서만 주입)
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project CaptionMate/CaptionMate.xcodeproj \
+            -scheme CaptionMate \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGNING_REQUIRED=NO
+
+  deploy-testflight:
+    runs-on: macos-15
+    needs: test-and-build
+    if: github.ref == 'refs/heads/develop'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.4'
+
+      - name: Import Certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_MAC_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Create keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+
+          # Import certificate
+          echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+          security import certificate.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -A
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      - name: Import Provisioning Profile
+        env:
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > profile.provisionprofile
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< "$(/usr/bin/security cms -D -i profile.provisionprofile)")
+          cp profile.provisionprofile "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
+          echo "PROVISIONING_PROFILE_UUID=$UUID" >> $GITHUB_ENV
+
+      - name: Build and Archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
           xcodebuild archive \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme CaptionMate \
-            -sdk macosx \
             -destination 'platform=macOS,arch=arm64' \
-            -archivePath ./CaptionMate.xcarchive \
+            -archivePath CaptionMate.xcarchive \
             -configuration Release \
-            DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ env.PP_UUID }}" \
-            OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/build.keychain" \
-            -allowProvisioningUpdates
+            PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_UUID" \
+            OTHER_CODE_SIGN_FLAGS="--keychain $HOME/Library/Keychains/build.keychain"
 
-      - name: Export for TestFlight (macOS .pkg)
+      - name: Export Archive
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          echo "📦 Exporting archive..."
-          cat > ExportOptions.plist << EOF
+          xcodebuild -exportArchive \
+            -archivePath CaptionMate.xcarchive \
+            -exportPath ./build \
+            -exportOptionsPlist <(cat << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -273,30 +103,18 @@ jobs:
             <key>method</key>
             <string>app-store-connect</string>
             <key>teamID</key>
-            <string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <string>$APPLE_TEAM_ID</string>
             <key>signingStyle</key>
             <string>manual</string>
-            <key>destination</key>
-            <string>export</string>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
             <key>provisioningProfiles</key>
             <dict>
               <key>com.cho407.CaptionMate</key>
-              <string>${{ env.PP_UUID }}</string>
+              <string>$PROVISIONING_PROFILE_UUID</string>
             </dict>
           </dict>
           </plist>
           EOF
-
-          xcodebuild -exportArchive \
-            -archivePath ./CaptionMate.xcarchive \
-            -exportPath ./build \
-            -exportOptionsPlist ExportOptions.plist
-
-          echo "Exported files:"; ls -la ./build
+          )
 
       - name: Upload to TestFlight
         uses: apple-actions/upload-testflight-build@v3
@@ -305,9 +123,3 @@ jobs:
           issuer-id: ${{ secrets.APPSTORE_ISSUER_ID }}
           api-key-id: ${{ secrets.APPSTORE_API_KEY_ID }}
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-
-      - name: TestFlight Upload Success
-        run: |
-          echo "✅ TestFlight 업로드 완료!"
-          echo "📱 TestFlight에서 새 빌드를 확인하세요"
-          echo "🔗 App Store Connect: https://appstoreconnect.apple.com"
