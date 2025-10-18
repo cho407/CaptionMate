@@ -1,5 +1,5 @@
 <p align="center"><img width="1200" height="800" alt="4953519D-FFBC-418F-9213-57B530AB878E" src="https://github.com/user-attachments/assets/e703a320-ca57-4a6e-bb2b-a1a99a8b88b2" />
-  
+
 # CaptionMate 🎬
 
 <p align="center">
