@@ -115,7 +115,7 @@ class ContentViewModel: ObservableObject {
     // MARK: - Initialization
 
     init() {
-        // 첫 실행 시에만 시스템 언어로 설정 (이미 저장된 값이 있으면 유지)
+        // 첫 실행 시에만 시스템 언어로 설정
         if UserDefaults.standard.object(forKey: "appLanguage") == nil {
             appLanguage = ContentViewModel.detectSystemLanguage()
         }
@@ -126,7 +126,7 @@ class ContentViewModel: ObservableObject {
         let systemLanguage = Locale.preferredLanguages.first ?? "en"
 
         // 지원하는 언어 목록
-        let supportedLanguages = ["ko"] // 현재는 한국어만 추가 지원
+        let supportedLanguages = ["ko"]
 
         // 시스템 언어가 지원 목록에 있는지 확인
         for supported in supportedLanguages {
@@ -135,7 +135,6 @@ class ContentViewModel: ObservableObject {
             }
         }
 
-        // 기본값 영어
         return "en"
     }
 
@@ -208,7 +207,7 @@ class ContentViewModel: ObservableObject {
         transcriptionResult = nil
     }
 
-    /// Compute 옵션 생성 (설정 상태의 compute unit 값을 사용)
+    /// Compute 옵션 생성
     func getComputeOptions() -> ModelComputeOptions {
         return ModelComputeOptions(
             audioEncoderCompute: encoderComputeUnits,
@@ -275,7 +274,6 @@ class ContentViewModel: ObservableObject {
         }
 
         // 5. 임시 디렉토리 정리
-        // tmpdir은 모든 앱이 공유하므로 관련 파일만 신중하게 삭제
         let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
         do {
             let tempContents = try fileManager.contentsOfDirectory(
@@ -297,8 +295,8 @@ class ContentViewModel: ObservableObject {
                     fileName.contains(".m4a") ||
                     fileName.contains(".aac") ||
                     fileName.contains(".flac") ||
-                    fileName.hasPrefix("tmp") || // 시스템 임시 파일
-                    fileName.contains("download") // 다운로드 관련
+                    fileName.hasPrefix("tmp") ||
+                    fileName.contains("download")
             }
 
             var totalClearedSize: Int64 = 0
@@ -338,7 +336,7 @@ class ContentViewModel: ObservableObject {
         }
     }
 
-    // 디스크 여유 공간 확인 함수를 추가합니다
+    /// 디스크 여유 공간 확인 함수
     func checkDiskSpace() -> (available: Int64, required: Int64, isEnough: Bool) {
         let fileManager = FileManager.default
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
@@ -353,11 +351,10 @@ class ContentViewModel: ObservableObject {
                 return (available: 0, required: 0, isEnough: false)
             }
 
-            // volumeAvailableCapacity는 Int 타입이므로 Int64로 변환
             let availableSpaceInt64 = Int64(availableSpace)
 
             // CoreML에 필요한 예상 캐싱 공간
-            let requiredSpace: Int64 = 3_000_000_000 // 1GB
+            let requiredSpace: Int64 = 3_000_000_000
 
             return (
                 available: availableSpaceInt64,
@@ -463,9 +460,9 @@ class ContentViewModel: ObservableObject {
 
         Task {
             // 로딩 단계별 진행률 비율 설정 (초기화/프리워밍/로딩)
-            let initProgressRatio: Float = 0.9 // 초기화 단계 (0.0 ~ 0.2)
-            let prewarmProgressRatio: Float = 0.7 // 프리워밍 단계 (0.2 ~ 0.7)
-            let loadProgressRatio: Float = 1.0 // 로딩 단계 (0.7 ~ 1.0)
+            let initProgressRatio: Float = 0.9 // 초기화 단계
+            let prewarmProgressRatio: Float = 0.7 // 프리워밍 단계
+            let loadProgressRatio: Float = 1.0 // 로딩 단계
 
             // 1. 초기화 단계 진행률 표시 시작
             let initProgressTask = Task {
@@ -575,7 +572,7 @@ class ContentViewModel: ObservableObject {
                         from: repoName,
                         progressCallback: { progress in
                             Task { @MainActor in
-                                // 다운로드 전용 진행률 업데이트 (0.0 ~ 1.0)
+                                // 다운로드 전용 진행률 업데이트
                                 self.modelManagementState
                                     .downloadProgress[model] = Float(progress.fractionCompleted)
                             }
@@ -935,7 +932,7 @@ class ContentViewModel: ObservableObject {
                             return
                         }
 
-                        // 취소 중인 상태인지 확인 - 즉시 중단
+                        // 취소 중인 상태인지 확인
                         let isCancelling = Task { @MainActor in
                             self.modelManagementState.cancellingModels.contains(model)
                         }
@@ -1196,7 +1193,7 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - 파일 선택 및 처리
 
-    /// 파일 선택 (UI 관련)
+    /// 파일 선택
     func selectFile() {
         uiState.isFilePickerPresented = true
     }
@@ -1318,7 +1315,7 @@ class ContentViewModel: ObservableObject {
         let avgLevel = totalLevel / Float(sampleCount)
 
         // dB 값을 LUFS로 변환 (대략적인 추정)
-        let estimatedLUFS = avgLevel + 10 // 간단한 변환식
+        let estimatedLUFS = avgLevel + 10
 
         // 타겟 LUFS (-14 LUFS)
         let targetLUFS: Float = -14.0
@@ -1326,7 +1323,7 @@ class ContentViewModel: ObservableObject {
         // 정규화 계산 (LUFS 기준)
         let gainNeeded = targetLUFS - estimatedLUFS
 
-        // 감쇠만 적용 (유튜브 스타일)
+        // 감쇠만 적용
         // 오디오가 타겟보다 클 경우만 줄이고, 작을 경우는 그대로 둠
         if gainNeeded < 0 {
             // dB를 선형 스케일로 변환 (감쇠 적용)
@@ -1336,7 +1333,6 @@ class ContentViewModel: ObservableObject {
             normalizedVolumeFactor = 1.0
         }
 
-        // 디버그 로그
         print(
             "Audio analysis - Average level: \(avgLevel) dB, Estimated LUFS: \(estimatedLUFS), Peak: \(peakLevel) dB"
         )
@@ -1346,7 +1342,7 @@ class ContentViewModel: ObservableObject {
         applyVolume()
     }
 
-    /// 볼륨 적용 함수 (간소화된 버전)
+    /// 볼륨 적용 함수
     private func applyVolume() {
         guard let player = audioPlayer else { return }
 
@@ -1360,7 +1356,7 @@ class ContentViewModel: ObservableObject {
         player.volume = normalizedVolumeFactor * Float(audioVolume)
     }
 
-    /// 파일 전사 시작 (선택된 파일 URL로 전사 실행)
+    /// 파일 전사 시작
     func transcribeFile(path: String) {
         resetState()
         stopImportedAudio()
@@ -1420,7 +1416,7 @@ class ContentViewModel: ObservableObject {
         let options = DecodingOptions(
             verbose: true,
             task: task,
-            language: isAutoLanguageEnable ? nil : languageCode, // 자동 언어 감지 옵션
+            language: isAutoLanguageEnable ? nil : languageCode,
             temperature: Float(temperatureStart),
             temperatureFallbackCount: Int(fallbackCount),
             sampleLength: sampleLength,
@@ -1498,7 +1494,7 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - Audio Preview & Deletion
 
-    /// 오디오 미리듣기 (AVAudioPlayer를 활용)
+    /// 오디오 미리듣기
     func playImportedAudio() {
         guard let url = audioState.importedAudioURL else { return }
         do {
@@ -1526,7 +1522,6 @@ class ContentViewModel: ObservableObject {
             audioPlayer?.play()
             audioState.isPlaying = true
 
-            // Combine 타이머로 교체하여 업데이트 성능 향상
             setupPlaybackTimeUpdater()
         } catch {
             print("Error playing audio: \(error.localizedDescription)")
@@ -1539,7 +1534,7 @@ class ContentViewModel: ObservableObject {
         audioState.playbackTimer?.invalidate()
         playbackTimerCancellable?.cancel()
 
-        // Combine 타이머 설정 - 30fps로 부드러운 업데이트
+        // Combine 타이머 설정
         playbackTimerCancellable = Timer.publish(every: 0.033, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
@@ -1623,7 +1618,7 @@ class ContentViewModel: ObservableObject {
         playbackTimerCancellable?.cancel()
     }
 
-    /// 재생 위치 이동 (특정 시간으로 이동)
+    /// 재생 위치 이동
     func seekToPosition(_ position: Double) {
         guard let player = audioPlayer else { return }
         player.currentTime = position
