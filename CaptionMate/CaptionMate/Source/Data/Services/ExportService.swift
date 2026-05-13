@@ -28,24 +28,40 @@ import WhisperKit
 
 // MARK: - ExportService
 
+enum ExportOutcome {
+    case success(path: String)
+    case cancelled
+    case failure(Error)
+}
+
+private enum ExportServiceError: LocalizedError {
+    case unsupportedFileType
+
+    var errorDescription: String? {
+        switch self {
+        case .unsupportedFileType:
+            return "The selected subtitle file type is not supported."
+        }
+    }
+}
+
 struct ExportService {
     /// 파일 내보내기 함수
     static func exportTranscriptionResult(result: TranscriptionResult,
                                           defaultFileName: String = "Subtitle",
-                                          frameRate: Double = 30.0) async {
+                                          frameRate: Double = 30.0) async -> ExportOutcome {
         // 모든 허용 UTType (추가된 파일 형식 포함)
         let allowedContentTypes = SubtitleFileType.allCases.map { $0.utType }
-        print("\(allowedContentTypes)")
         // NSSavePanel을 통해 파일 저장 경로와 선택된 파일 형식을 받아옴
         let (saveURL, selectedUTType) = await NSSavePanel.showSavePanel(
             allowedFileTypes: allowedContentTypes,
             defaultFileName: defaultFileName
         )
         guard let saveURL = saveURL,
-              let selectedUTType = selectedUTType,
-              let selectedFileType = SubtitleFileType.from(utType: selectedUTType) else {
+	              let selectedUTType = selectedUTType,
+	              let selectedFileType = SubtitleFileType.from(utType: selectedUTType) else {
             print("Export cancelled or file type not selected")
-            return
+            return .cancelled
         }
 
         // 저장 경로에서 outputDir와 파일 이름을 분리
@@ -70,9 +86,13 @@ struct ExportService {
             switch exportResult {
             case let .success(path):
                 print("Export succeeded: \(path)")
+                return .success(path: path)
             case let .failure(error):
                 print("Export failed: \(error.localizedDescription)")
+                return .failure(error)
             }
         }
+
+        return .failure(ExportServiceError.unsupportedFileType)
     }
 }

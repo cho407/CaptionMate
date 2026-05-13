@@ -81,25 +81,59 @@ open class WriteFCPXML: ResultWriting {
 
     /// 초를 FCPXML 타임코드 형식으로 변환
     private func convertToFCPXMLTime(seconds: Float) -> String {
-        let secondsDouble = Double(seconds)
+        let secondsDouble = max(0, Double(seconds))
         if secondsDouble == Double(Int(secondsDouble)) {
             return "\(Int(secondsDouble))s"
         }
+
         if abs(frameRate - 29.97) < 0.01 {
-            let multiplier = 30000
-            let denominator = 1001
-            let frames = Int(floor(secondsDouble * Double(multiplier) / Double(denominator)))
-            if frames % denominator == 0 {
-                return "\(frames / denominator)s"
-            }
-            return "\(frames)/\(denominator)s"
+            let frameDurationNumerator = 1001
+            let frameDurationDenominator = 30000
+            let frames = Int(floor(
+                secondsDouble * Double(frameDurationDenominator) /
+                    Double(frameDurationNumerator)
+            ))
+            return reducedSecondsString(
+                numerator: frames * frameDurationNumerator,
+                denominator: frameDurationDenominator
+            )
         }
+
         let denominator = Int(frameRate)
         let frames = Int(floor(secondsDouble * Double(denominator)))
-        if frames % denominator == 0 {
-            return "\(frames / denominator)s"
+        return reducedSecondsString(numerator: frames, denominator: denominator)
+    }
+
+    private func reducedSecondsString(numerator: Int, denominator: Int) -> String {
+        guard numerator > 0, denominator > 0 else { return "0s" }
+        let divisor = greatestCommonDivisor(numerator, denominator)
+        let reducedNumerator = numerator / divisor
+        let reducedDenominator = denominator / divisor
+
+        if reducedDenominator == 1 {
+            return "\(reducedNumerator)s"
         }
-        return "\(frames)/\(denominator)s"
+        return "\(reducedNumerator)/\(reducedDenominator)s"
+    }
+
+    private func greatestCommonDivisor(_ lhs: Int, _ rhs: Int) -> Int {
+        var a = abs(lhs)
+        var b = abs(rhs)
+        while b != 0 {
+            let remainder = a % b
+            a = b
+            b = remainder
+        }
+        return max(a, 1)
+    }
+
+    private func escapedXML(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
     }
 
     public func write(result: TranscriptionResult, to file: String,
@@ -147,6 +181,7 @@ open class WriteFCPXML: ResultWriting {
 
         // 프로젝트 시작 시간은 0초로 고정
         let tcStartString = "0s"
+        let projectName = escapedXML(file)
 
         // FCPXML 템플릿 구성 시작
         var xmlContent = """
@@ -161,7 +196,7 @@ open class WriteFCPXML: ResultWriting {
             </resources>
             <library>
                 <event name="CaptionMate">
-                    <project name="\(file)">
+                    <project name="\(projectName)">
                         <sequence format="r1" duration="\(timelineDuration)" tcStart="\(
                             tcStartString
                         )" tcFormat="NDF">
@@ -210,6 +245,7 @@ open class WriteFCPXML: ResultWriting {
                     let wordDurationStr = convertToFCPXMLTime(seconds: wordTiming.end - wordTiming
                         .start)
                     let wordTextStyleId = "ts\(counter)"
+                    let wordText = escapedXML(wordTiming.word)
 
                     xmlContent += """
 
@@ -225,8 +261,7 @@ open class WriteFCPXML: ResultWriting {
                                         <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
                                         <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
                                         <text>
-                                            <text-style ref="\(wordTextStyleId)">\(wordTiming
-                        .word)</text-style>
+                                            <text-style ref="\(wordTextStyleId)">\(wordText)</text-style>
                                         </text>
                                         <text-style-def id="\(wordTextStyleId)">
                                             <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>
@@ -237,6 +272,7 @@ open class WriteFCPXML: ResultWriting {
                 }
             } else {
                 let textStyleId = "ts\(counter)"
+                let segmentText = escapedXML(segment.text)
                 xmlContent += """
 
                                 <title name="Title\(counter)" offset="\(
@@ -251,8 +287,7 @@ open class WriteFCPXML: ResultWriting {
                                     <param name="Wrap Mode" key="9999/10199/10201/5/10203/30/34/5" value="1 (Repeat)"/>
                                     <param name="Width" key="9999/10199/10201/5/10203/30/36" value="3"/>
                                     <text>
-                                        <text-style ref="\(textStyleId)">\(segment
-                    .text)</text-style>
+                                        <text-style ref="\(textStyleId)">\(segmentText)</text-style>
                                     </text>
                                     <text-style-def id="\(textStyleId)">
                                         <text-style font="Arial" fontSize="50" fontFace="Regular" fontColor="0.999996 1 1 1" shadowColor="0 0 0 0.75" shadowOffset="5 315" alignment="center"/>

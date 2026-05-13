@@ -25,14 +25,149 @@ import AppKit
 import AVFoundation
 import Combine
 import CoreML
+import SpeakerKit
 import SwiftUI
 import WhisperKit
 
 // MARK: - ContentViewModel
 
+struct AppLanguageOption: Identifiable, Equatable, Sendable {
+    let code: String
+    let displayName: String
+
+    var id: String { code }
+}
+
+private enum StorageCleanupPolicy {
+    static let staleTemporaryAudioAge: TimeInterval = 60 * 60 * 24
+    static let appScopedCoreMLCacheSubpaths = [
+        "com.apple.e5rt.e5bundlecache",
+        "com.apple.CoreML",
+        "CoreML",
+    ]
+}
+
+enum AppLanguageResolver {
+    static let fallbackLanguageCode = "en-US"
+    static let appLanguageDefaultsKey = "appLanguage"
+    static let legacyAppleLanguagesDefaultsKey = "AppleLanguages"
+
+    private static let legacyLanguageAliases = [
+        "en": fallbackLanguageCode,
+        "pt": "pt-BR",
+        "zh": "zh-Hans",
+    ]
+
+    static func preferredAppLanguage(
+        from preferredLanguages: [String],
+        supportedLanguages: [AppLanguageOption]
+    ) -> String {
+        guard let primaryLanguage = preferredLanguages.first else {
+            return fallbackLanguageCode
+        }
+
+        return normalizedSupportedLanguage(
+            primaryLanguage,
+            supportedLanguages: supportedLanguages
+        ) ?? fallbackLanguageCode
+    }
+
+    static func normalizedSupportedLanguage(
+        _ language: String,
+        supportedLanguages: [AppLanguageOption]
+    ) -> String? {
+        let normalizedPrimaryLanguage = normalizeLanguageCode(language)
+        let primaryBaseLanguage = normalizedPrimaryLanguage.split(separator: "-").first.map(String.init)
+        let supportedCodesByNormalizedCode = Dictionary(
+            supportedLanguages.map { (normalizeLanguageCode($0.code), $0.code) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        for supportedLanguage in supportedLanguages {
+            let normalizedSupportedLanguage = normalizeLanguageCode(supportedLanguage.code)
+            if normalizedPrimaryLanguage == normalizedSupportedLanguage ||
+                normalizedPrimaryLanguage.hasPrefix("\(normalizedSupportedLanguage)-") {
+                return supportedLanguage.code
+            }
+
+            if let primaryBaseLanguage,
+               normalizedSupportedLanguage == primaryBaseLanguage {
+                return supportedLanguage.code
+            }
+        }
+
+        if let aliasedLanguage = legacyLanguageAliases[normalizedPrimaryLanguage],
+           supportedCodesByNormalizedCode[normalizeLanguageCode(aliasedLanguage)] != nil {
+            return aliasedLanguage
+        }
+
+        if let primaryBaseLanguage,
+           let aliasedLanguage = legacyLanguageAliases[primaryBaseLanguage],
+           supportedCodesByNormalizedCode[normalizeLanguageCode(aliasedLanguage)] != nil {
+            return aliasedLanguage
+        }
+
+        return nil
+    }
+
+    private static func normalizeLanguageCode(_ code: String) -> String {
+        code.replacingOccurrences(of: "_", with: "-").lowercased()
+    }
+
+    static func clearLegacyAppleLanguagesOverride(in defaults: UserDefaults = .standard) {
+        guard defaults.object(forKey: legacyAppleLanguagesDefaultsKey) != nil else {
+            return
+        }
+
+        defaults.removeObject(forKey: legacyAppleLanguagesDefaultsKey)
+        defaults.synchronize()
+    }
+}
+
 @MainActor
 class ContentViewModel: ObservableObject {
     private var isLoadingModel = false
+    private var activeTranscribeTaskID: UUID?
+    private var activeSpeakerDiarizationTaskID: UUID?
+    private var speakerDiarizationModelTask: Task<Void, Never>?
+    private var speakerDiarizationTask: Task<Void, Never>?
+    private var modelLoadTask: Task<Void, Never>?
+    private var modelCatalogTask: Task<Void, Never>?
+    private var remoteModelSizeTask: Task<Void, Never>?
+    private var waveformProcessingTask: Task<Void, Never>?
+    private var waveformProcessingTaskID: UUID?
+    private var normalizationTask: Task<Void, Never>?
+    private var normalizationTaskID: UUID?
+    private var speakerDiarizationDownloadProgress: Progress?
+    private var downloadCancellationMonitorTasks: [String: Task<Void, Never>] = [:]
+
+#if DEBUG
+    var activeDownloadCancellationMonitorCountForTesting: Int {
+        downloadCancellationMonitorTasks.count
+    }
+
+    var hasActiveModelLoadTaskForTesting: Bool {
+        modelLoadTask != nil
+    }
+
+    var hasActiveAudioProcessingTaskForTesting: Bool {
+        waveformProcessingTask != nil || normalizationTask != nil
+    }
+
+    func setModelLoadTaskForTesting(_ task: Task<Void, Never>) {
+        modelLoadTask = task
+    }
+
+    func setAudioProcessingTasksForTesting(
+        waveformTask: Task<Void, Never>? = nil,
+        normalizationTask: Task<Void, Never>? = nil
+    ) {
+        self.waveformProcessingTask = waveformTask
+        waveformProcessingTaskID = waveformTask == nil ? nil : UUID()
+        self.normalizationTask = normalizationTask
+        normalizationTaskID = normalizationTask == nil ? nil : UUID()
+    }
+#endif
 
     // MARK: - Published Properties
 
@@ -52,6 +187,8 @@ class ContentViewModel: ObservableObject {
 
     /// Export 진행 여부
     @Published var isExporting: Bool = false
+    @Published var batchQueue: [BatchImportItem] = []
+    @Published var currentBatchIndex: Int?
 
     @Published var audioPlayer: AVAudioPlayer?
     @Published var normalizedVolumeFactor: Float = 1.0
@@ -67,6 +204,7 @@ class ContentViewModel: ObservableObject {
 
     // Combine 관련
     private var playbackTimerCancellable: AnyCancellable?
+    private var lastDecoderPreviewUpdate: Date = .distantPast
 
     // MARK: - AppStorage (사용자 설정, UserDefaults 기반)
 
@@ -83,6 +221,8 @@ class ContentViewModel: ObservableObject {
         false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool =
         false
+    @AppStorage("enableSpeakerDiarization") var enableSpeakerDiarization: Bool = false
+    @AppStorage("speakerDiarizationSpeakerCount") var speakerDiarizationSpeakerCount: Int = 0
     @AppStorage("temperatureStart") var temperatureStart: Double = 0.0
     @AppStorage("fallbackCount") var fallbackCount: Double = 5.0
     @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double =
@@ -98,12 +238,23 @@ class ContentViewModel: ObservableObject {
 
     // Export 전용 설정
     @AppStorage("frameRate") var frameRate: Double = 30.0
+    @AppStorage("includeSpeakerLabelsInExport") var includeSpeakerLabelsInExport: Bool = true
+    @AppStorage("selectedExportPreset") private var selectedExportPresetRaw: String =
+        SubtitleExportPreset.general.rawValue
+    @AppStorage("hasSeenFirstRunGuide") var hasSeenFirstRunGuide: Bool = false
+    @AppStorage("speakerDiarizationModelManifestVersion")
+    private var speakerDiarizationModelManifestVersion: Int = 0
 
     // 기타 설정
     @AppStorage("encoderComputeUnits") var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
-    @AppStorage("appLanguage") var appLanguage: String = detectSystemLanguage()
+    @Published var appLanguage: String = AppLanguageResolver.fallbackLanguageCode {
+        didSet {
+            guard oldValue != appLanguage else { return }
+            UserDefaults.standard.set(appLanguage, forKey: AppLanguageResolver.appLanguageDefaultsKey)
+        }
+    }
     @AppStorage("appTheme") private var appThemeRaw: String = AppTheme.auto.rawValue
 
     /// 현재 선택된 테마
@@ -112,86 +263,498 @@ class ContentViewModel: ObservableObject {
         set { appThemeRaw = newValue.rawValue }
     }
 
+    var selectedExportPreset: SubtitleExportPreset {
+        get { SubtitleExportPreset(rawValue: selectedExportPresetRaw) ?? .general }
+        set { selectedExportPresetRaw = newValue.rawValue }
+    }
+
+    var batchProgressText: String {
+        guard let currentBatchIndex,
+              batchQueue.indices.contains(currentBatchIndex) else {
+            return "\(batchQueue.count) files"
+        }
+        return "\(currentBatchIndex + 1) of \(batchQueue.count)"
+    }
+
+    var supportedAppLanguages: [AppLanguageOption] {
+        Self.supportedAppLanguages
+    }
+
     // MARK: - Initialization
 
+    private static let supportedAppLanguages: [AppLanguageOption] = [
+        .init(code: "en-US", displayName: "English (US)"),
+        .init(code: "en-GB", displayName: "English (UK)"),
+        .init(code: "ko", displayName: "한국어"),
+        .init(code: "ja", displayName: "日本語"),
+        .init(code: "es", displayName: "Español"),
+        .init(code: "de", displayName: "Deutsch"),
+        .init(code: "fr", displayName: "Français"),
+        .init(code: "pt-BR", displayName: "Português (Brasil)"),
+        .init(code: "hi", displayName: "हिन्दी"),
+        .init(code: "zh-Hans", displayName: "简体中文"),
+    ]
+
+    private static let transcriptionLanguageCodes: [String: String] = [
+        "afrikaans": "af",
+        "arabic": "ar",
+        "basque": "eu",
+        "bengali": "bn",
+        "cantonese": "yue",
+        "catalan": "ca",
+        "chinese": "zh",
+        "czech": "cs",
+        "danish": "da",
+        "dutch": "nl",
+        "english": "en",
+        "finnish": "fi",
+        "french": "fr",
+        "galician": "gl",
+        "german": "de",
+        "greek": "el",
+        "gujarati": "gu",
+        "hebrew": "he",
+        "hindi": "hi",
+        "hungarian": "hu",
+        "indonesian": "id",
+        "italian": "it",
+        "japanese": "ja",
+        "kannada": "kn",
+        "korean": "ko",
+        "malay": "ms",
+        "marathi": "mr",
+        "norwegian": "no",
+        "polish": "pl",
+        "portuguese": "pt",
+        "punjabi": "pa",
+        "romanian": "ro",
+        "russian": "ru",
+        "spanish": "es",
+        "swedish": "sv",
+        "tamil": "ta",
+        "telugu": "te",
+        "thai": "th",
+        "turkish": "tr",
+        "ukrainian": "uk",
+        "urdu": "ur",
+        "vietnamese": "vi",
+    ]
+
+#if DEBUG
+    private enum UITestArgument {
+        static let resetDefaults = "-CaptionMateUITestResetDefaults"
+        static let speakerFixture = "-CaptionMateUITestSpeakerFixture"
+        static let disableModelDownloads = "-CaptionMateUITestDisableModelDownloads"
+    }
+
+    private static var launchArguments: [String] {
+        ProcessInfo.processInfo.arguments
+    }
+
+    private static var isUITesting: Bool {
+        launchArguments.contains(UITestArgument.resetDefaults) ||
+            launchArguments.contains(UITestArgument.speakerFixture) ||
+            launchArguments.contains(UITestArgument.disableModelDownloads)
+    }
+
+    var shouldSkipModelSelectorAutoActionsForUITesting: Bool {
+        Self.isUITesting
+    }
+#endif
+
     init() {
+#if DEBUG
+        if Self.launchArguments.contains(UITestArgument.resetDefaults) {
+            Self.resetPersistentDefaultsForUITesting()
+            configureBaseDefaultsForUITesting()
+        }
+#endif
+
+        AppLanguageResolver.clearLegacyAppleLanguagesOverride()
+
         // 첫 실행 시에만 시스템 언어로 설정
-        if UserDefaults.standard.object(forKey: "appLanguage") == nil {
+        if let storedLanguage = UserDefaults.standard.string(
+            forKey: AppLanguageResolver.appLanguageDefaultsKey
+        ) {
+            appLanguage = storedLanguage
+            normalizeStoredAppLanguageIfNeeded()
+        } else {
             appLanguage = ContentViewModel.detectSystemLanguage()
+        }
+
+#if DEBUG
+        if Self.launchArguments.contains(UITestArgument.speakerFixture) {
+            configureSpeakerFixtureForUITesting()
+        }
+#endif
+    }
+
+#if DEBUG
+    private static func resetPersistentDefaultsForUITesting() {
+        guard let bundleID = Bundle.main.bundleIdentifier else { return }
+        UserDefaults.standard.removePersistentDomain(forName: bundleID)
+        UserDefaults.standard.synchronize()
+    }
+
+    private func configureBaseDefaultsForUITesting() {
+        appLanguage = "en-US"
+        hasSeenFirstRunGuide = true
+        enableSpeakerDiarization = false
+        includeSpeakerLabelsInExport = true
+        speakerDiarizationSpeakerCount = 0
+        uiState.showFirstRunGuide = false
+        uiState.showAdvancedOptions = false
+        uiState.isModelmanagerViewPresented = false
+    }
+
+    private func configureSpeakerFixtureForUITesting() {
+        hasSeenFirstRunGuide = true
+        appLanguage = "en-US"
+        enableSpeakerDiarization = true
+        includeSpeakerLabelsInExport = true
+        speakerDiarizationSpeakerCount = 2
+        enableTimestamps = true
+        modelManagementState.modelState = .loaded
+
+        let segments = [
+            TranscriptionSegment(start: 0, end: 1.8, text: "Welcome to CaptionMate."),
+            TranscriptionSegment(start: 2.0, end: 3.8, text: "This segment already has a speaker."),
+        ]
+        transcriptionResult = TranscriptionResult(
+            text: segments.map(\.text).joined(separator: " "),
+            segments: segments,
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+        transcriptionState.confirmedSegments = segments
+        transcriptionState.speakerAssignments = [
+            nil,
+            SpeakerSegmentAssignment(speakerID: 0),
+        ]
+        transcriptionState.speakerNames = [:]
+        transcriptionState.speakerDiarization = SpeakerDiarizationState(
+            detectedSpeakerCount: 2
+        )
+        audioState.audioFileName = "UITest Speaker Fixture"
+        audioState.importedAudioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateUITestSpeakerFixture.wav")
+        audioState.totalDuration = 3.8
+        uiState.isTranscribingView = true
+        uiState.showFirstRunGuide = false
+        uiState.isModelmanagerViewPresented = false
+        refreshSubtitleQualityIssues()
+    }
+
+    func activateSpeakerFixtureNavigationForUITestingIfNeeded() {
+        guard Self.launchArguments.contains(UITestArgument.speakerFixture) else { return }
+
+        uiState.isTranscribingView = false
+        Task { @MainActor [weak self] in
+            await Task.yield()
+            self?.uiState.isTranscribingView = true
+        }
+    }
+#endif
+
+    func dismissUserMessage() {
+        uiState.userMessage = nil
+    }
+
+    private func showUserMessage(
+        _ kind: UserMessage.Kind,
+        title: String,
+        detail: String? = nil,
+        autoDismissAfter delay: TimeInterval? = 4.0
+    ) {
+        let message = UserMessage(kind: kind, title: title, detail: detail)
+        uiState.userMessage = message
+
+        guard let delay else { return }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            await MainActor.run {
+                if self?.uiState.userMessage?.id == message.id {
+                    self?.uiState.userMessage = nil
+                }
+            }
+        }
+    }
+
+    func presentFirstRunGuideIfNeeded() {
+        guard !hasSeenFirstRunGuide else { return }
+        uiState.showFirstRunGuide = true
+    }
+
+    func dismissFirstRunGuide() {
+        hasSeenFirstRunGuide = true
+        uiState.showFirstRunGuide = false
+    }
+
+    func prepareRecommendedModelFromGuide() {
+        let recommendedModel = WhisperKit.recommendedModels().default
+        selectedModel = recommendedModel
+        dismissFirstRunGuide()
+        prepareDefaultSpeakerDiarizationModelIfNeeded()
+
+        if modelManagementState.localModels.contains(recommendedModel) {
+            loadModel(recommendedModel)
+        } else {
+            downloadModel(recommendedModel)
+            showUserMessage(
+                .info,
+                title: "Downloading Recommended Model",
+                detail: modelManagementState.displayName(for: recommendedModel)
+            )
+        }
+    }
+
+    func applySelectedExportPreset(showMessage: Bool = true) {
+        frameRate = selectedExportPreset.frameRate
+        guard showMessage else { return }
+        showUserMessage(
+            .success,
+            title: "Export Preset Applied",
+            detail: "\(selectedExportPreset.displayName) · \(String(format: "%.2f fps", frameRate))"
+        )
+    }
+
+    func applyRecommendedPerformanceSettings(showMessage: Bool = true) {
+        let activeCores = max(1, ProcessInfo.processInfo.activeProcessorCount)
+        let memoryGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
+        let memoryAdjustedLimit = memoryGB >= 32 ? 8 : (memoryGB >= 16 ? 6 : 4)
+        let recommendedWorkers = min(max(2, activeCores / 2), memoryAdjustedLimit)
+
+        concurrentWorkerCount = Double(recommendedWorkers)
+        chunkingStrategy = .vad
+
+        guard showMessage else { return }
+        showUserMessage(
+            .success,
+            title: "Performance Tuned",
+            detail: "\(recommendedWorkers) workers · VAD chunking"
+        )
+    }
+
+    private struct PreparedAudioImport {
+        let localURL: URL
+        let displayName: String
+        let sidecar: CaptionMateSidecar?
+        let sidecarURL: URL?
+        let sidecarRestoreError: String?
+    }
+
+    nonisolated private static func appTemporaryAudioDirectoryURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateAudio", isDirectory: true)
+    }
+
+    nonisolated private static func prepareAudioImport(
+        from sourceURL: URL,
+        needsSecurityScopedAccess: Bool
+    ) async throws -> PreparedAudioImport {
+        try await Task.detached(priority: .userInitiated) {
+            let didStartAccessing = needsSecurityScopedAccess ?
+                sourceURL.startAccessingSecurityScopedResource() : false
+            defer {
+                if didStartAccessing {
+                    sourceURL.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let localURL = try copyAudioFileToTemporaryDirectory(from: sourceURL)
+            let sidecarResult = loadSidecarIfPresent(nextTo: sourceURL)
+
+            return PreparedAudioImport(
+                localURL: localURL,
+                displayName: sourceURL.deletingPathExtension().lastPathComponent,
+                sidecar: sidecarResult.sidecar,
+                sidecarURL: sidecarResult.url,
+                sidecarRestoreError: sidecarResult.errorMessage
+            )
+        }.value
+    }
+
+    nonisolated private static func loadSidecarIfPresent(
+        nextTo mediaURL: URL
+    ) -> (sidecar: CaptionMateSidecar?, url: URL?, errorMessage: String?) {
+        let sidecarURL = CaptionMateSidecarService.sidecarURL(forMediaURL: mediaURL)
+        guard FileManager.default.fileExists(atPath: sidecarURL.path) else {
+            return (nil, nil, nil)
+        }
+
+        do {
+            return (try CaptionMateSidecarService.read(from: sidecarURL), sidecarURL, nil)
+        } catch {
+            return (nil, sidecarURL, error.localizedDescription)
+        }
+    }
+
+    nonisolated private static func copyAudioFileToTemporaryDirectory(
+        from sourceURL: URL
+    ) throws -> URL {
+        let fileManager = FileManager.default
+        let tempDirectoryURL = appTemporaryAudioDirectoryURL()
+        try fileManager.createDirectory(
+            at: tempDirectoryURL,
+            withIntermediateDirectories: true
+        )
+
+        let fileExtension = sourceURL.pathExtension
+        let uniqueFileName = fileExtension.isEmpty ?
+            UUID().uuidString : "\(UUID().uuidString).\(fileExtension)"
+        let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
+
+        try fileManager.copyItem(at: sourceURL, to: localFileURL)
+        return localFileURL
+    }
+
+    nonisolated private static func normalizationFactor(for audioURL: URL) -> Float {
+        do {
+            let player = try AVAudioPlayer(contentsOf: audioURL)
+            player.isMeteringEnabled = true
+
+            let sampleCount = 50
+            guard player.duration.isFinite, player.duration > 0 else { return 1.0 }
+
+            var totalLevel: Float = 0
+            var peakLevel: Float = -160
+            let interval = player.duration / Double(sampleCount)
+
+            player.volume = 0
+            player.play()
+            defer {
+                player.stop()
+                player.currentTime = 0
+            }
+
+            for i in 0 ..< sampleCount {
+                if Task.isCancelled { return 1.0 }
+                player.currentTime = Double(i) * interval
+                Thread.sleep(forTimeInterval: 0.01)
+                player.updateMeters()
+
+                let avgPower = player.averagePower(forChannel: 0)
+                let peakPower = player.peakPower(forChannel: 0)
+                totalLevel += avgPower
+                peakLevel = max(peakLevel, peakPower)
+            }
+
+            let avgLevel = totalLevel / Float(sampleCount)
+            let estimatedLUFS = avgLevel + 10
+            let targetLUFS: Float = -14.0
+            let gainNeeded = targetLUFS - estimatedLUFS
+            let factor = gainNeeded < 0 ? pow(10.0, gainNeeded / 20.0) : 1.0
+
+            print(
+                "Audio analysis - Average level: \(avgLevel) dB, Estimated LUFS: \(estimatedLUFS), Peak: \(peakLevel) dB"
+            )
+            print("Normalization factor: \(factor)")
+            return factor
+        } catch {
+            print("Audio normalization analysis failed: \(error.localizedDescription)")
+            return 1.0
         }
     }
 
     /// 시스템 언어 감지
     private static func detectSystemLanguage() -> String {
-        let systemLanguage = Locale.preferredLanguages.first ?? "en"
+        AppLanguageResolver.preferredAppLanguage(
+            from: Locale.preferredLanguages,
+            supportedLanguages: supportedAppLanguages
+        )
+    }
 
-        // 지원하는 언어 목록
-        let supportedLanguages = ["ko"]
-
-        // 시스템 언어가 지원 목록에 있는지 확인
-        for supported in supportedLanguages {
-            if systemLanguage.hasPrefix(supported) {
-                return supported
-            }
+    private func normalizeStoredAppLanguageIfNeeded() {
+        guard let normalizedLanguage = AppLanguageResolver.normalizedSupportedLanguage(
+            appLanguage,
+            supportedLanguages: Self.supportedAppLanguages
+        ) else {
+            appLanguage = AppLanguageResolver.fallbackLanguageCode
+            return
         }
 
-        return "en"
+        if normalizedLanguage != appLanguage {
+            appLanguage = normalizedLanguage
+        }
     }
 
     // MARK: - Methods
 
     /// 앱 언어 변경
     func changeAppLanguage(to language: String) {
-        appLanguage = language
+        guard let languageCode = getLanguageCode(for: language) else {
+            return
+        }
 
-        // Sheet들 닫기
-        uiState.showAdvancedOptions = false // SettingsView
-        uiState.isModelmanagerViewPresented = false // ModelManagerView
+        AppLanguageResolver.clearLegacyAppleLanguagesOverride()
+        appLanguage = languageCode
 
-        // 시스템에 언어 변경 알림
-        if let languageCode = getLanguageCode(for: language) {
-            UserDefaults.standard.set([languageCode], forKey: "AppleLanguages")
-            UserDefaults.standard.synchronize()
+        print("App language changed to: \(languageCode)")
 
-            print("App language changed to: \(language)")
-
-            // 언어 변경 후 잠시 지연을 두고 Alert 표시
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.uiState.isLanguageChanged.toggle()
-            }
+        // 언어 변경 후 잠시 지연을 두고 Alert 표시
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.uiState.isLanguageChanged.toggle()
         }
     }
 
     /// 언어 코드 변환
     private func getLanguageCode(for language: String) -> String? {
-        switch language {
-        case "en": return "en"
-        case "ko": return "ko"
-        default: return nil
-        }
+        AppLanguageResolver.normalizedSupportedLanguage(
+            language,
+            supportedLanguages: Self.supportedAppLanguages
+        )
     }
 
     /// 현재 언어 표시명
     func getCurrentLanguageDisplayName() -> String {
-        switch appLanguage {
-        case "ko": return "한국어"
-        case "en": return "English"
-        default: return "English"
+        Self.supportedAppLanguages.first { $0.code == appLanguage }?.displayName ?? "English"
+    }
+
+    func transcriptionLanguageTitle(for language: String) -> String {
+        let normalizedLanguage = language
+            .replacingOccurrences(of: "_", with: "-")
+            .lowercased()
+
+        if let languageCode = Self.transcriptionLanguageCodes[normalizedLanguage],
+           let localizedName = Locale(identifier: appLanguage)
+            .localizedString(forLanguageCode: languageCode) {
+            return localizedName
         }
+
+        if normalizedLanguage.count <= 8,
+           let localizedName = Locale(identifier: appLanguage)
+            .localizedString(forLanguageCode: normalizedLanguage) {
+            return localizedName
+        }
+
+        return language.capitalized
     }
 
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
-    func resetState() {
-        uiState.transcribeTask?.cancel()
+    func resetState(preservingImportedAudio: Bool = false) {
+        cancelActiveTranscriptionTask()
+        cancelActiveSpeakerDiarizationTask()
+        stopImportedAudio()
         uiState.isTranscribingView = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
 
         // 임시 파일 정리
-        cleanupPreviousAudioFile()
+        if !preservingImportedAudio {
+            cancelAudioProcessingTasks()
+            cleanupPreviousAudioFile()
+            audioState.importedAudioURL = nil
+            audioState.audioFileName = "Subtitle"
+            audioState.waveformSamples = []
+            audioState.isWaveformProcessing = false
+            audioState.totalDuration = 0
+            audioPlaybackState.currentPlayerTime = 0
+            audioPlayer = nil
+        }
 
         transcriptionState.currentText = ""
         transcriptionState.currentChunks = [:]
+        lastDecoderPreviewUpdate = .distantPast
         transcriptionState.pipelineStart = Double.greatestFiniteMagnitude
         transcriptionState.firstTokenTime = Double.greatestFiniteMagnitude
         transcriptionState.effectiveRealTimeFactor = 0
@@ -204,7 +767,83 @@ class ContentViewModel: ObservableObject {
         transcriptionState.currentDecodingLoops = 0
         transcriptionState.lastConfirmedSegmentEndSeconds = 0
         transcriptionState.confirmedSegments = []
+        transcriptionState.speakerAssignments = []
+        transcriptionState.speakerNames = [:]
+        transcriptionState.speakerDiarization = SpeakerDiarizationState()
+        uiState.subtitleQualityIssues = []
+        uiState.showSubtitleReview = false
+        uiState.focusedSubtitleSegmentIndex = nil
+        uiState.subtitleIssueFilter = .all
+        uiState.subtitleSearchText = ""
+        uiState.subtitleReplaceText = ""
         transcriptionResult = nil
+    }
+
+    private func cancelActiveTranscriptionTask() {
+        uiState.transcribeTask?.cancel()
+        uiState.transcribeTask = nil
+        activeTranscribeTaskID = nil
+    }
+
+    private func cancelActiveSpeakerDiarizationTask() {
+        speakerDiarizationTask?.cancel()
+        speakerDiarizationTask = nil
+        activeSpeakerDiarizationTaskID = nil
+        transcriptionState.speakerDiarization.isRunning = false
+    }
+
+    private func cancelAudioProcessingTasks() {
+        waveformProcessingTask?.cancel()
+        waveformProcessingTask = nil
+        waveformProcessingTaskID = nil
+        normalizationTask?.cancel()
+        normalizationTask = nil
+        normalizationTaskID = nil
+    }
+
+    func prepareForClose() {
+        cancelActiveTranscriptionTask()
+        cancelActiveSpeakerDiarizationTask()
+        cancelAudioProcessingTasks()
+        uiState.transcriptionTask?.cancel()
+        uiState.transcriptionTask = nil
+
+        for task in modelManagementState.downloadTasks.values {
+            task.cancel()
+        }
+        for progress in modelManagementState.downloadProgressObjects.values {
+            progress.cancel()
+        }
+        for task in downloadCancellationMonitorTasks.values {
+            task.cancel()
+        }
+        downloadCancellationMonitorTasks.removeAll()
+        modelManagementState.downloadTasks.removeAll()
+        modelManagementState.downloadProgressObjects.removeAll()
+        modelManagementState.lastProgressCallbackTime.removeAll()
+        modelManagementState.currentDownloadingModels.removeAll()
+        modelManagementState.cancellingModels.removeAll()
+        modelManagementState.queuedDownloadModels.removeAll()
+        modelManagementState.downloadBatchModels.removeAll()
+        modelManagementState.downloadProgress.removeAll()
+        modelManagementState.isDownloading = false
+        modelCatalogTask?.cancel()
+        modelCatalogTask = nil
+        remoteModelSizeTask?.cancel()
+        remoteModelSizeTask = nil
+        if modelManagementState.catalogLoadState.isLoading {
+            modelManagementState.catalogLoadState = .idle
+        }
+        modelManagementState.isRemoteModelSizeLoading = false
+        speakerDiarizationModelTask?.cancel()
+        speakerDiarizationModelTask = nil
+        modelLoadTask?.cancel()
+        modelLoadTask = nil
+        isLoadingModel = false
+        speakerDiarizationDownloadProgress?.cancel()
+        speakerDiarizationDownloadProgress = nil
+
+        stopImportedAudio()
     }
 
     /// Compute 옵션 생성
@@ -217,123 +856,45 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - Model Management
 
-    /// 캐시 디렉토리 정리 함수
-    func clearCoreMLRuntimeCache() {
-        // 앱 캐시 디렉토리 경로 가져오기
+    /// 앱 소유 CoreML 런타임 캐시만 정리한다.
+    nonisolated func clearCoreMLRuntimeCache() {
         let fileManager = FileManager.default
 
-        // 1. 앱의 캐시 디렉토리 찾기
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
             .first else {
             print("Cache directory not found.")
             return
         }
 
-        // 2. 앱의 번들 ID 가져오기
         let bundleID = Bundle.main.bundleIdentifier ?? "com.CaptionMate"
-
-        // 3. CoreML 캐시 디렉토리 찾기
-        let possibleCacheDirs = [
-            cachesDirectory.appendingPathComponent(bundleID)
-                .appendingPathComponent("com.apple.e5rt.e5bundlecache"),
-            cachesDirectory.appendingPathComponent(bundleID)
-                .appendingPathComponent("com.apple.CoreML"),
-            cachesDirectory.appendingPathComponent("com.apple.CoreML"),
-            cachesDirectory.appendingPathComponent("CoreML"),
-        ]
-
-        // 4. 모든 가능한 캐시 디렉토리 정리
-        var clearedAny = false
-        for cacheDir in possibleCacheDirs {
-            if fileManager.fileExists(atPath: cacheDir.path) {
-                do {
-                    // a. 디렉토리 내용 가져오기
-                    let contents = try fileManager.contentsOfDirectory(
-                        at: cacheDir,
-                        includingPropertiesForKeys: nil
-                    )
-
-                    // b. 각 파일/폴더 삭제
-                    for item in contents {
-                        do {
-                            try fileManager.removeItem(at: item)
-                            print("Cache item deleted: \(item.lastPathComponent)")
-                            clearedAny = true
-                        } catch {
-                            print(
-                                "Failed to delete cache item: \(item.lastPathComponent) - \(error.localizedDescription)"
-                            )
-                        }
-                    }
-
-                    print("CoreML cache directory cleaned: \(cacheDir.path)")
-                } catch {
-                    print("Failed to access CoreML cache directory: \(error.localizedDescription)")
-                }
-            }
+        let appCacheDirectory = cachesDirectory.appendingPathComponent(bundleID, isDirectory: true)
+        let cacheDirectories = StorageCleanupPolicy.appScopedCoreMLCacheSubpaths.map {
+            appCacheDirectory.appendingPathComponent($0, isDirectory: true)
         }
 
-        // 5. 임시 디렉토리 정리
-        let tempDirectory = URL(fileURLWithPath: NSTemporaryDirectory())
-        do {
-            let tempContents = try fileManager.contentsOfDirectory(
-                at: tempDirectory,
-                includingPropertiesForKeys: [.fileSizeKey, .creationDateKey]
-            )
+        var removedItemCount = 0
+        var removedBytes: Int64 = 0
 
-            // 앱 관련 임시 파일 필터링
-            let appTempFiles = tempContents.filter { file in
-                let fileName = file.lastPathComponent.lowercased()
-                return fileName.contains("coreml") ||
-                    fileName.contains("whisper") ||
-                    fileName.contains(".bundle") ||
-                    fileName.contains("model") ||
-                    fileName.contains("mps") ||
-                    fileName.contains("mlmodel") ||
-                    fileName.contains(".wav") ||
-                    fileName.contains(".mp3") ||
-                    fileName.contains(".m4a") ||
-                    fileName.contains(".aac") ||
-                    fileName.contains(".flac") ||
-                    fileName.hasPrefix("tmp") ||
-                    fileName.contains("download")
-            }
-
-            var totalClearedSize: Int64 = 0
-            for tempFile in appTempFiles {
-                do {
-                    // 파일 크기 확인
-                    let resourceValues = try tempFile.resourceValues(forKeys: [.fileSizeKey])
-                    let fileSize = resourceValues.fileSize ?? 0
-
-                    try fileManager.removeItem(at: tempFile)
-                    totalClearedSize += Int64(fileSize)
-                    print(
-                        "Temporary file deleted: \(tempFile.lastPathComponent) (\(ByteCountFormatter.string(fromByteCount: Int64(fileSize), countStyle: .file)))"
-                    )
-                    clearedAny = true
-                } catch {
-                    print(
-                        "Failed to delete temporary file: \(tempFile.lastPathComponent) - \(error.localizedDescription)"
-                    )
-                }
-            }
-
-            if totalClearedSize > 0 {
-                print(
-                    "Total temporary files cleaned: \(ByteCountFormatter.string(fromByteCount: totalClearedSize, countStyle: .file))"
+        for cacheDirectory in cacheDirectories {
+            do {
+                let report = try StorageCleanupService.cleanupContents(
+                    in: cacheDirectory,
+                    fileManager: fileManager
                 )
+                removedItemCount += report.removedItemCount
+                removedBytes += report.removedBytes
+            } catch {
+                print("Failed to clean CaptionMate runtime cache: \(error.localizedDescription)")
             }
-        } catch {
-            print("Failed to search temporary directory: \(error.localizedDescription)")
         }
 
-        // 6. 결과 메시지 출력
-        if clearedAny {
-            print("CoreML cache files cleaned")
-        } else {
-            print("No CoreML cache files found to clean")
+        guard removedItemCount > 0 else {
+            print("No CaptionMate runtime cache files found to clean")
+            return
         }
+
+        let formattedSize = ByteCountFormatter.string(fromByteCount: removedBytes, countStyle: .file)
+        print("CaptionMate runtime cache cleaned: \(removedItemCount) items, \(formattedSize)")
     }
 
     /// 디스크 여유 공간 확인 함수
@@ -387,15 +948,13 @@ class ContentViewModel: ObservableObject {
         }
 
         // 백그라운드 작업 취소
-        uiState.transcribeTask?.cancel()
+        cancelActiveTranscriptionTask()
         uiState.transcriptionTask?.cancel()
+        uiState.transcriptionTask = nil
         uiState.isTranscribingView = false
 
         // 전사 관련 상태 초기화
         resetState()
-
-        // CoreML 런타임 캐시 정리
-        clearCoreMLRuntimeCache()
 
         // WhisperKit 인스턴스 해제
         if let kit = whisperKit {
@@ -444,6 +1003,7 @@ class ContentViewModel: ObservableObject {
     func loadModel(_ model: String, redownload: Bool = false) {
         guard !isLoadingModel else { return }
         isLoadingModel = true
+        modelLoadTask?.cancel()
 
         // 상태 초기화
         modelManagementState.modelState = .unloading
@@ -458,7 +1018,12 @@ class ContentViewModel: ObservableObject {
         modelManagementState.hasModelLoadError = false
         modelManagementState.modelLoadError = nil
 
-        Task {
+        modelLoadTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.modelLoadTask = nil
+                self.isLoadingModel = false
+            }
             // 로딩 단계별 진행률 비율 설정 (초기화/프리워밍/로딩)
             let initProgressRatio: Float = 0.9 // 초기화 단계
             let prewarmProgressRatio: Float = 0.7 // 프리워밍 단계
@@ -466,7 +1031,7 @@ class ContentViewModel: ObservableObject {
 
             // 1. 초기화 단계 진행률 표시 시작
             let initProgressTask = Task {
-                await updateProgressBar(
+                await self.updateProgressBar(
                     startProgress: 0.0,
                     targetProgress: initProgressRatio,
                     maxTime: 2.0
@@ -474,66 +1039,67 @@ class ContentViewModel: ObservableObject {
             }
 
             // 디스크 공간 확인 및 캐시 정리
-            let diskSpace = checkDiskSpace()
+            let diskSpace = self.checkDiskSpace()
             if !diskSpace.isEnough {
                 print(
                     "⚠️ Insufficient disk space: Available \(diskSpace.available / 1_000_000) MB, Required \(diskSpace.required / 1_000_000) MB"
                 )
-                clearCoreMLRuntimeCache()
+                self.clearCoreMLRuntimeCache()
             }
 
             // 기존 WhisperKit 인스턴스 해제
-            if let kit = whisperKit {
+            if let kit = self.whisperKit {
                 await kit.unloadModels()
                 print("Previous WhisperKit model released")
-                whisperKit = nil
+                self.whisperKit = nil
             }
 
             // 초기화 진행률 업데이트 작업 완료
             initProgressTask.cancel()
             await MainActor.run {
-                modelManagementState.loadingProgressValue = initProgressRatio
+                self.modelManagementState.loadingProgressValue = initProgressRatio
             }
 
             print("Selected model: \(model)")
+            let computeOptions = self.getComputeOptions()
             print("""
                 연산 옵션:
-                - Mel Spectrogram:  \(getComputeOptions().melCompute.description)
-                - Audio Encoder:    \(getComputeOptions().audioEncoderCompute.description)
-                - Text Decoder:     \(getComputeOptions().textDecoderCompute.description)
-                - Prefill Data:     \(getComputeOptions().prefillCompute.description)
+                - Mel Spectrogram:  \(computeOptions.melCompute.description)
+                - Audio Encoder:    \(computeOptions.audioEncoderCompute.description)
+                - Text Decoder:     \(computeOptions.textDecoderCompute.description)
+                - Prefill Data:     \(computeOptions.prefillCompute.description)
             """)
 
             // 2. WhisperKit 인스턴스 생성
             do {
-                let config = WhisperKitConfig(computeOptions: getComputeOptions(),
+                let config = WhisperKitConfig(computeOptions: computeOptions,
                                               verbose: true,
                                               logLevel: .debug,
                                               prewarm: false,
                                               load: false,
                                               download: false)
-                whisperKit = try await WhisperKit(config)
+                self.whisperKit = try await WhisperKit(config)
             } catch {
                 print("⚠️ WhisperKit initialization failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    modelManagementState.modelState = .unloaded
-                    modelManagementState.hasModelLoadError = true
-                    modelManagementState
+                    self.modelManagementState.modelState = .unloaded
+                    self.modelManagementState.hasModelLoadError = true
+                    self.modelManagementState
                         .modelLoadError =
                         "Model initialization failed: \(error.localizedDescription)"
-                    modelManagementState.loadingProgressValue = 0.0
-                    isLoadingModel = false
+                    self.modelManagementState.loadingProgressValue = 0.0
+                    self.isLoadingModel = false
                 }
                 return
             }
 
-            guard let whisperKit = whisperKit else {
+            guard let whisperKit = self.whisperKit else {
                 await MainActor.run {
-                    modelManagementState.modelState = .unloaded
-                    modelManagementState.hasModelLoadError = true
-                    modelManagementState.modelLoadError = "WhisperKit instance creation failed"
-                    modelManagementState.loadingProgressValue = 0.0
-                    isLoadingModel = false
+                    self.modelManagementState.modelState = .unloaded
+                    self.modelManagementState.hasModelLoadError = true
+                    self.modelManagementState.modelLoadError = "WhisperKit instance creation failed"
+                    self.modelManagementState.loadingProgressValue = 0.0
+                    self.isLoadingModel = false
                 }
                 return
             }
@@ -541,25 +1107,29 @@ class ContentViewModel: ObservableObject {
             // 3. 모델 파일 설정 단계
             var folder: URL?
             do {
-                if modelManagementState.localModels.contains(model) && !redownload {
+                if self.modelManagementState.localModels.contains(model) && !redownload {
                     // 로컬 모델 경로 가져오기 - 다운로드 없이 바로 로드
-                    folder = URL(fileURLWithPath: modelManagementState.localModelPath)
-                        .appendingPathComponent(model)
+                    folder = try ModelCatalogService.modelFolderURL(
+                        for: model,
+                        in: self.modelManagementState.localModelPath
+                    )
 
                     // 로컬 모델은 다운로드 상태를 완료로 설정
-                    if modelManagementState.downloadProgress[model] == nil {
-                        modelManagementState.downloadProgress[model] = 1.0
+                    if self.modelManagementState.downloadProgress[model] == nil {
+                        self.modelManagementState.downloadProgress[model] = 1.0
                     }
                 } else {
                     // 다운로드 시작 전 상태 업데이트
                     await MainActor.run {
-                        modelManagementState.modelState = .downloading
-                        modelManagementState.currentDownloadingModels.insert(model)
-                        modelManagementState.isDownloading = true
+                        self.modelManagementState.beginDownloadBatchIfIdle()
+                        self.modelManagementState.trackDownloadRequest(model)
+                        self.modelManagementState.modelState = .downloading
+                        self.modelManagementState.currentDownloadingModels.insert(model)
+                        self.modelManagementState.isDownloading = true
                     }
 
                     let downloadTask = Task {
-                        await updateProgressBar(
+                        await self.updateProgressBar(
                             startProgress: 0.0,
                             targetProgress: 0.99,
                             maxTime: 20.0
@@ -569,12 +1139,15 @@ class ContentViewModel: ObservableObject {
                     // 모델 다운로드
                     folder = try await WhisperKit.download(
                         variant: model,
-                        from: repoName,
+                        from: self.repoName,
                         progressCallback: { progress in
-                            Task { @MainActor in
-                                // 다운로드 전용 진행률 업데이트
-                                self.modelManagementState
-                                    .downloadProgress[model] = Float(progress.fractionCompleted)
+                            Task { [weak self] in
+                                await MainActor.run { [weak self] in
+                                    guard let self else { return }
+                                    // 다운로드 전용 진행률 업데이트
+                                    self.modelManagementState
+                                        .downloadProgress[model] = Float(progress.fractionCompleted)
+                                }
                             }
                         }
                     )
@@ -582,37 +1155,32 @@ class ContentViewModel: ObservableObject {
                     // 다운로드 완료 후 상태 업데이트
                     downloadTask.cancel()
                     await MainActor.run {
-                        modelManagementState.modelState = .downloaded
-                        modelManagementState.downloadProgress[model] = 1.0
-                        modelManagementState.currentDownloadingModels.remove(model)
+                        self.modelManagementState.modelState = .downloaded
+                        self.modelManagementState.downloadProgress[model] = 1.0
+                        self.modelManagementState.currentDownloadingModels.remove(model)
 
-                        // 다운로드 중인 모델이 더 없다면 다운로드 상태 해제
-                        if modelManagementState.currentDownloadingModels.isEmpty {
-                            modelManagementState.isDownloading = false
-                        }
+                        self.updateDownloadActivityState()
 
-                        if !modelManagementState.localModels.contains(model) {
-                            modelManagementState.localModels.append(model)
+                        if !self.modelManagementState.localModels.contains(model) {
+                            self.modelManagementState.localModels.append(model)
                         }
                     }
                 }
             } catch {
                 print("⚠️ Model download failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    modelManagementState.modelState = .unloaded
-                    modelManagementState.hasModelLoadError = true
-                    modelManagementState
+                    self.modelManagementState.modelState = .unloaded
+                    self.modelManagementState.hasModelLoadError = true
+                    self.modelManagementState
                         .modelLoadError = "Model download failed: \(error.localizedDescription)"
-                    modelManagementState.loadingProgressValue = 0.0
-                    modelManagementState.downloadProgress[model] = nil
-                    modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.loadingProgressValue = 0.0
+                    self.modelManagementState.downloadProgress[model] = nil
+                    self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.untrackDownloadRequest(model)
 
-                    // 다운로드 중인 모델이 더 없다면 다운로드 상태 해제
-                    if modelManagementState.currentDownloadingModels.isEmpty {
-                        modelManagementState.isDownloading = false
-                    }
+                    self.updateDownloadActivityState()
 
-                    isLoadingModel = false
+                    self.isLoadingModel = false
                 }
                 return
             }
@@ -623,14 +1191,14 @@ class ContentViewModel: ObservableObject {
 
                 // 프리워밍 시작
                 await MainActor.run {
-                    modelManagementState.modelState = .prewarming
+                    self.modelManagementState.modelState = .prewarming
                 }
 
                 // 프리워밍 진행률 업데이트 작업 시작
                 let prewarmProgressTask = Task {
-                    await updateProgressBar(startProgress: 0.0,
-                                            targetProgress: prewarmProgressRatio,
-                                            maxTime: 15) // 프리워밍은 보통 시간이 좀 더 걸림
+                    await self.updateProgressBar(startProgress: 0.0,
+                                                 targetProgress: prewarmProgressRatio,
+                                                 maxTime: 15) // 프리워밍은 보통 시간이 좀 더 걸림
                 }
 
                 // 모델 프리워밍
@@ -640,7 +1208,7 @@ class ContentViewModel: ObservableObject {
 
                     // 프리워밍 완료 후 진행률 업데이트
                     await MainActor.run {
-                        modelManagementState.loadingProgressValue = prewarmProgressRatio
+                        self.modelManagementState.loadingProgressValue = prewarmProgressRatio
                     }
                 } catch {
                     print("⚠️ Model prewarm failed: \(error.localizedDescription)")
@@ -649,23 +1217,23 @@ class ContentViewModel: ObservableObject {
                     // 재다운로드 시도
                     if !redownload {
                         await MainActor.run {
-                            modelManagementState.loadingProgressValue = 0.0
-                            modelManagementState.hasModelLoadError = true
-                            modelManagementState
+                            self.modelManagementState.loadingProgressValue = 0.0
+                            self.modelManagementState.hasModelLoadError = true
+                            self.modelManagementState
                                 .modelLoadError = "Model optimization failed, retrying..."
+                            self.isLoadingModel = false
                         }
-                        loadModel(model, redownload: true)
-                        isLoadingModel = false
+                        self.loadModel(model, redownload: true)
                         return
                     } else {
                         await MainActor.run {
-                            modelManagementState.modelState = .unloaded
-                            modelManagementState.hasModelLoadError = true
-                            modelManagementState
+                            self.modelManagementState.modelState = .unloaded
+                            self.modelManagementState.hasModelLoadError = true
+                            self.modelManagementState
                                 .modelLoadError =
                                 "Model optimization failed: \(error.localizedDescription)"
-                            modelManagementState.loadingProgressValue = 0.0
-                            isLoadingModel = false
+                            self.modelManagementState.loadingProgressValue = 0.0
+                            self.isLoadingModel = false
                         }
                         return
                     }
@@ -673,14 +1241,14 @@ class ContentViewModel: ObservableObject {
 
                 // 5. 모델 로딩 단계
                 await MainActor.run {
-                    modelManagementState.modelState = .loading
+                    self.modelManagementState.modelState = .loading
                 }
 
                 // 로딩 진행률 업데이트 작업 시작
                 let loadProgressTask = Task {
-                    await updateProgressBar(startProgress: prewarmProgressRatio,
-                                            targetProgress: loadProgressRatio,
-                                            maxTime: 10)
+                    await self.updateProgressBar(startProgress: prewarmProgressRatio,
+                                                 targetProgress: loadProgressRatio,
+                                                 maxTime: 10)
                 }
 
                 // 모델 로드 시도
@@ -699,7 +1267,7 @@ class ContentViewModel: ObservableObject {
                         print(
                             "MPSGraph error or disk space shortage detected, retrying after cache cleanup..."
                         )
-                        clearCoreMLRuntimeCache()
+                        self.clearCoreMLRuntimeCache()
 
                         // 한 번 더 시도
                         do {
@@ -707,24 +1275,24 @@ class ContentViewModel: ObservableObject {
                             try await whisperKit.loadModels()
                         } catch {
                             await MainActor.run {
-                                modelManagementState.modelState = .unloaded
-                                modelManagementState.hasModelLoadError = true
-                                modelManagementState
+                                self.modelManagementState.modelState = .unloaded
+                                self.modelManagementState.hasModelLoadError = true
+                                self.modelManagementState
                                     .modelLoadError =
                                     "Model load failed (after retry): \(error.localizedDescription)"
-                                modelManagementState.loadingProgressValue = 0.0
-                                isLoadingModel = false
+                                self.modelManagementState.loadingProgressValue = 0.0
+                                self.isLoadingModel = false
                             }
                             return
                         }
                     } else {
                         await MainActor.run {
-                            modelManagementState.modelState = .unloaded
-                            modelManagementState.hasModelLoadError = true
-                            modelManagementState
+                            self.modelManagementState.modelState = .unloaded
+                            self.modelManagementState.hasModelLoadError = true
+                            self.modelManagementState
                                 .modelLoadError = "Model load failed: \(error.localizedDescription)"
-                            modelManagementState.loadingProgressValue = 0.0
-                            isLoadingModel = false
+                            self.modelManagementState.loadingProgressValue = 0.0
+                            self.isLoadingModel = false
                         }
                         return
                     }
@@ -733,18 +1301,23 @@ class ContentViewModel: ObservableObject {
                 // 모델 로딩 성공
                 await MainActor.run {
                     // 모델 정보 업데이트 및 완료 상태 설정
-                    modelManagementState.availableLanguages = Constants.languages.map { $0.key }
+                    self.modelManagementState.availableLanguages = Constants.languages.map { $0.key }
                         .sorted()
-                    modelManagementState.loadingProgressValue = loadProgressRatio
-                    modelManagementState.modelState = whisperKit.modelState
-                    currentLoadedModel = model
+                    self.modelManagementState.loadingProgressValue = loadProgressRatio
+                    self.modelManagementState.modelState = whisperKit.modelState
+                    self.currentLoadedModel = model
 
                     // 에러 상태 초기화 (성공적으로 로드됨)
-                    modelManagementState.hasModelLoadError = false
-                    modelManagementState.modelLoadError = nil
+                    self.modelManagementState.hasModelLoadError = false
+                    self.modelManagementState.modelLoadError = nil
+                    self.showUserMessage(
+                        .success,
+                        title: "Model Ready",
+                        detail: self.modelManagementState.displayName(for: model)
+                    )
+                    self.modelLoadTask = nil
                 }
             }
-            isLoadingModel = false
         }
     }
 
@@ -785,9 +1358,12 @@ class ContentViewModel: ObservableObject {
     /// 모델 삭제
     func deleteModel(_ model: String) {
         if modelManagementState.localModels.contains(model) {
-            let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)
-                .appendingPathComponent(model)
             do {
+                let modelFolder = try ModelCatalogService.modelFolderURL(
+                    for: model,
+                    in: modelManagementState.localModelPath
+                )
+
                 // 모델 크기 정보 백업
                 let modelSize = modelManagementState.modelSizes[model]
 
@@ -807,8 +1383,204 @@ class ContentViewModel: ObservableObject {
                 }
 
                 print("Model deleted: \(model)")
+                showUserMessage(
+                    .success,
+                    title: "Model Deleted",
+                    detail: modelManagementState.displayName(for: model)
+                )
             } catch {
                 print("Error deleting model: \(error)")
+                showUserMessage(.error, title: "Delete Failed", detail: error.localizedDescription)
+            }
+        }
+    }
+
+    func refreshSpeakerDiarizationModelState() {
+        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
+            modelManagementState.speakerDiarizationModelState = .unloaded
+            modelManagementState.speakerDiarizationModelPath = ""
+            modelManagementState.speakerDiarizationModelError = "Document directory not found."
+            modelManagementState.speakerDiarizationModelNeedsRepair = false
+            modelManagementState.speakerDiarizationModelNeedsUpdate = false
+            return
+        }
+
+        modelManagementState.speakerDiarizationModelPath = modelRoot.path
+
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: modelRoot.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            modelManagementState.speakerDiarizationModelState = .unloaded
+            modelManagementState.speakerDiarizationModelProgress = nil
+            modelManagementState.speakerDiarizationModelError = nil
+            modelManagementState.speakerDiarizationModelNeedsRepair = false
+            modelManagementState.speakerDiarizationModelNeedsUpdate = false
+            modelManagementState.speakerDiarizationModelSize = SpeakerDiarizationModelStore
+                .estimatedDownloadSize
+            return
+        }
+
+        let report = SpeakerDiarizationModelStore.validationReport(for: modelRoot)
+        let folderSize = ModelCatalogService.folderSize(url: modelRoot)
+        modelManagementState.speakerDiarizationModelSize = max(
+            folderSize,
+            SpeakerDiarizationModelStore.estimatedDownloadSize
+        )
+
+        if report.isValid {
+            let needsUpdate = speakerDiarizationModelManifestVersion <
+                SpeakerDiarizationModelStore.manifestVersion
+            modelManagementState.speakerDiarizationModelState = .downloaded
+            modelManagementState.speakerDiarizationModelProgress = 1.0
+            modelManagementState.speakerDiarizationModelError = needsUpdate ? "Update available" : nil
+            modelManagementState.speakerDiarizationModelNeedsRepair = false
+            modelManagementState.speakerDiarizationModelNeedsUpdate = needsUpdate
+        } else {
+            modelManagementState.speakerDiarizationModelState = .unloaded
+            modelManagementState.speakerDiarizationModelProgress = nil
+            modelManagementState.speakerDiarizationModelError =
+                "Missing files: \(report.missingRelativePaths.prefix(3).joined(separator: ", "))"
+            modelManagementState.speakerDiarizationModelNeedsRepair = true
+            modelManagementState.speakerDiarizationModelNeedsUpdate = false
+        }
+    }
+
+    func prepareDefaultSpeakerDiarizationModelIfNeeded(
+        forceRepair: Bool = false,
+        showSuccessMessage: Bool = false
+    ) {
+#if DEBUG
+        guard !Self.isUITesting else {
+            refreshSpeakerDiarizationModelState()
+            return
+        }
+#endif
+
+        guard !modelManagementState.isSpeakerDiarizationModelPreparing else { return }
+
+        refreshSpeakerDiarizationModelState()
+        if !forceRepair, modelManagementState.isSpeakerDiarizationModelReady {
+            return
+        }
+
+        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
+            modelManagementState.speakerDiarizationModelError = "Document directory not found."
+            return
+        }
+
+        let shouldResetLocalCache = forceRepair ||
+            modelManagementState.speakerDiarizationModelNeedsRepair ||
+            modelManagementState.speakerDiarizationModelNeedsUpdate
+
+        speakerDiarizationModelTask?.cancel()
+        speakerDiarizationDownloadProgress = nil
+        modelManagementState.speakerDiarizationModelState = .downloading
+        modelManagementState.speakerDiarizationModelProgress = 0.0
+        modelManagementState.speakerDiarizationModelError = nil
+        modelManagementState.speakerDiarizationModelNeedsRepair = false
+        modelManagementState.speakerDiarizationModelNeedsUpdate = false
+        modelManagementState.speakerDiarizationModelPath = modelRoot.path
+
+        speakerDiarizationModelTask = Task(priority: .background) { [weak self] in
+            guard let self else { return }
+
+            do {
+                if shouldResetLocalCache {
+                    try? FileManager.default.removeItem(at: modelRoot)
+                }
+
+                let diskSpace = self.checkDiskSpace()
+                if !diskSpace.isEnough {
+                    self.clearCoreMLRuntimeCache()
+                }
+
+                let config = PyannoteConfig(
+                    modelRepo: SpeakerDiarizationModelStore.repoName,
+                    download: true,
+                    useBackgroundDownloadSession: false,
+                    load: false,
+                    verbose: false,
+                    concurrentSegmenterWorkers: 1,
+                    concurrentEmbedderWorkers: 1
+                )
+                let diarizer = SpeakerKitDiarizer.pyannote(config: config)
+                let progressCallback: (Progress) -> Void = { [weak self] progress in
+                    Task<Void, Never> { [weak self] in
+                        self?.updateSpeakerDiarizationDownloadProgress(progress)
+                    }
+                }
+                _ = try await diarizer.loader.resolveModels(
+                    downloader: diarizer.downloader,
+                    progressCallback: progressCallback
+                )
+                self.modelManagementState.speakerDiarizationModelProgress = 1.0
+
+                self.refreshSpeakerDiarizationModelState()
+                let report = SpeakerDiarizationModelStore.validationReport(for: modelRoot)
+                guard report.isValid else {
+                    throw CocoaError(.fileReadCorruptFile)
+                }
+
+                self.speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore
+                    .manifestVersion
+                self.refreshSpeakerDiarizationModelState()
+                self.speakerDiarizationDownloadProgress = nil
+                self.speakerDiarizationModelTask = nil
+
+                if showSuccessMessage {
+                    self.showUserMessage(
+                        .success,
+                        title: "Speaker Model Ready",
+                        detail: self.modelManagementState.formattedSpeakerDiarizationModelSize
+                    )
+                }
+            } catch is CancellationError {
+                try? FileManager.default.removeItem(at: modelRoot)
+                self.modelManagementState.speakerDiarizationModelState = .unloaded
+                self.modelManagementState.speakerDiarizationModelProgress = nil
+                self.modelManagementState.speakerDiarizationModelError = "Download cancelled."
+                self.speakerDiarizationDownloadProgress = nil
+                self.speakerDiarizationModelTask = nil
+            } catch {
+                self.modelManagementState.speakerDiarizationModelState = .unloaded
+                self.modelManagementState.speakerDiarizationModelProgress = nil
+                self.modelManagementState.speakerDiarizationModelError = error.localizedDescription
+                self.modelManagementState.speakerDiarizationModelNeedsRepair =
+                    FileManager.default.fileExists(atPath: modelRoot.path)
+                self.speakerDiarizationDownloadProgress = nil
+                self.speakerDiarizationModelTask = nil
+            }
+        }
+    }
+
+    func repairDefaultSpeakerDiarizationModel() {
+        prepareDefaultSpeakerDiarizationModelIfNeeded(
+            forceRepair: true,
+            showSuccessMessage: true
+        )
+    }
+
+    private func updateSpeakerDiarizationDownloadProgress(_ progress: Progress) {
+        speakerDiarizationDownloadProgress = progress
+        let fraction = progress.fractionCompleted
+        guard fraction.isFinite else { return }
+        modelManagementState.speakerDiarizationModelProgress =
+            Float(min(max(fraction, 0), 1))
+    }
+
+    func cancelDefaultSpeakerDiarizationModelDownload() {
+        guard modelManagementState.isSpeakerDiarizationModelPreparing else { return }
+        speakerDiarizationDownloadProgress?.cancel()
+        speakerDiarizationDownloadProgress = nil
+        speakerDiarizationModelTask?.cancel()
+        speakerDiarizationModelTask = nil
+        modelManagementState.speakerDiarizationModelState = .unloaded
+        modelManagementState.speakerDiarizationModelProgress = nil
+        modelManagementState.speakerDiarizationModelError = "Download cancelled."
+
+        if let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() {
+            Task(priority: .utility) {
+                try? FileManager.default.removeItem(at: modelRoot)
             }
         }
     }
@@ -817,20 +1589,84 @@ class ContentViewModel: ObservableObject {
 
     /// 모델 다운로드
     func downloadModel(_ model: String) {
-        // 현재 다운로드 중인 모델 수가 최대 동시 다운로드 수보다 작은지 확인
         guard modelManagementState.canStartDownload(model: model) else {
-            print("Maximum concurrent downloads reached")
+            showUserMessage(.warning, title: "Download Unavailable")
             return
         }
 
-        // 다운로드 시작 전 디스크 공간 확인
+        modelManagementState.beginDownloadBatchIfIdle()
+        modelManagementState.trackDownloadRequest(model)
+
+        if modelManagementState.currentDownloadingModels.count >=
+            modelManagementState.maxConcurrentDownloads {
+            modelManagementState.queuedDownloadModels.append(model)
+            modelManagementState.downloadProgress[model] = 0.0
+            modelManagementState.downloadErrors.removeValue(forKey: model)
+            showUserMessage(
+                .info,
+                title: "Download Queued",
+                detail: modelManagementState.displayName(for: model)
+            )
+            return
+        }
+
+        startModelDownload(model)
+    }
+
+    private func startNextQueuedDownloadIfPossible() {
+        while modelManagementState.currentDownloadingModels.count <
+            modelManagementState.maxConcurrentDownloads,
+            !modelManagementState.queuedDownloadModels.isEmpty {
+            let nextModel = modelManagementState.queuedDownloadModels.removeFirst()
+            startModelDownload(nextModel)
+        }
+    }
+
+    private func updateDownloadActivityState() {
+        modelManagementState.isDownloading =
+            !modelManagementState.currentDownloadingModels.isEmpty ||
+            !modelManagementState.queuedDownloadModels.isEmpty
+        modelManagementState.clearDownloadBatchIfIdle()
+    }
+
+    private func estimatedDownloadSize(for model: String) -> Int64 {
+        max(
+            modelManagementState.downloadDisplaySize(for: model),
+            ModelCatalogService.estimatedDownloadSize(for: model)
+        )
+    }
+
+    private func estimatedRequiredDownloadSpace(for model: String) -> Int64 {
+        Int64(Double(estimatedDownloadSize(for: model)) * 1.2)
+    }
+
+    private func estimatedRemainingDownloadSpaceForOtherActiveDownloads(
+        excluding model: String
+    ) -> Int64 {
+        modelManagementState.currentDownloadingModels
+            .filter { $0 != model }
+            .reduce(Int64(0)) { total, activeModel in
+                let remainingProgress = 1.0 - Double(
+                    modelManagementState.downloadProgressValue(for: activeModel)
+                )
+                let remainingSize = Double(estimatedDownloadSize(for: activeModel)) *
+                    max(remainingProgress, 0)
+                return total + Int64(remainingSize * 1.2)
+            }
+    }
+
+    private func startModelDownload(_ model: String) {
         guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first else {
             print("Document directory not found")
+            modelManagementState.untrackDownloadRequest(model)
+            updateDownloadActivityState()
+            showUserMessage(.error, title: "Download Failed", detail: "Document directory not found.")
             return
         }
 
         // 다운로드 상태 업데이트
+        modelManagementState.trackDownloadRequest(model)
         modelManagementState.currentDownloadingModels.insert(model)
         modelManagementState.isDownloading = true
         modelManagementState.downloadProgress[model] = 0.0
@@ -842,8 +1678,7 @@ class ContentViewModel: ObservableObject {
             modelManagementState.downloadTasks[model] = nil
         }
 
-        // 백그라운드 작업 생성
-        let task = Task.detached(priority: .background) { [weak self] in
+        let task = Task(priority: .background) { [weak self] in
             guard let self = self else { return }
 
             do {
@@ -851,28 +1686,31 @@ class ContentViewModel: ObservableObject {
                     .resourceValues(forKeys: [.volumeAvailableCapacityKey])
                 guard let availableSpace = resourceValues.volumeAvailableCapacity else {
                     await MainActor.run {
-                        self.modelManagementState.downloadErrors[model] = "Cannot check disk space"
+                        self.modelManagementState.downloadErrors[model] = "Cannot check disk space."
+                        self.modelManagementState.currentDownloadingModels.remove(model)
+                        self.modelManagementState.downloadProgress[model] = nil
+                        self.modelManagementState.downloadTasks[model] = nil
+                        self.modelManagementState.untrackDownloadRequest(model)
+                        self.showUserMessage(
+                            .error,
+                            title: "Download Failed",
+                            detail: "Cannot check disk space."
+                        )
+                        self.startNextQueuedDownloadIfPossible()
+                        self.updateDownloadActivityState()
                     }
                     return
                 }
 
-                // 모델 크기 예상치 계산
-                let estimatedSize: Int64
-                if model.contains("large") {
-                    estimatedSize = 3_600_000_000 // 3GB + 20%
-                } else if model.contains("medium") {
-                    estimatedSize = 1_800_000_000 // 1.5GB + 20%
-                } else if model.contains("small") {
-                    estimatedSize = 600_000_000 // 500MB + 20%
-                } else if model.contains("base") {
-                    estimatedSize = 300_000_000 // 250MB + 20%
-                } else {
-                    estimatedSize = 180_000_000 // 150MB + 20%
-                }
+                let estimatedSize = self.estimatedDownloadSize(for: model)
+                let requiredSpace = self.estimatedRequiredDownloadSpace(for: model)
+                let reservedSpaceForOtherDownloads = self
+                    .estimatedRemainingDownloadSpaceForOtherActiveDownloads(excluding: model)
+                let totalRequiredSpace = requiredSpace + reservedSpaceForOtherDownloads
 
-                if availableSpace < estimatedSize {
+                if availableSpace < totalRequiredSpace {
                     let availableGB = Double(availableSpace) / 1_000_000_000.0
-                    let requiredGB = Double(estimatedSize) / 1_000_000_000.0
+                    let requiredGB = Double(totalRequiredSpace) / 1_000_000_000.0
                     let errorMessage = String(
                         format: "Insufficient disk space. Required: %.1f GB, Available: %.1f GB",
                         requiredGB,
@@ -880,15 +1718,20 @@ class ContentViewModel: ObservableObject {
                     )
                     await MainActor.run {
                         self.modelManagementState.downloadErrors[model] = errorMessage
+                        self.modelManagementState.currentDownloadingModels.remove(model)
+                        self.modelManagementState.downloadProgress[model] = nil
+                        self.modelManagementState.downloadTasks[model] = nil
+                        self.modelManagementState.untrackDownloadRequest(model)
+                        self.showUserMessage(.error, title: "Download Failed", detail: errorMessage)
+                        self.startNextQueuedDownloadIfPossible()
+                        self.updateDownloadActivityState()
                     }
                     return
                 }
 
-                // 다운로드 진행률 업데이트를 위한 타이머 설정
-                let progressUpdateInterval: TimeInterval = 0.5 // 0.5초마다 업데이트
+                let progressUpdateInterval: TimeInterval = 0.5
                 var lastUpdateTime = Date()
 
-                // 다운로드 시작
                 let modelFolder = try await WhisperKit.download(
                     variant: model,
                     from: self.repoName,
@@ -991,13 +1834,22 @@ class ContentViewModel: ObservableObject {
                                         .resourceValues(forKeys: [.volumeAvailableCapacityKey]),
                                         let currentSpace = resourceValues.volumeAvailableCapacity,
                                         currentSpace <
-                                        Int64(Double(estimatedSize) *
-                                            (1.0 - progress.fractionCompleted)) {
+                                        Int64(
+                                            Double(estimatedSize) *
+                                                max(1.0 - progress.fractionCompleted, 0) *
+                                                1.2
+                                        ) +
+                                        self.estimatedRemainingDownloadSpaceForOtherActiveDownloads(
+                                            excluding: model
+                                        ) {
+                                        progress.cancel()
                                         self.modelManagementState
                                             .downloadErrors[model] =
                                             "Disk space became insufficient during download"
                                         self.modelManagementState.currentDownloadingModels
                                             .remove(model)
+                                        self.modelManagementState.untrackDownloadRequest(model)
+                                        self.updateDownloadActivityState()
                                         return
                                     }
                                 }
@@ -1012,37 +1864,53 @@ class ContentViewModel: ObservableObject {
                     throw CancellationError()
                 }
 
-                // 다운로드 완료 처리
+                let actualSize = await Task.detached {
+                    ModelCatalogService.folderSize(url: modelFolder)
+                }.value
+
                 await MainActor.run {
                     self.modelManagementState.currentDownloadingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = 1.0
+                    self.modelManagementState.downloadTasks[model] = nil
+                    self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+                    self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
 
                     if !self.modelManagementState.localModels.contains(model) {
                         self.modelManagementState.localModels.append(model)
                     }
 
-                    // 실제 다운로드된 모델의 크기 계산
-                    let actualSize = self.calculateFolderSize(url: modelFolder)
                     self.modelManagementState.modelSizes[model] = actualSize
+                    self.modelManagementState.modelSizeSources[model] = .local
 
-                    // 모든 다운로드가 완료되었는지 확인
-                    if self.modelManagementState.currentDownloadingModels.isEmpty {
-                        self.modelManagementState.isDownloading = false
-                    }
+                    self.showUserMessage(
+                        .success,
+                        title: "Model Downloaded",
+                        detail: self.modelManagementState.displayName(for: model)
+                    )
+                    self.startNextQueuedDownloadIfPossible()
+                    self.updateDownloadActivityState()
                 }
 
             } catch is CancellationError {
                 print("Model download cancelled: \(model)")
-                // 취소 중 상태가 아니라면 즉시 정리 (모니터링이 없는 경우)
                 let isCancelling = await MainActor
                     .run { self.modelManagementState.cancellingModels.contains(model) }
                 if !isCancelling {
                     await cleanupPartialDownload(model)
+                    await MainActor.run {
+                        self.modelManagementState.currentDownloadingModels.remove(model)
+                        self.modelManagementState.downloadProgress[model] = nil
+                        self.modelManagementState.downloadTasks[model] = nil
+                        self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+                        self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+                        self.modelManagementState.untrackDownloadRequest(model)
+                        self.startNextQueuedDownloadIfPossible()
+                        self.updateDownloadActivityState()
+                    }
                 }
             } catch {
                 print("Model download failed: \(error.localizedDescription)")
 
-                // DownloadError로 변환 (취소로 인한 파일 이동 에러는 nil 반환)
                 let downloadError = DownloadError.from(error)
 
                 await MainActor.run {
@@ -1050,33 +1918,43 @@ class ContentViewModel: ObservableObject {
                         .downloadErrors[model] = "Download failed: \(error.localizedDescription)"
                     self.modelManagementState.currentDownloadingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = nil
+                    self.modelManagementState.downloadTasks[model] = nil
                     self.modelManagementState.cancellingModels.remove(model) // 에러 시 취소 상태도 해제
                     self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
                     self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
-
-                    if self.modelManagementState.currentDownloadingModels.isEmpty {
-                        self.modelManagementState.isDownloading = false
-                    }
+                    self.modelManagementState.untrackDownloadRequest(model)
 
                     // 다운로드 실패 알림 표시 (취소로 인한 에러가 아닌 경우만)
                     if let downloadError = downloadError {
                         self.uiState.downloadError = downloadError
                         self.uiState.showDownloadErrorAlert = true
                     }
+                    self.showUserMessage(
+                        .error,
+                        title: "Download Failed",
+                        detail: error.localizedDescription
+                    )
+                    self.startNextQueuedDownloadIfPossible()
+                    self.updateDownloadActivityState()
                 }
                 await cleanupPartialDownload(model)
             }
         }
 
-        // 작업 참조 저장
         modelManagementState.downloadTasks[model] = task
     }
 
     /// 부분 다운로드 파일 정리 헬퍼 메서드
     private func cleanupPartialDownload(_ model: String) async {
         // 부분적으로 다운로드된 파일 삭제
-        let modelFolder = URL(fileURLWithPath: modelManagementState.localModelPath)
-            .appendingPathComponent(model)
+        guard let modelFolder = try? ModelCatalogService.modelFolderURL(
+            for: model,
+            in: modelManagementState.localModelPath
+        ) else {
+            print("Skipped partial download cleanup for unsafe model name: \(model)")
+            return
+        }
+
         if FileManager.default.fileExists(atPath: modelFolder.path) {
             do {
                 try FileManager.default.removeItem(at: modelFolder)
@@ -1089,6 +1967,20 @@ class ContentViewModel: ObservableObject {
 
     /// 다운로드 취소
     func cancelDownload(_ model: String) {
+        if let queuedIndex = modelManagementState.queuedDownloadModels.firstIndex(of: model) {
+            modelManagementState.queuedDownloadModels.remove(at: queuedIndex)
+            modelManagementState.downloadProgress[model] = nil
+            modelManagementState.downloadErrors.removeValue(forKey: model)
+            modelManagementState.untrackDownloadRequest(model)
+            updateDownloadActivityState()
+            showUserMessage(
+                .info,
+                title: "Download Cancelled",
+                detail: modelManagementState.displayName(for: model)
+            )
+            return
+        }
+
         guard let task = modelManagementState.downloadTasks[model],
               modelManagementState.currentDownloadingModels.contains(model) else {
             return
@@ -1099,6 +1991,8 @@ class ContentViewModel: ObservableObject {
         // 1. 즉시 취소 중 상태로 변경
         modelManagementState.cancellingModels.insert(model)
         modelManagementState.currentDownloadingModels.remove(model)
+        modelManagementState.untrackDownloadRequest(model)
+        updateDownloadActivityState()
 
         // 2. NSProgress 직접 취소 (다운로드 즉시 중단)
         if let progress = modelManagementState.downloadProgressObjects[model] {
@@ -1110,8 +2004,9 @@ class ContentViewModel: ObservableObject {
         task.cancel()
 
         // 3. Progress 콜백이 완전히 멈출 때까지 모니터링 시작
-        Task {
-            await monitorProgressCompletion(model: model)
+        downloadCancellationMonitorTasks[model]?.cancel()
+        downloadCancellationMonitorTasks[model] = Task { [weak self] in
+            await self?.monitorProgressCompletion(model: model)
         }
 
         print(
@@ -1159,9 +2054,11 @@ class ContentViewModel: ObservableObject {
             do {
                 try await Task.sleep(nanoseconds: UInt64(checkInterval * 1_000_000_000))
             } catch {
-                break
+                return
             }
         }
+
+        guard !Task.isCancelled else { return }
 
         // 최종 정리 (마지막 콜백 완료 후)
         await finalizeProgressCompletion(model: model)
@@ -1174,17 +2071,18 @@ class ContentViewModel: ObservableObject {
             self.modelManagementState.cancellingModels.remove(model)
             self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
             self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+            self.modelManagementState.currentDownloadingModels.remove(model)
 
             // 다운로드 관련 상태 정리
             self.modelManagementState.downloadProgress[model] = nil
             self.modelManagementState.downloadTasks[model] = nil
+            self.modelManagementState.untrackDownloadRequest(model)
+            self.downloadCancellationMonitorTasks.removeValue(forKey: model)
 
             // 모든 다운로드가 완료되었는지 확인
-            if self.modelManagementState.currentDownloadingModels.isEmpty {
-                self.modelManagementState.isDownloading = false
-            }
-
             print("Progress completion confirmed - Cancelling UI released: \(model)")
+            self.startNextQueuedDownloadIfPossible()
+            self.updateDownloadActivityState()
         }
 
         // 부분 다운로드 파일 정리
@@ -1202,41 +2100,119 @@ class ContentViewModel: ObservableObject {
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
         case let .success(urls):
+            guard !urls.isEmpty else { return }
+            if urls.count > 1 {
+                setBatchQueue(urls, needsSecurityScopedAccess: true)
+            }
+
             guard let selectedFileURL = urls.first else { return }
-            if selectedFileURL.startAccessingSecurityScopedResource() {
-                // 비동기 처리를 위한 Task 생성
-                Task {
-                    await processSelectedFile(selectedFileURL)
+            Task {
+                if urls.count > 1 {
+                    await loadBatchItem(at: 0)
+                } else {
+                    clearBatchQueue()
+                    await processSelectedFile(
+                        selectedFileURL,
+                        needsSecurityScopedAccess: true
+                    )
                 }
             }
         case let .failure(error):
             print("File selection error: \(error.localizedDescription)")
+            showUserMessage(.error, title: "Import Failed", detail: error.localizedDescription)
+        }
+    }
+
+    func setBatchQueue(_ urls: [URL], needsSecurityScopedAccess: Bool) {
+        batchQueue = urls.map { url in
+            BatchImportItem(
+                url: url,
+                displayName: url.deletingPathExtension().lastPathComponent,
+                needsSecurityScopedAccess: needsSecurityScopedAccess
+            )
+        }
+        currentBatchIndex = batchQueue.isEmpty ? nil : 0
+        showUserMessage(
+            .success,
+            title: "Batch Queue Ready",
+            detail: "\(batchQueue.count) files added."
+        )
+    }
+
+    func clearBatchQueue() {
+        batchQueue = []
+        currentBatchIndex = nil
+    }
+
+    func loadBatchItem(at index: Int) async {
+        guard batchQueue.indices.contains(index) else { return }
+        currentBatchIndex = index
+        let item = batchQueue[index]
+        await processSelectedFile(
+            item.url,
+            needsSecurityScopedAccess: item.needsSecurityScopedAccess
+        )
+    }
+
+    func loadNextBatchItem() {
+        guard let currentBatchIndex,
+              batchQueue.indices.contains(currentBatchIndex + 1) else {
+            showUserMessage(.info, title: "End of Batch")
+            return
+        }
+
+        Task {
+            await loadBatchItem(at: currentBatchIndex + 1)
+        }
+    }
+
+    func loadPreviousBatchItem() {
+        guard let currentBatchIndex,
+              batchQueue.indices.contains(currentBatchIndex - 1) else {
+            showUserMessage(.info, title: "Start of Batch")
+            return
+        }
+
+        Task {
+            await loadBatchItem(at: currentBatchIndex - 1)
+        }
+    }
+
+    func removeBatchItem(at index: Int) {
+        guard batchQueue.indices.contains(index) else { return }
+        batchQueue.remove(at: index)
+
+        if batchQueue.isEmpty {
+            currentBatchIndex = nil
+        } else if let currentBatchIndex {
+            self.currentBatchIndex = min(currentBatchIndex, batchQueue.count - 1)
         }
     }
 
     /// 선택된 파일 처리 (비동기 작업)
     @MainActor
-    private func processSelectedFile(_ selectedFileURL: URL) async {
+    private func processSelectedFile(
+        _ selectedFileURL: URL,
+        needsSecurityScopedAccess: Bool
+    ) async {
         do {
-            // 기존 오디오 플레이어 및 임시 파일 정리
-            cleanupPreviousAudioFile()
-            stopImportedAudio()
-            audioPlayer = nil
+            let importedAudio = try await Self.prepareAudioImport(
+                from: selectedFileURL,
+                needsSecurityScopedAccess: needsSecurityScopedAccess
+            )
 
-            let audioFileData = try Data(contentsOf: selectedFileURL)
-            let uniqueFileName = UUID().uuidString + "." + selectedFileURL.pathExtension
-            let tempDirectoryURL = FileManager.default.temporaryDirectory
-            let localFileURL = tempDirectoryURL.appendingPathComponent(uniqueFileName)
-            try audioFileData.write(to: localFileURL)
-            print("File saved to temporary directory: \(localFileURL)")
+            resetState()
 
             // 임시 파일 URL 저장 (나중에 정리용)
-            audioState.temporaryAudioURL = localFileURL
-            audioState.audioFileName = selectedFileURL.deletingPathExtension().lastPathComponent
+            audioState.temporaryAudioURL = importedAudio.localURL
+            audioState.audioFileName = importedAudio.displayName
+            audioState.waveformSamples = []
+            audioState.isWaveformProcessing = true
+            normalizedVolumeFactor = 1.0
 
             // 파일을 임포트한 후 바로 총 재생 시간을 확인하고 업데이트
             do {
-                let audioAsset = AVURLAsset(url: selectedFileURL)
+                let audioAsset = AVURLAsset(url: importedAudio.localURL)
                 let duration = try await audioAsset.load(.duration)
                 let durationInSeconds = CMTimeGetSeconds(duration)
 
@@ -1246,12 +2222,10 @@ class ContentViewModel: ObservableObject {
                 print("Audio file duration: \(durationInSeconds) seconds")
 
                 // 미리 AVAudioPlayer 생성하여 정보 준비
-                let player = try AVAudioPlayer(contentsOf: selectedFileURL)
+                let player = try AVAudioPlayer(contentsOf: importedAudio.localURL)
                 audioPlayer = player
                 audioPlayer?.prepareToPlay() // 버퍼링 미리 수행
-
-                // 오디오 파일 분석 - 평균 음량 및 피크값 확인 및 노멀라이제이션 계수 계산
-                calculateNormalizationFactor(player)
+                applyVolume()
 
                 // 정확한 재생 시간 재확인
                 if audioState.totalDuration == 0 {
@@ -1262,84 +2236,87 @@ class ContentViewModel: ObservableObject {
             }
 
             // 파일 URL 저장
-            audioState.importedAudioURL = selectedFileURL
+            audioState.importedAudioURL = importedAudio.localURL
 
-            // 파일 임포트 후 백그라운드에서 파형 생성
-            await processWaveform()
+            if let sidecar = importedAudio.sidecar {
+                restoreTranscriptionSidecar(sidecar, sourceURL: importedAudio.sidecarURL)
+                let sidecarName = importedAudio.sidecarURL?.lastPathComponent ?? "sidecar"
+                showUserMessage(
+                    .success,
+                    title: "Saved Subtitles Restored",
+                    detail: "\(sidecar.segments.count) segment(s) restored from \(sidecarName). " +
+                        "Review or transcribe again if the audio changed.",
+                    autoDismissAfter: 6.0
+                )
+            } else if let sidecarRestoreError = importedAudio.sidecarRestoreError {
+                showUserMessage(
+                    .warning,
+                    title: "Sidecar Restore Failed",
+                    detail: sidecarRestoreError
+                )
+            } else {
+                showUserMessage(
+                    .success,
+                    title: "Audio Ready",
+                    detail: "\(importedAudio.displayName) is ready to transcribe."
+                )
+            }
+
+            updateNormalizationFactor(for: importedAudio.localURL)
+            startWaveformProcessing(for: importedAudio.localURL)
         } catch {
             print("File selection error: \(error.localizedDescription)")
+            showUserMessage(.error, title: "Import Failed", detail: error.localizedDescription)
         }
     }
 
-    // 오디오 레벨 분석 및 노멀라이제이션 계수 계산 함수
-    private func calculateNormalizationFactor(_ player: AVAudioPlayer) {
-        // 오디오 미터링 활성화
-        player.isMeteringEnabled = true
+    private func updateNormalizationFactor(for audioURL: URL) {
+        normalizationTask?.cancel()
+        let taskID = UUID()
+        normalizationTaskID = taskID
+        normalizationTask = Task { [weak self] in
+            let calculationTask = Task.detached(priority: .utility) {
+                Self.normalizationFactor(for: audioURL)
+            }
+            let normalizationFactor = await withTaskCancellationHandler(operation: {
+                await calculationTask.value
+            }, onCancel: {
+                calculationTask.cancel()
+            })
 
-        // 전체 파일을 여러 구간으로 나누어 샘플링
-        let sampleCount = 50
-        var totalLevel: Float = 0
-        var peakLevel: Float = -160 // 초기값 (dB 단위)
+            guard let self,
+                  !Task.isCancelled,
+                  self.normalizationTaskID == taskID,
+                  self.audioState.importedAudioURL == audioURL else { return }
 
-        // 오디오 길이 기반 간격 계산
-        let duration = player.duration
-        let interval = duration / Double(sampleCount)
-
-        // 전체 오디오 구간 분석 (무음 재생)
-        player.volume = 0 // 소리 없이 분석
-        player.play()
-
-        for i in 0 ..< sampleCount {
-            // 특정 지점으로 이동
-            player.currentTime = Double(i) * interval
-
-            // 약간 대기하여 미터가 업데이트되도록 함
-            Thread.sleep(forTimeInterval: 0.01)
-
-            // 미터 업데이트
-            player.updateMeters()
-
-            // 평균 및 피크 레벨 (dB 단위) 측정
-            let avgPower = player.averagePower(forChannel: 0)
-            let peakPower = player.peakPower(forChannel: 0)
-
-            totalLevel += avgPower
-            peakLevel = max(peakLevel, peakPower)
+            self.normalizedVolumeFactor = normalizationFactor
+            self.applyVolume()
+            self.clearNormalizationTaskIfCurrent(taskID)
         }
+    }
 
-        // 분석 후 정지
-        player.stop()
-        player.currentTime = 0
-
-        // 평균 레벨 계산 (dB 단위)
-        let avgLevel = totalLevel / Float(sampleCount)
-
-        // dB 값을 LUFS로 변환 (대략적인 추정)
-        let estimatedLUFS = avgLevel + 10
-
-        // 타겟 LUFS (-14 LUFS)
-        let targetLUFS: Float = -14.0
-
-        // 정규화 계산 (LUFS 기준)
-        let gainNeeded = targetLUFS - estimatedLUFS
-
-        // 감쇠만 적용
-        // 오디오가 타겟보다 클 경우만 줄이고, 작을 경우는 그대로 둠
-        if gainNeeded < 0 {
-            // dB를 선형 스케일로 변환 (감쇠 적용)
-            normalizedVolumeFactor = pow(10.0, gainNeeded / 20.0)
-        } else {
-            // 타겟보다 작으므로 그대로 유지
-            normalizedVolumeFactor = 1.0
+    private func startWaveformProcessing(for url: URL) {
+        waveformProcessingTask?.cancel()
+        let taskID = UUID()
+        waveformProcessingTaskID = taskID
+        waveformProcessingTask = Task { [weak self] in
+            await self?.processWaveform(for: url)
+            await MainActor.run { [weak self] in
+                self?.clearWaveformProcessingTaskIfCurrent(taskID)
+            }
         }
+    }
 
-        print(
-            "Audio analysis - Average level: \(avgLevel) dB, Estimated LUFS: \(estimatedLUFS), Peak: \(peakLevel) dB"
-        )
-        print("Normalization factor: \(normalizedVolumeFactor)")
+    private func clearWaveformProcessingTaskIfCurrent(_ taskID: UUID) {
+        guard waveformProcessingTaskID == taskID else { return }
+        waveformProcessingTask = nil
+        waveformProcessingTaskID = nil
+    }
 
-        // 초기 볼륨 적용
-        applyVolume()
+    private func clearNormalizationTaskIfCurrent(_ taskID: UUID) {
+        guard normalizationTaskID == taskID else { return }
+        normalizationTask = nil
+        normalizationTaskID = nil
     }
 
     /// 볼륨 적용 함수
@@ -1358,17 +2335,35 @@ class ContentViewModel: ObservableObject {
 
     /// 파일 전사 시작
     func transcribeFile(path: String) {
-        resetState()
+        resetState(preservingImportedAudio: true)
         stopImportedAudio()
         whisperKit?.audioProcessor = AudioProcessor()
-        uiState.transcribeTask = Task {
-            audioState.isTranscribing = true
+        let taskID = UUID()
+        activeTranscribeTaskID = taskID
+        uiState.transcribeTask = Task { [weak self] in
+            guard let self else { return }
+            self.audioState.isTranscribing = true
+            self.showUserMessage(.info, title: "Transcribing", detail: self.audioState.audioFileName)
+            defer {
+                self.audioState.isTranscribing = false
+                if self.activeTranscribeTaskID == taskID {
+                    self.uiState.transcribeTask = nil
+                    self.activeTranscribeTaskID = nil
+                }
+            }
+
             do {
-                try await transcribeCurrentFile(path: path)
+                try await self.transcribeCurrentFile(path: path)
+            } catch is CancellationError {
+                self.showUserMessage(.info, title: "Transcription Cancelled")
             } catch {
                 print("Transcription error: \(error.localizedDescription)")
+                self.showUserMessage(
+                    .error,
+                    title: "Transcription Failed",
+                    detail: error.localizedDescription
+                )
             }
-            audioState.isTranscribing = false
         }
     }
 
@@ -1376,7 +2371,7 @@ class ContentViewModel: ObservableObject {
     func transcribeCurrentFile(path: String) async throws {
         Logging.debug("Loading audio file: \(path)")
         let loadingStart = Date()
-        let audioFileSamples = try await Task {
+        let audioFileSamples = try await Task.detached(priority: .userInitiated) {
             try autoreleasepool {
                 try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
             }
@@ -1400,7 +2395,948 @@ class ContentViewModel: ObservableObject {
             transcriptionState.pipelineStart = transcription?.timings.pipelineStart ?? 0
             transcriptionState.currentLag = transcription?.timings.decodingLoop ?? 0
             transcriptionState.confirmedSegments = segments
+            transcriptionState.speakerAssignments = Array(repeating: nil, count: segments.count)
+            transcriptionState.speakerNames = [:]
+            transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            refreshSubtitleQualityIssues()
+            showUserMessage(
+                .success,
+                title: "Transcription Complete",
+                detail: "\(segments.count) segments are ready to edit and export."
+            )
+            audioState.isTranscribing = false
         }
+
+        try Task.checkCancellation()
+        await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)
+    }
+
+    private func runSpeakerDiarizationIfEnabled(audioSamples: [Float]) async {
+        guard enableSpeakerDiarization,
+              !transcriptionState.confirmedSegments.isEmpty else {
+            return
+        }
+
+        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
+            transcriptionState.speakerDiarization = SpeakerDiarizationState(
+                errorMessage: "Document directory not found."
+            )
+            showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: "Document directory not found.")
+            return
+        }
+
+        refreshSpeakerDiarizationModelState()
+        guard modelManagementState.isSpeakerDiarizationModelReady else {
+            let detail = modelManagementState.isSpeakerDiarizationModelPreparing
+                ? "Speaker model is still preparing."
+                : (modelManagementState.speakerDiarizationModelError ?? "Speaker model is not ready.")
+            transcriptionState.speakerDiarization = SpeakerDiarizationState(errorMessage: detail)
+            showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: detail)
+            return
+        }
+
+        transcriptionState.speakerDiarization = SpeakerDiarizationState(isRunning: true)
+        showUserMessage(.info, title: "Analyzing Speakers", detail: audioState.audioFileName)
+
+        let service = SpeakerDiarizationService(modelRootURL: modelRoot)
+        let expectedSpeakerCount = speakerDiarizationExpectedSpeakerCount()
+        do {
+            let timelineSegments = try await service.diarize(
+                audioSamples: audioSamples,
+                expectedSpeakerCount: expectedSpeakerCount
+            ) { [weak self] progress in
+                let progressValue = progress.fractionCompleted.isFinite ? progress.fractionCompleted : 0
+                Task { @MainActor [weak self] in
+                    guard let self,
+                          self.transcriptionState.speakerDiarization.isRunning else {
+                        return
+                    }
+                    self.transcriptionState.speakerDiarization.progress = min(max(progressValue, 0), 1)
+                }
+            }
+            try Task.checkCancellation()
+
+            let assignments = SpeakerAssignmentMapper.assignments(
+                for: transcriptionState.confirmedSegments,
+                from: timelineSegments
+            )
+            let speakerCount = Set(timelineSegments.map(\.speakerID)).count
+            transcriptionState.speakerAssignments = assignments
+            transcriptionState.speakerDiarization = SpeakerDiarizationState(
+                isRunning: false,
+                progress: 1,
+                detectedSpeakerCount: speakerCount,
+                errorMessage: speakerCount == 0 ? "No speakers detected." : nil
+            )
+
+            let assignedCount = assignments.compactMap { $0 }.count
+            showUserMessage(
+                speakerCount > 0 ? .success : .warning,
+                title: speakerCount > 0 ? "Speakers Ready" : "No Speakers Detected",
+                detail: speakerCount > 0
+                    ? "\(speakerCount) speaker(s), \(assignedCount) labeled segment(s)."
+                    : nil
+            )
+        } catch is CancellationError {
+            transcriptionState.speakerDiarization.isRunning = false
+        } catch {
+            transcriptionState.speakerDiarization = SpeakerDiarizationState(
+                errorMessage: error.localizedDescription
+            )
+            showUserMessage(
+                .warning,
+                title: "Speaker Analysis Failed",
+                detail: error.localizedDescription
+            )
+        }
+    }
+
+    func updateTranscriptionSegmentText(at index: Int, text: String) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        transcriptionState.confirmedSegments[index].text = text
+        transcriptionState.confirmedSegments[index].words = nil
+
+        guard let result = transcriptionResult,
+              result.segments.indices.contains(index) else { return }
+
+        result.segments[index].text = text
+        result.segments[index].words = nil
+        refreshSubtitleQualityIssues()
+    }
+
+    @discardableResult
+    func refreshSubtitleQualityIssues() -> [SubtitleQualityIssue] {
+        var issues = SubtitleQualityChecker.check(segments: transcriptionState.confirmedSegments)
+        issues.append(contentsOf: speakerLabelReviewIssues())
+        uiState.subtitleQualityIssues = issues
+        return issues
+    }
+
+    private func speakerLabelReviewIssues() -> [SubtitleQualityIssue] {
+        guard enableSpeakerDiarization,
+              includeSpeakerLabelsInExport,
+              !transcriptionState.confirmedSegments.isEmpty,
+              !availableSpeakerIDs().isEmpty else {
+            return []
+        }
+
+        var issues: [SubtitleQualityIssue] = []
+        var defaultNameSpeakerIDs: Set<Int> = []
+
+        for index in transcriptionState.confirmedSegments.indices {
+            let segment = transcriptionState.confirmedSegments[index]
+            let trimmedText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else { continue }
+
+            guard let assignment = speakerAssignment(forSegmentAt: index) else {
+                issues.append(.init(
+                    segmentIndex: index,
+                    severity: .warning,
+                    kind: .missingSpeaker,
+                    message: "Missing speaker label",
+                    suggestion: "Assign a speaker or turn off speaker labels before export."
+                ))
+                continue
+            }
+
+            let customName = speakerName(for: assignment.speakerID)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if customName.isEmpty,
+               !defaultNameSpeakerIDs.contains(assignment.speakerID) {
+                defaultNameSpeakerIDs.insert(assignment.speakerID)
+                issues.append(.init(
+                    segmentIndex: index,
+                    severity: .info,
+                    kind: .defaultSpeakerName,
+                    message: "\(defaultSpeakerName(for: assignment.speakerID)) uses a default name",
+                    suggestion: "Rename this speaker if the exported file needs real names."
+                ))
+            }
+        }
+
+        return issues
+    }
+
+    func qualityIssues(forSegmentAt index: Int) -> [SubtitleQualityIssue] {
+        uiState.subtitleQualityIssues.filter { $0.segmentIndex == index }
+    }
+
+    func speakerAssignment(forSegmentAt index: Int) -> SpeakerSegmentAssignment? {
+        guard transcriptionState.speakerAssignments.indices.contains(index) else { return nil }
+        return transcriptionState.speakerAssignments[index]
+    }
+
+    func speakerDiarizationExpectedSpeakerCount() -> Int? {
+        let clampedCount = min(max(speakerDiarizationSpeakerCount, 0), 8)
+        return clampedCount > 0 ? clampedCount : nil
+    }
+
+    func speakerCountOptionTitle(for count: Int) -> String {
+        count == 0 ? "Auto" : "\(count)"
+    }
+
+    func speakerCountOptionTitleKey(for count: Int) -> LocalizedStringKey {
+        guard count == 0 else { return LocalizedStringKey(String(count)) }
+        return "Auto"
+    }
+
+    func availableSpeakerIDs() -> [Int] {
+        let detectedIDs = Array(0 ..< transcriptionState.speakerDiarization.detectedSpeakerCount)
+        let configuredIDs = Array(0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0))
+        let assignedIDs = transcriptionState.speakerAssignments.compactMap { $0?.speakerID }
+        return Array(Set(detectedIDs + configuredIDs + assignedIDs)).sorted()
+    }
+
+    func defaultSpeakerName(for speakerID: Int) -> String {
+        "Speaker \(speakerID + 1)"
+    }
+
+    func speakerName(for speakerID: Int) -> String {
+        transcriptionState.speakerNames[speakerID] ?? ""
+    }
+
+    func speakerDisplayName(for speakerID: Int) -> String {
+        let customName = transcriptionState.speakerNames[speakerID]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return (customName?.isEmpty == false ? customName : nil) ??
+            defaultSpeakerName(for: speakerID)
+    }
+
+    func speakerDisplayName(for assignment: SpeakerSegmentAssignment?) -> String? {
+        assignment.map { speakerDisplayName(for: $0.speakerID) }
+    }
+
+    func restoreTranscriptionSidecar(
+        _ sidecar: CaptionMateSidecar,
+        sourceURL _: URL? = nil
+    ) {
+        let restoredSegments = sidecar.segments.map { segment in
+            TranscriptionSegment(
+                start: segment.start,
+                end: segment.end,
+                text: segment.text
+            )
+        }
+        let language = sidecar.language.isEmpty ? selectedLanguage : sidecar.language
+
+        transcriptionResult = TranscriptionResult(
+            text: restoredSegments.map(\.text).joined(separator: " "),
+            segments: restoredSegments,
+            language: language,
+            timings: TranscriptionTimings()
+        )
+        transcriptionState.currentText = ""
+        transcriptionState.confirmedSegments = restoredSegments
+        transcriptionState.speakerAssignments = sidecar.segments.map { segment in
+            segment.speakerID.map(SpeakerSegmentAssignment.init)
+        }
+        transcriptionState.speakerNames = Dictionary(
+            uniqueKeysWithValues: sidecar.speakerNames.compactMap { key, value in
+                guard let speakerID = Int(key) else { return nil }
+                return (speakerID, value)
+            }
+        )
+
+        let preset = SubtitleExportPreset(rawValue: sidecar.exportSettings.selectedExportPreset)
+        if let preset {
+            selectedExportPreset = preset
+        }
+        frameRate = sidecar.exportSettings.frameRate
+        includeSpeakerLabelsInExport = sidecar.exportSettings.includeSpeakerLabelsInExport
+
+        let restoredSpeakerCount = min(max(sidecar.exportSettings.speakerDiarizationSpeakerCount, 0), 8)
+        speakerDiarizationSpeakerCount = restoredSpeakerCount
+        let restoredSpeakerIDs = Set(
+            transcriptionState.speakerAssignments.compactMap { $0?.speakerID } +
+                Array(transcriptionState.speakerNames.keys)
+        )
+        let detectedCount = max(restoredSpeakerCount, (restoredSpeakerIDs.max() ?? -1) + 1)
+        transcriptionState.speakerDiarization = SpeakerDiarizationState(
+            detectedSpeakerCount: detectedCount
+        )
+        if detectedCount > 0 {
+            enableSpeakerDiarization = true
+        }
+
+        uiState.isTranscribingView = !restoredSegments.isEmpty
+        refreshSubtitleQualityIssues()
+    }
+
+    func setSpeakerName(_ name: String, for speakerID: Int) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedName.isEmpty {
+            transcriptionState.speakerNames.removeValue(forKey: speakerID)
+        } else {
+            transcriptionState.speakerNames[speakerID] = trimmedName
+        }
+        refreshSubtitleQualityIssues()
+    }
+
+    func setSpeakerAssignment(at index: Int, speakerID: Int?) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+        normalizeSpeakerAssignmentCount()
+        transcriptionState.speakerAssignments[index] = speakerID.map(SpeakerSegmentAssignment.init)
+        refreshSubtitleQualityIssues()
+    }
+
+    func setSpeakerDiarizationEnabled(_ enabled: Bool) {
+        enableSpeakerDiarization = enabled
+        if enabled {
+            prepareDefaultSpeakerDiarizationModelIfNeeded()
+        } else {
+            cancelActiveSpeakerDiarizationTask()
+            transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            transcriptionState.speakerAssignments = Array(
+                repeating: nil,
+                count: transcriptionState.confirmedSegments.count
+            )
+            transcriptionState.speakerNames = [:]
+        }
+        refreshSubtitleQualityIssues()
+    }
+
+    func reanalyzeSpeakersForCurrentAudio() {
+        guard !transcriptionState.confirmedSegments.isEmpty else {
+            showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: "No subtitles are ready.")
+            return
+        }
+
+        guard let audioURL = audioState.importedAudioURL else {
+            showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: "No imported audio file.")
+            return
+        }
+
+        guard !transcriptionState.speakerDiarization.isRunning else { return }
+
+        enableSpeakerDiarization = true
+        prepareDefaultSpeakerDiarizationModelIfNeeded()
+
+        let taskID = UUID()
+        activeSpeakerDiarizationTaskID = taskID
+        speakerDiarizationTask?.cancel()
+        speakerDiarizationTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if self.activeSpeakerDiarizationTaskID == taskID {
+                    self.speakerDiarizationTask = nil
+                    self.activeSpeakerDiarizationTaskID = nil
+                }
+            }
+
+            do {
+                let audioSamples = try await Task.detached(priority: .userInitiated) {
+                    try autoreleasepool {
+                        try AudioProcessor.loadAudioAsFloatArray(fromPath: audioURL.path)
+                    }
+                }.value
+                try Task.checkCancellation()
+                await self.runSpeakerDiarizationIfEnabled(audioSamples: audioSamples)
+            } catch is CancellationError {
+                self.transcriptionState.speakerDiarization.isRunning = false
+            } catch {
+                self.transcriptionState.speakerDiarization = SpeakerDiarizationState(
+                    errorMessage: error.localizedDescription
+                )
+                self.showUserMessage(
+                    .warning,
+                    title: "Speaker Analysis Failed",
+                    detail: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    func subtitleSearchMatchCount() -> Int {
+        let query = uiState.subtitleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return 0 }
+
+        return transcriptionState.confirmedSegments.reduce(0) { count, segment in
+            segment.text.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) == nil
+                ? count
+                : count + 1
+        }
+    }
+
+    func focusNextSubtitleSearchMatch() {
+        let query = uiState.subtitleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty,
+              !transcriptionState.confirmedSegments.isEmpty else {
+            showUserMessage(.warning, title: "Search Unavailable")
+            return
+        }
+
+        let startIndex = (uiState.focusedSubtitleSegmentIndex ?? -1) + 1
+        let orderedIndices = Array(transcriptionState.confirmedSegments.indices[startIndex...]) +
+            Array(transcriptionState.confirmedSegments.indices[..<min(
+                startIndex,
+                transcriptionState.confirmedSegments.count
+            )])
+
+        guard let matchIndex = orderedIndices.first(where: { index in
+            transcriptionState.confirmedSegments[index].text.range(
+                of: query,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil
+        }) else {
+            showUserMessage(.info, title: "No Matches")
+            return
+        }
+
+        uiState.focusedSubtitleSegmentIndex = matchIndex
+    }
+
+    func replaceNextSubtitleMatch() {
+        let query = uiState.subtitleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            showUserMessage(.warning, title: "Search Text Required")
+            return
+        }
+
+        let startIndex = uiState.focusedSubtitleSegmentIndex ?? 0
+        let orderedIndices = Array(transcriptionState.confirmedSegments.indices[startIndex...]) +
+            Array(transcriptionState.confirmedSegments.indices[..<startIndex])
+
+        guard let matchIndex = orderedIndices.first(where: { index in
+            transcriptionState.confirmedSegments[index].text.range(
+                of: query,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            ) != nil
+        }) else {
+            showUserMessage(.info, title: "No Matches")
+            return
+        }
+
+        guard let updatedText = Self.replacingFirstMatch(
+            in: transcriptionState.confirmedSegments[matchIndex].text,
+            searchText: query,
+            replacementText: uiState.subtitleReplaceText
+        ) else { return }
+
+        updateTranscriptionSegmentText(at: matchIndex, text: updatedText)
+        uiState.focusedSubtitleSegmentIndex = matchIndex
+    }
+
+    func replaceAllSubtitleMatches() {
+        let query = uiState.subtitleSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            showUserMessage(.warning, title: "Search Text Required")
+            return
+        }
+
+        var segments = transcriptionState.confirmedSegments
+        var replacementCount = 0
+        for index in segments.indices {
+            let originalText = segments[index].text
+            let updatedText = originalText.replacingOccurrences(
+                of: query,
+                with: uiState.subtitleReplaceText,
+                options: [.caseInsensitive, .diacriticInsensitive]
+            )
+            guard updatedText != originalText else { continue }
+
+            segments[index].text = updatedText
+            segments[index].words = nil
+            replacementCount += 1
+        }
+
+        if replacementCount > 0 {
+            replaceTranscriptionSegments(segments)
+        }
+
+        showUserMessage(
+            replacementCount > 0 ? .success : .info,
+            title: replacementCount > 0 ? "Replace Complete" : "No Matches",
+            detail: replacementCount > 0 ? "\(replacementCount) segment(s) updated." : nil
+        )
+    }
+
+    func focusSubtitleIssue(_ issue: SubtitleQualityIssue) {
+        uiState.showSubtitleReview = false
+        uiState.focusedSubtitleSegmentIndex = issue.segmentIndex
+    }
+
+    func applySubtitleReviewQuickFixes() {
+        let fixedCount = applySubtitleQualityQuickFixes()
+        if fixedCount > 0 {
+            showUserMessage(
+                .success,
+                title: "Subtitle Fixes Applied",
+                detail: "\(fixedCount) quick fix(es) applied. Review the remaining issues before export."
+            )
+        } else {
+            showUserMessage(
+                .info,
+                title: "No Quick Fixes Available",
+                detail: "Open the listed segment to adjust it manually."
+            )
+        }
+    }
+
+    @discardableResult
+    func applySubtitleQualityQuickFixes() -> Int {
+        refreshSubtitleQualityIssues()
+        guard !transcriptionState.confirmedSegments.isEmpty else { return 0 }
+
+        var segments = transcriptionState.confirmedSegments
+        var assignments = Self.normalizedSpeakerAssignments(
+            transcriptionState.speakerAssignments,
+            count: segments.count
+        )
+        var fixedCount = 0
+
+        fixedCount += Self.trimAndRemoveEmptySegments(
+            segments: &segments,
+            assignments: &assignments
+        )
+        fixedCount += Self.normalizeSubtitleTimings(segments: &segments)
+        fixedCount += Self.splitReadableLongSegments(
+            segments: &segments,
+            assignments: &assignments
+        )
+        fixedCount += fillMissingSpeakerAssignments(assignments: &assignments)
+
+        guard fixedCount > 0 else {
+            refreshSubtitleQualityIssues()
+            return 0
+        }
+
+        transcriptionState.confirmedSegments = segments
+        transcriptionState.speakerAssignments = Self.normalizedSpeakerAssignments(
+            assignments,
+            count: segments.count
+        )
+        transcriptionResult?.segments = segments
+        transcriptionResult?.text = segments.map(\.text).joined(separator: " ")
+        refreshSubtitleQualityIssues()
+        return fixedCount
+    }
+
+    private static func trimAndRemoveEmptySegments(
+        segments: inout [TranscriptionSegment],
+        assignments: inout [SpeakerSegmentAssignment?]
+    ) -> Int {
+        var fixedCount = 0
+        var keptSegments: [TranscriptionSegment] = []
+        var keptAssignments: [SpeakerSegmentAssignment?] = []
+        keptSegments.reserveCapacity(segments.count)
+        keptAssignments.reserveCapacity(assignments.count)
+
+        for index in segments.indices {
+            var segment = segments[index]
+            let trimmedText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmedText != segment.text {
+                segment.text = trimmedText
+                segment.words = nil
+                fixedCount += 1
+            }
+
+            if trimmedText.isEmpty {
+                fixedCount += 1
+                continue
+            }
+
+            keptSegments.append(segment)
+            keptAssignments.append(assignments.indices.contains(index) ? assignments[index] : nil)
+        }
+
+        segments = keptSegments
+        assignments = keptAssignments
+        return fixedCount
+    }
+
+    private static func normalizeSubtitleTimings(segments: inout [TranscriptionSegment]) -> Int {
+        guard !segments.isEmpty else { return 0 }
+
+        var fixedCount = 0
+        for index in segments.indices {
+            var segment = segments[index]
+            if segment.end <= segment.start {
+                let targetEnd = segment.start + SubtitleQualityChecker.minDuration
+                if index < segments.index(before: segments.endIndex),
+                   segments[index + 1].start > segment.start {
+                    segment.end = min(targetEnd, segments[index + 1].start)
+                } else {
+                    segment.end = targetEnd
+                }
+                segment.words = nil
+                fixedCount += 1
+            }
+
+            if index < segments.index(before: segments.endIndex),
+               segment.end > segments[index + 1].start,
+               segments[index + 1].start > segment.start {
+                segment.end = segments[index + 1].start
+                segment.words = nil
+                fixedCount += 1
+            }
+
+            segments[index] = segment
+        }
+
+        return fixedCount
+    }
+
+    private static func splitReadableLongSegments(
+        segments: inout [TranscriptionSegment],
+        assignments: inout [SpeakerSegmentAssignment?]
+    ) -> Int {
+        var fixedCount = 0
+        var index = segments.startIndex
+
+        while index < segments.endIndex {
+            let segment = segments[index]
+            let duration = segment.end - segment.start
+            let trimmedText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let readableCharacterCount = trimmedText.filter { !$0.isWhitespace }.count
+            let charactersPerSecond = duration > 0 ?
+                Float(readableCharacterCount) / duration : 0
+            let needsSplit = duration > SubtitleQualityChecker.maxDuration ||
+                trimmedText.count > SubtitleQualityChecker.maxTotalLength ||
+                trimmedText.split(whereSeparator: \.isNewline).contains {
+                    $0.count > SubtitleQualityChecker.maxLineLength
+                } ||
+                charactersPerSecond > SubtitleQualityChecker.maxCharactersPerSecond
+
+            guard needsSplit,
+                  duration >= SubtitleQualityChecker.minDuration * 2,
+                  let splitText = splitSubtitleText(trimmedText) else {
+                index += 1
+                continue
+            }
+
+            let midpoint = segment.start + duration / 2
+            let firstSegment = TranscriptionSegment(
+                start: segment.start,
+                end: midpoint,
+                text: splitText.first
+            )
+            let secondSegment = TranscriptionSegment(
+                start: midpoint,
+                end: segment.end,
+                text: splitText.second
+            )
+            let assignment = assignments.indices.contains(index) ? assignments[index] : nil
+
+            segments.replaceSubrange(index ... index, with: [firstSegment, secondSegment])
+            assignments.replaceSubrange(index ... index, with: [assignment, assignment])
+            fixedCount += 1
+            index += 2
+        }
+
+        return fixedCount
+    }
+
+    private func fillMissingSpeakerAssignments(
+        assignments: inout [SpeakerSegmentAssignment?]
+    ) -> Int {
+        guard enableSpeakerDiarization,
+              includeSpeakerLabelsInExport,
+              !assignments.isEmpty else {
+            return 0
+        }
+
+        let detectedIDs = Array(0 ..< transcriptionState.speakerDiarization.detectedSpeakerCount)
+        let configuredIDs = Array(0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0))
+        let namedIDs = Array(transcriptionState.speakerNames.keys)
+        let assignedIDs = assignments.compactMap { $0?.speakerID }
+        let availableIDs = Array(Set(detectedIDs + configuredIDs + namedIDs + assignedIDs)).sorted()
+        guard let fallbackID = availableIDs.first else { return 0 }
+
+        var fixedCount = 0
+        var previousAssignment: SpeakerSegmentAssignment?
+        for index in assignments.indices {
+            if let assignment = assignments[index] {
+                previousAssignment = assignment
+                continue
+            }
+
+            let nextAssignment = assignments[(index + 1)...].compactMap { $0 }.first
+            let replacement = previousAssignment ??
+                nextAssignment ??
+                SpeakerSegmentAssignment(speakerID: fallbackID)
+            assignments[index] = replacement
+            previousAssignment = replacement
+            fixedCount += 1
+        }
+
+        return fixedCount
+    }
+
+    func splitTranscriptionSegment(at index: Int) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+        let segment = transcriptionState.confirmedSegments[index]
+        let duration = segment.end - segment.start
+        guard duration > 0,
+              let splitText = Self.splitSubtitleText(segment.text) else {
+            showUserMessage(.warning, title: "Split Unavailable")
+            return
+        }
+
+        let midpoint = segment.start + duration / 2
+        let firstSegment = TranscriptionSegment(
+            start: segment.start,
+            end: midpoint,
+            text: splitText.first
+        )
+        let secondSegment = TranscriptionSegment(
+            start: midpoint,
+            end: segment.end,
+            text: splitText.second
+        )
+
+        var segments = transcriptionState.confirmedSegments
+        segments.replaceSubrange(index ... index, with: [firstSegment, secondSegment])
+        replaceTranscriptionSegments(segments)
+    }
+
+    func mergeTranscriptionSegment(at index: Int, withNext: Bool) {
+        let neighborIndex = withNext ? index + 1 : index - 1
+        guard transcriptionState.confirmedSegments.indices.contains(index),
+              transcriptionState.confirmedSegments.indices.contains(neighborIndex) else {
+            showUserMessage(.warning, title: "Merge Unavailable")
+            return
+        }
+
+        let firstIndex = min(index, neighborIndex)
+        let secondIndex = max(index, neighborIndex)
+        let first = transcriptionState.confirmedSegments[firstIndex]
+        let second = transcriptionState.confirmedSegments[secondIndex]
+        let mergedText = [first.text, second.text]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        let mergedSegment = TranscriptionSegment(
+            start: min(first.start, second.start),
+            end: max(first.end, second.end),
+            text: mergedText
+        )
+
+        var segments = transcriptionState.confirmedSegments
+        segments.replaceSubrange(firstIndex ... secondIndex, with: [mergedSegment])
+        replaceTranscriptionSegments(segments)
+    }
+
+    func nudgeTranscriptionSegment(at index: Int, by seconds: Float) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        var segment = segments[index]
+        let duration = max(0.1, segment.end - segment.start)
+        let lowerBound = index == 0 ? Float(0) : segments[index - 1].end
+        let upperBound = index < segments.count - 1 ?
+            max(lowerBound, segments[index + 1].start - duration) :
+            Float.greatestFiniteMagnitude
+        let newStart = min(max(segment.start + seconds, lowerBound), upperBound)
+
+        segment.start = newStart
+        segment.end = newStart + duration
+        segment.words = nil
+        segments[index] = segment
+        replaceTranscriptionSegments(segments)
+    }
+
+    func adjustTranscriptionSegmentStart(at index: Int, by seconds: Float) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        var segment = segments[index]
+        let lowerBound = index == 0 ? Float(0) : segments[index - 1].end
+        let upperBound = segment.end - 0.1
+        segment.start = min(max(segment.start + seconds, lowerBound), upperBound)
+        segment.words = nil
+        segments[index] = segment
+        replaceTranscriptionSegments(segments)
+    }
+
+    func adjustTranscriptionSegmentEnd(at index: Int, by seconds: Float) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        var segment = segments[index]
+        let lowerBound = segment.start + 0.1
+        let upperBound = index < segments.count - 1 ?
+            segments[index + 1].start :
+            Float.greatestFiniteMagnitude
+        segment.end = min(max(segment.end + seconds, lowerBound), upperBound)
+        segment.words = nil
+        segments[index] = segment
+        replaceTranscriptionSegments(segments)
+    }
+
+    func setTranscriptionSegmentStart(at index: Int, to seconds: Float) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        var segment = segments[index]
+        let lowerBound = index == 0 ? Float(0) : segments[index - 1].end
+        let upperBound = segment.end - 0.1
+        segment.start = min(max(seconds, lowerBound), upperBound)
+        segment.words = nil
+        segments[index] = segment
+        replaceTranscriptionSegments(segments)
+    }
+
+    func setTranscriptionSegmentEnd(at index: Int, to seconds: Float) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        var segment = segments[index]
+        let lowerBound = segment.start + 0.1
+        let upperBound = index < segments.count - 1 ?
+            segments[index + 1].start :
+            Float.greatestFiniteMagnitude
+        segment.end = min(max(seconds, lowerBound), upperBound)
+        segment.words = nil
+        segments[index] = segment
+        replaceTranscriptionSegments(segments)
+    }
+
+    func deleteTranscriptionSegment(at index: Int) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+
+        var segments = transcriptionState.confirmedSegments
+        segments.remove(at: index)
+        replaceTranscriptionSegments(segments)
+    }
+
+    private func replaceTranscriptionSegments(_ segments: [TranscriptionSegment]) {
+        let previousSegments = transcriptionState.confirmedSegments
+        let previousAssignments = transcriptionState.speakerAssignments
+        transcriptionState.confirmedSegments = segments
+        if previousAssignments.allSatisfy({ $0 == nil }) {
+            transcriptionState.speakerAssignments = Array(repeating: nil, count: segments.count)
+        } else if Self.segmentTimingsMatch(previousSegments, segments) {
+            transcriptionState.speakerAssignments = Self.normalizedSpeakerAssignments(
+                previousAssignments,
+                count: segments.count
+            )
+        } else {
+            transcriptionState.speakerAssignments = SpeakerAssignmentMapper.preservedAssignments(
+                for: segments,
+                from: previousSegments,
+                assignments: previousAssignments
+            )
+        }
+        transcriptionResult?.segments = segments
+        refreshSubtitleQualityIssues()
+    }
+
+    private func normalizeSpeakerAssignmentCount() {
+        let segmentCount = transcriptionState.confirmedSegments.count
+        if transcriptionState.speakerAssignments.count == segmentCount {
+            return
+        }
+
+        if transcriptionState.speakerAssignments.count > segmentCount {
+            transcriptionState.speakerAssignments = Array(
+                transcriptionState.speakerAssignments.prefix(segmentCount)
+            )
+        } else {
+            transcriptionState.speakerAssignments.append(
+                contentsOf: Array(
+                    repeating: nil,
+                    count: segmentCount - transcriptionState.speakerAssignments.count
+                )
+            )
+        }
+    }
+
+    private static func normalizedSpeakerAssignments(
+        _ assignments: [SpeakerSegmentAssignment?],
+        count: Int
+    ) -> [SpeakerSegmentAssignment?] {
+        if assignments.count >= count {
+            return Array(assignments.prefix(count))
+        }
+        return assignments + Array(repeating: nil, count: count - assignments.count)
+    }
+
+    private static func segmentTimingsMatch(
+        _ lhs: [TranscriptionSegment],
+        _ rhs: [TranscriptionSegment]
+    ) -> Bool {
+        guard lhs.count == rhs.count else { return false }
+        for index in lhs.indices where lhs[index].start != rhs[index].start || lhs[index].end != rhs[index].end {
+            return false
+        }
+        return true
+    }
+
+    private static func splitSubtitleText(_ text: String) -> (first: String, second: String)? {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedText.count > 1 else { return nil }
+
+        let midpointOffset = trimmedText.count / 2
+        let midpoint = trimmedText.index(trimmedText.startIndex, offsetBy: midpointOffset)
+
+        let splitIndex = trimmedText[midpoint...].firstIndex(where: \.isWhitespace) ??
+            trimmedText[..<midpoint].lastIndex(where: \.isWhitespace) ??
+            midpoint
+
+        let secondStart = trimmedText[splitIndex].isWhitespace ?
+            trimmedText.index(after: splitIndex) : splitIndex
+        let first = String(trimmedText[..<splitIndex])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let second = String(trimmedText[secondStart...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !first.isEmpty, !second.isEmpty else { return nil }
+        return (first, second)
+    }
+
+    private static func replacingFirstMatch(
+        in text: String,
+        searchText: String,
+        replacementText: String
+    ) -> String? {
+        guard let range = text.range(
+            of: searchText,
+            options: [.caseInsensitive, .diacriticInsensitive]
+        ) else { return nil }
+
+        var updatedText = text
+        updatedText.replaceSubrange(range, with: replacementText)
+        return updatedText
+    }
+
+    static func wrappedSubtitleText(
+        _ text: String,
+        maxLineLength: Int,
+        maxLines: Int
+    ) -> String {
+        let words = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .split(whereSeparator: \.isWhitespace)
+            .map(String.init)
+        guard !words.isEmpty else { return "" }
+
+        var lines: [String] = []
+        var currentLine = ""
+
+        for word in words {
+            if currentLine.isEmpty {
+                currentLine = word
+            } else if currentLine.count + 1 + word.count <= maxLineLength {
+                currentLine += " \(word)"
+            } else {
+                lines.append(currentLine)
+                currentLine = word
+            }
+        }
+
+        if !currentLine.isEmpty {
+            lines.append(currentLine)
+        }
+
+        guard lines.count > maxLines, maxLines > 0 else {
+            return lines.joined(separator: "\n")
+        }
+
+        let visibleLines = Array(lines.prefix(maxLines - 1))
+        let remainingText = lines.dropFirst(maxLines - 1).joined(separator: " ")
+        return (visibleLines + [remainingText]).joined(separator: "\n")
     }
 
     /// 오디오 샘플 전사
@@ -1431,8 +3367,17 @@ class ContentViewModel: ObservableObject {
             chunkingStrategy: chunkingStrategy
         )
 
-        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { progress in
-            DispatchQueue.main.async {
+        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
+            guard let self else { return false }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let now = Date()
+                guard now.timeIntervalSince(self.lastDecoderPreviewUpdate) >= 0.12 else {
+                    return
+                }
+                self.lastDecoderPreviewUpdate = now
+
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
                 let chunkId = self.selectedTask == "transcribe" ? 0 : progress.windowId
                 var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
@@ -1507,9 +3452,6 @@ class ContentViewModel: ObservableObject {
                 if audioState.totalDuration == 0 {
                     audioState.totalDuration = audioPlayer?.duration ?? 0.0
                 }
-
-                // 새 플레이어를 만든 경우 노멀라이제이션 계수 계산
-                calculateNormalizationFactor(audioPlayer!)
             }
 
             // 재생 속도 설정
@@ -1530,17 +3472,14 @@ class ContentViewModel: ObservableObject {
 
     // 재생 시간 업데이트를 위한 Combine 타이머 설정
     private func setupPlaybackTimeUpdater() {
-        // 이전 타이머 취소
-        audioState.playbackTimer?.invalidate()
-        playbackTimerCancellable?.cancel()
+        invalidatePlaybackTimer()
 
         // Combine 타이머 설정
-        playbackTimerCancellable = Timer.publish(every: 0.033, on: .main, in: .common)
+        playbackTimerCancellable = Timer.publish(every: 0.05, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 guard let self = self, let player = self.audioPlayer else {
-                    // 플레이어가 없으면 타이머 정리
-                    self?.playbackTimerCancellable?.cancel()
+                    self?.invalidatePlaybackTimer()
                     return
                 }
 
@@ -1557,10 +3496,16 @@ class ContentViewModel: ObservableObject {
                         player.currentTime = 0.0
                         self.audioPlaybackState.currentPlayerTime = 0.0
                     }
-                    // 재생이 멈췄으므로 타이머 정리
-                    self.playbackTimerCancellable?.cancel()
+                    self.invalidatePlaybackTimer()
                 }
             }
+    }
+
+    private func invalidatePlaybackTimer() {
+        audioState.playbackTimer?.invalidate()
+        audioState.playbackTimer = nil
+        playbackTimerCancellable?.cancel()
+        playbackTimerCancellable = nil
     }
 
     /// 선택된 배속으로 재생
@@ -1601,10 +3546,7 @@ class ContentViewModel: ObservableObject {
     func pauseImportedAudio() {
         audioPlayer?.pause()
         audioState.isPlaying = false
-
-        // 타이머 정리
-        audioState.playbackTimer?.invalidate()
-        playbackTimerCancellable?.cancel()
+        invalidatePlaybackTimer()
     }
 
     func stopImportedAudio() {
@@ -1612,10 +3554,7 @@ class ContentViewModel: ObservableObject {
         audioPlayer?.currentTime = 0
         audioPlaybackState.currentPlayerTime = 0
         audioState.isPlaying = false
-
-        // 타이머 정리
-        audioState.playbackTimer?.invalidate()
-        playbackTimerCancellable?.cancel()
+        invalidatePlaybackTimer()
     }
 
     /// 재생 위치 이동
@@ -1685,6 +3624,7 @@ class ContentViewModel: ObservableObject {
     func deleteImportedAudio() {
         // 재생 중이면 먼저 정지
         stopImportedAudio()
+        cancelAudioProcessingTasks()
 
         // 임시 파일 정리
         cleanupPreviousAudioFile()
@@ -1693,6 +3633,7 @@ class ContentViewModel: ObservableObject {
         audioState.importedAudioURL = nil
         audioState.audioFileName = ""
         audioState.waveformSamples = []
+        audioState.isWaveformProcessing = false
         audioState.totalDuration = 0
         audioPlaybackState.currentPlayerTime = 0
         print("Imported audio removed from app.")
@@ -1715,27 +3656,44 @@ class ContentViewModel: ObservableObject {
         }
     }
 
-    /// 앱 시작 시 통합 정리 (이전 세션의 모든 임시 파일)
+    /// 앱이 직접 만든 오래된 임시 오디오 파일만 정리
+    private func cleanupStaleTemporaryAudioFiles() {
+        let tempDirectoryURL = Self.appTemporaryAudioDirectoryURL()
+        let preservedURLs = audioState.temporaryAudioURL.map { Set([$0]) } ?? []
+
+        do {
+            let report = try StorageCleanupService.cleanupStaleItems(
+                in: tempDirectoryURL,
+                olderThan: StorageCleanupPolicy.staleTemporaryAudioAge,
+                preserving: preservedURLs
+            )
+
+            if !report.isEmpty {
+                print(
+                    "CaptionMate temporary audio cleaned: \(ByteCountFormatter.string(fromByteCount: report.removedBytes, countStyle: .file))"
+                )
+            }
+        } catch {
+            print("Failed to clean CaptionMate temporary audio: \(error.localizedDescription)")
+        }
+    }
+
+    /// 앱 시작 시 이전 세션의 오래된 임시 파일 정리
     func performStartupCleanup() async {
-        print("🧹 Starting comprehensive cleanup on app launch...")
+        print("Starting startup cleanup...")
 
         // 1. 현재 세션의 오디오 임시 파일 정리
         cleanupPreviousAudioFile()
+        cleanupStaleTemporaryAudioFiles()
 
-        // 2. 백그라운드에서 전체 임시 파일 정리
-        await Task.detached(priority: .background) {
-            await MainActor.run {
-                self.clearCoreMLRuntimeCache()
-            }
-        }.value
-
-        print("✅ Startup cleanup completed")
+        print("Startup cleanup completed")
     }
 
     /// 오디오 파일에서 파형 데이터를 생성 (RMS 기반 계산 예시)
-    func processWaveform() async {
-        guard let url = audioState.importedAudioURL else { return }
+    func processWaveform(for url: URL) async {
+        guard audioState.importedAudioURL == url else { return }
         do {
+            try Task.checkCancellation()
             // 현재 파형 샘플이 비어있지 않으면 초기화 (새 파일용)
             if !audioState.waveformSamples.isEmpty {
                 await MainActor.run {
@@ -1754,48 +3712,165 @@ class ContentViewModel: ObservableObject {
                 }
             }
 
-            // 오디오 샘플 로드 및 파형 계산
-            let samples = try await Task {
+            // 파형은 작은 버퍼 단위로 읽어 전체 오디오 샘플 배열을 추가로 만들지 않는다.
+            let waveformSamples = try await Task.detached(priority: .userInitiated) {
                 try autoreleasepool {
-                    try AudioProcessor.loadAudioAsFloatArray(fromPath: url.path)
+                    try Self.computeWaveform(fromAudioURL: url)
                 }
             }.value
+            try Task.checkCancellation()
 
-            // 파형 계산 및 상태 업데이트
-            let waveformSamples = computeWaveform(from: samples)
+            // 파형 상태 업데이트
             await MainActor.run {
+                guard audioState.importedAudioURL == url else { return }
+
                 // 모든 정보 업데이트 (동시에 한 번에 갱신)
                 audioState.waveformSamples = waveformSamples
+                audioState.isWaveformProcessing = false
 
                 // 디버그 로그
                 print(
                     "Waveform update completed: \(waveformSamples.count) samples, total duration: \(audioState.totalDuration) seconds"
                 )
             }
+        } catch is CancellationError {
+            if audioState.importedAudioURL == url {
+                audioState.isWaveformProcessing = false
+            }
         } catch {
+            if audioState.importedAudioURL == url {
+                audioState.isWaveformProcessing = false
+            }
             print("Error processing waveform: \(error.localizedDescription)")
         }
     }
 
-    private func computeWaveform(from samples: [Float]) -> [Float] {
-        let chunkSize = 1024
+    private enum WaveformProcessingError: LocalizedError {
+        case unsupportedAudioFormat
+
+        var errorDescription: String? {
+            switch self {
+            case .unsupportedAudioFormat:
+                return "The audio file could not be read as floating point PCM."
+            }
+        }
+    }
+
+    private nonisolated static let waveformReferenceSampleRate: Double = 16_000
+    private nonisolated static let waveformReferenceChunkSize = 1024
+
+    nonisolated static func computeWaveform(from samples: [Float]) -> [Float] {
+        let chunkSize = waveformReferenceChunkSize
         var rmsValues = [Float]()
+        rmsValues.reserveCapacity(samples.count / chunkSize + 1)
         var index = 0
         while index < samples.count {
-            let chunk = samples[index ..< min(index + chunkSize, samples.count)]
-            let sumSquares = chunk.reduce(0) { $0 + $1 * $1 }
-            let rms = sqrt(sumSquares / Float(chunk.count))
+            let endIndex = min(index + chunkSize, samples.count)
+            var sumSquares: Float = 0
+            var sampleIndex = index
+            while sampleIndex < endIndex {
+                let sample = samples[sampleIndex]
+                sumSquares += sample * sample
+                sampleIndex += 1
+            }
+            let rms = sqrt(sumSquares / Float(endIndex - index))
             rmsValues.append(rms)
             index += chunkSize
         }
         return rmsValues
     }
 
+    nonisolated static func computeWaveform(fromAudioURL audioURL: URL) throws -> [Float] {
+        let audioFile = try AVAudioFile(
+            forReading: audioURL,
+            commonFormat: .pcmFormatFloat32,
+            interleaved: false
+        )
+        let format = audioFile.processingFormat
+        let channelCount = Int(format.channelCount)
+        guard channelCount > 0 else {
+            throw WaveformProcessingError.unsupportedAudioFormat
+        }
+
+        let sampleRate = format.sampleRate > 0 ? format.sampleRate : waveformReferenceSampleRate
+        let framesPerWaveformSample = max(
+            1,
+            Int((sampleRate / waveformReferenceSampleRate) * Double(waveformReferenceChunkSize))
+        )
+        let readFrameCapacity = AVAudioFrameCount(
+            min(max(framesPerWaveformSample * 16, 4096), 65_536)
+        )
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: readFrameCapacity
+        ) else {
+            throw WaveformProcessingError.unsupportedAudioFormat
+        }
+
+        var rmsValues = [Float]()
+        if audioFile.length > 0 {
+            rmsValues.reserveCapacity(
+                Int(ceil(Double(audioFile.length) / Double(framesPerWaveformSample)))
+            )
+        }
+
+        var sumSquares: Double = 0
+        var sampleCountInChunk = 0
+
+        while audioFile.framePosition < audioFile.length {
+            try Task.checkCancellation()
+            let remainingFrames = audioFile.length - audioFile.framePosition
+            let framesToRead = AVAudioFrameCount(min(Int64(readFrameCapacity), remainingFrames))
+            try audioFile.read(into: buffer, frameCount: framesToRead)
+
+            let frameLength = Int(buffer.frameLength)
+            guard frameLength > 0 else { break }
+            guard let channelData = buffer.floatChannelData else {
+                throw WaveformProcessingError.unsupportedAudioFormat
+            }
+
+            for frameIndex in 0 ..< frameLength {
+                var mixedSample: Float = 0
+                for channelIndex in 0 ..< channelCount {
+                    mixedSample += channelData[channelIndex][frameIndex]
+                }
+                let sample = mixedSample / Float(channelCount)
+                sumSquares += Double(sample * sample)
+                sampleCountInChunk += 1
+
+                if sampleCountInChunk == framesPerWaveformSample {
+                    rmsValues.append(Float(sqrt(sumSquares / Double(sampleCountInChunk))))
+                    sumSquares = 0
+                    sampleCountInChunk = 0
+                }
+            }
+        }
+
+        if sampleCountInChunk > 0 {
+            rmsValues.append(Float(sqrt(sumSquares / Double(sampleCountInChunk))))
+        }
+
+        return rmsValues
+    }
+
     // MARK: - Export Service 호출
 
-    func exportTranscription() async {
-        guard var result = transcriptionResult else {
+    func exportTranscription(skipQualityReview: Bool = false) async {
+        guard let result = transcriptionResult else {
             print("No transcription result available.")
+            showUserMessage(.warning, title: "Nothing to Export")
+            return
+        }
+
+        let qualityIssues = refreshSubtitleQualityIssues()
+        let hasBlockingIssues = qualityIssues.contains { $0.severity == .error }
+        if hasBlockingIssues || (!skipQualityReview && !qualityIssues.isEmpty) {
+            uiState.showSubtitleReview = true
+            showUserMessage(
+                hasBlockingIssues ? .error : .warning,
+                title: hasBlockingIssues ? "Fix Required Before Export" : "Review Subtitles Before Export",
+                detail: "\(qualityIssues.count) subtitle quality issue(s) found."
+            )
             return
         }
 
@@ -1808,9 +3883,21 @@ class ContentViewModel: ObservableObject {
 
         // 세그먼트와 단어 처리: 앞뒤 공백 제거 후 빈 세그먼트 제거 등
         var cleanSegments: [TranscriptionSegment] = []
-        for segment in result.segments {
+        let exportPreset = selectedExportPreset
+        for (index, segment) in result.segments.enumerated() {
             var cleanSegment = segment
-            cleanSegment.text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let speakerAssignment = speakerAssignment(forSegmentAt: index)
+            cleanSegment.text = SpeakerLabelFormatter.prefixedText(
+                segment.text,
+                assignment: speakerAssignment,
+                speakerName: speakerDisplayName(for: speakerAssignment),
+                includeSpeakerLabel: includeSpeakerLabelsInExport
+            )
+            cleanSegment.text = Self.wrappedSubtitleText(
+                cleanSegment.text,
+                maxLineLength: exportPreset.maxLineLength,
+                maxLines: exportPreset.maxLines
+            )
             if let words = segment.words {
                 var cleanWords: [WordTiming] = []
                 for word in words {
@@ -1827,18 +3914,87 @@ class ContentViewModel: ObservableObject {
             }
         }
         cleanSegments.sort { $0.start < $1.start }
+        guard !cleanSegments.isEmpty else {
+            showUserMessage(.warning, title: "Nothing to Export", detail: "All segments are empty.")
+            return
+        }
+
         // 세그먼트 간 겹침 조정
-        for i in 0 ..< cleanSegments.count - 1 {
-            if cleanSegments[i].end > cleanSegments[i + 1].start {
-                cleanSegments[i].end = cleanSegments[i + 1].start
+        if cleanSegments.count > 1 {
+            for i in 0 ..< (cleanSegments.count - 1) {
+                if cleanSegments[i].end > cleanSegments[i + 1].start {
+                    cleanSegments[i].end = cleanSegments[i + 1].start
+                }
             }
         }
-        result.segments = cleanSegments
 
         // ExportService의 writer 분기 처리를 사용하여 파일 내보내기
-        await ExportService.exportTranscriptionResult(result: result,
-                                                      defaultFileName: audioState.audioFileName,
-                                                      frameRate: frameRate)
+        let exportResult = TranscriptionResult(
+            text: cleanSegments.map(\.text).joined(separator: " "),
+            segments: cleanSegments,
+            language: result.language,
+            timings: result.timings,
+            seekTime: result.seekTime
+        )
+        let outcome = await ExportService.exportTranscriptionResult(
+            result: exportResult,
+            defaultFileName: audioState.audioFileName,
+            frameRate: frameRate
+        )
+
+        switch outcome {
+        case let .success(path):
+            do {
+                let sidecarURL = try writeCurrentSidecar(
+                    nextToExportedPath: path,
+                    language: result.language,
+                    timings: result.timings
+                )
+                let detail = sidecarURL.map { "\(path)\nSidecar: \($0.path)" } ?? path
+                showUserMessage(.success, title: "Export Complete", detail: detail)
+            } catch {
+                showUserMessage(
+                    .warning,
+                    title: "Export Complete, Sidecar Failed",
+                    detail: error.localizedDescription
+                )
+            }
+        case .cancelled:
+            showUserMessage(.info, title: "Export Cancelled")
+        case let .failure(error):
+            showUserMessage(.error, title: "Export Failed", detail: error.localizedDescription)
+        }
+    }
+
+    private func writeCurrentSidecar(
+        nextToExportedPath path: String,
+        language: String,
+        timings: TranscriptionTimings
+    ) throws -> URL? {
+        guard !transcriptionState.confirmedSegments.isEmpty else {
+            return nil
+        }
+
+        let sidecarResult = TranscriptionResult(
+            text: transcriptionState.confirmedSegments.map(\.text).joined(separator: " "),
+            segments: transcriptionState.confirmedSegments,
+            language: language,
+            timings: timings
+        )
+        let sidecar = CaptionMateSidecar(
+            result: sidecarResult,
+            audioFileName: audioState.audioFileName,
+            speakerAssignments: transcriptionState.speakerAssignments,
+            speakerNames: transcriptionState.speakerNames,
+            selectedExportPreset: selectedExportPreset,
+            frameRate: frameRate,
+            includeSpeakerLabelsInExport: includeSpeakerLabelsInExport,
+            speakerDiarizationSpeakerCount: speakerDiarizationSpeakerCount
+        )
+        return try CaptionMateSidecarService.write(
+            sidecar,
+            nextToMediaURL: URL(fileURLWithPath: path)
+        )
     }
 
     // MARK: - Drag and drop
@@ -1860,55 +4016,11 @@ class ContentViewModel: ObservableObject {
 
                 if let urlData = item as? Data,
                    let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                    // 메인 스레드에서 파일 처리
-                    DispatchQueue.main.async {
-                        // 파일 접근 권한 확보
-                        let shouldStopAccessing = url.startAccessingSecurityScopedResource()
-
-                        // 기존 오디오 플레이어 및 임시 파일 정리
-                        self.cleanupPreviousAudioFile()
-                        self.stopImportedAudio()
-                        self.audioPlayer = nil
-
-                        // 파일 이름 저장
-                        self.audioState.audioFileName = url.deletingPathExtension()
-                            .lastPathComponent
-
-                        // 파일 URL 저장
-                        self.audioState.importedAudioURL = url
-
-                        // 비동기 처리를 위한 Task 생성 - 파일 정보 읽기 및 파형 생성
-                        Task { @MainActor in
-                            do {
-                                // 오디오 파일 재생 시간 설정
-                                let audioAsset = AVURLAsset(url: url)
-                                let duration = try await audioAsset.load(.duration)
-                                let durationInSeconds = CMTimeGetSeconds(duration)
-
-                                // 재생 시간 업데이트
-                                self.audioState.totalDuration = durationInSeconds
-                                self.audioPlayer?.currentTime = 0.0
-
-                                // 오디오 플레이어 초기화
-                                let player = try AVAudioPlayer(contentsOf: url)
-                                self.audioPlayer = player
-
-                                // 노멀라이제이션 계수 계산 (파일 로드 시 1회)
-                                self.calculateNormalizationFactor(player)
-
-                                self.audioPlayer?.prepareToPlay()
-
-                                // 파형 생성 처리
-                                await self.processWaveform()
-                            } catch {
-                                print("Audio file load error: \(error.localizedDescription)")
-                            }
-                        }
-
-                        // 파일 접근 권한 해제
-                        if shouldStopAccessing {
-                            url.stopAccessingSecurityScopedResource()
-                        }
+                    Task { @MainActor in
+                        await self.processSelectedFile(
+                            url,
+                            needsSecurityScopedAccess: true
+                        )
                     }
                 } else {
                     print(
@@ -1919,165 +4031,153 @@ class ContentViewModel: ObservableObject {
     }
 
     /// 로컬 및 원격 모델 목록 업데이트
-    func fetchModels() {
-        print("Starting to fetch model list...")
+    func fetchModels(forceRefresh: Bool = false) {
+        if modelManagementState.catalogLoadState.isLoading, !forceRefresh {
+            return
+        }
 
-        // 상태 초기화
-        modelManagementState.availableModels = []
-        modelManagementState.modelSizes = [:] // 모델 크기 정보 초기화
-
-        // 에러 상태 초기화
+        modelCatalogTask?.cancel()
+        modelManagementState.catalogLoadState = .loadingLocal
         modelManagementState.hasModelLoadError = false
         modelManagementState.modelLoadError = nil
 
-        if let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
-            .first {
-            let modelPath = documents.appendingPathComponent(modelManagementState.modelStorage).path
-            print("Model path verification: \(modelPath)")
+        let modelStorage = modelManagementState.modelStorage
+        let activeRepoName = repoName
 
-            // 디렉토리가 없으면 생성
-            if !FileManager.default.fileExists(atPath: modelPath) {
-                do {
-                    try FileManager.default.createDirectory(
-                        at: URL(fileURLWithPath: modelPath),
-                        withIntermediateDirectories: true
-                    )
-                    print("Model directory created: \(modelPath)")
-                } catch {
-                    print("Failed to create model directory: \(error.localizedDescription)")
-                }
-            }
-
-            modelManagementState.localModelPath = modelPath
+        modelCatalogTask = Task { [weak self] in
+            guard let self else { return }
 
             do {
-                let allFiles = try FileManager.default.contentsOfDirectory(atPath: modelPath)
-                // .DS_Store 및 기타 시스템 파일 필터링 + 디렉토리만 포함
-                let fileManager = FileManager.default
-                let downloadedModels = allFiles.filter { fileName in
-                    // 숨겨진 파일 제외
-                    if fileName.hasPrefix(".") {
-                        return false
-                    }
+                let localSnapshot = try await Task.detached {
+                    try ModelCatalogService.loadLocalModelFolders(modelStorage: modelStorage)
+                }.value
 
-                    // 디렉토리인지 확인
-                    let fullPath = URL(fileURLWithPath: modelPath).appendingPathComponent(fileName)
-                        .path
-                    var isDir: ObjCBool = false
-                    if fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) {
-                        return isDir.boolValue
-                    }
-                    return false
+                guard !Task.isCancelled else { return }
+
+                let localFolders = ModelCatalogService.orderedLocalModelFolders(
+                    localSnapshot.folders,
+                    formattingNamesWith: ModelUtilities.formatModelFiles
+                )
+                let localNames = localFolders.map(\.name)
+                self.modelManagementState.localModelPath = localSnapshot.directoryURL.path
+                self.modelManagementState.localModels = localNames
+
+                for folder in localFolders {
+                    self.modelManagementState.modelSizes[folder.name] = folder.size
+                    self.modelManagementState.modelSizeSources[folder.name] = .local
                 }
-                print("Local model list: \(downloadedModels)")
 
-                // 로컬 모델 및 크기 정보 갱신
-                for model in downloadedModels {
-                    let modelFolderURL = URL(fileURLWithPath: modelPath)
-                        .appendingPathComponent(model)
-
-                    // 모델 크기 계산
-                    let totalSize = calculateFolderSize(url: modelFolderURL)
-                    modelManagementState.modelSizes[model] = totalSize
-
-                    if !modelManagementState.localModels.contains(model) {
-                        modelManagementState.localModels = downloadedModels
-                    }
-                }
+                self.modelManagementState.availableModels = self.mergedModelList(
+                    localModels: localNames,
+                    remoteModels: self.modelManagementState.availableModels
+                )
+                self.refreshSpeakerDiarizationModelState()
             } catch {
-                print("Failed to fetch local model list: \(error.localizedDescription)")
+                self.modelManagementState.catalogLoadState = .failed(error.localizedDescription)
+                self.modelManagementState.hasModelLoadError = true
+                self.modelManagementState.modelLoadError = error.localizedDescription
+                return
             }
-        }
 
-        modelManagementState.localModels = ModelUtilities
-            .formatModelFiles(modelManagementState.localModels)
-        for model in modelManagementState.localModels
-            where !modelManagementState.availableModels.contains(model) {
-            modelManagementState.availableModels.append(model)
-        }
+#if DEBUG
+            guard !Self.isUITesting else {
+                self.modelManagementState.catalogLoadState = .ready
+                return
+            }
+#endif
 
-        print("Models found locally: \(modelManagementState.localModels)")
-        print("Previously selected model: \(selectedModel)")
-
-        Task {
-            // 원격 모델 목록 가져오기 시도
-            var supportedModels: [String] = []
-            var disabledModels: [String] = []
+            self.modelManagementState.catalogLoadState = .loadingRemote
+            let cachedSizes = forceRefresh ? [:] :
+                ModelCatalogService.cachedRemoteSizes(repoName: activeRepoName)
 
             let modelSupport = await WhisperKit.recommendedRemoteModels()
-            supportedModels = modelSupport.supported
-            disabledModels = modelSupport.disabled
-            print("Fetched model list from WhisperKit: \(supportedModels.count) models")
+            guard !Task.isCancelled else { return }
 
-            // 메인 스레드에서 UI 업데이트
-            await MainActor.run {
-                for model in supportedModels {
-                    if !modelManagementState.availableModels.contains(model) {
-                        modelManagementState.availableModels.append(model)
+            self.modelManagementState.disabledModels = modelSupport.disabled
+            self.applyRemoteModels(
+                modelSupport.supported,
+                cachedSizes: cachedSizes,
+                forceRemoteSizeRefresh: forceRefresh
+            )
+            self.modelManagementState.catalogLoadState = .ready
+            self.refreshRemoteModelSizes(for: modelSupport.supported, repoName: activeRepoName)
+        }
+    }
 
-                        // 원격 모델 예상 크기 - 실제 크기를 알 수 없으므로 예상치 설정
-                        if !modelManagementState.modelSizes.keys.contains(model) {
-                            // 모델 이름에 따라 예상 크기 설정 (MB 단위)
-                            let estimatedSize: Int64
-                            if model.contains("large") {
-                                estimatedSize = 3_000_000_000 // 약 3GB
-                            } else if model.contains("medium") {
-                                estimatedSize = 1_500_000_000 // 약 1.5GB
-                            } else if model.contains("small") {
-                                estimatedSize = 500_000_000 // 약 500MB
-                            } else if model.contains("base") {
-                                estimatedSize = 250_000_000 // 약 250MB
-                            } else {
-                                estimatedSize = 150_000_000 // 약 150MB (기본값)
-                            }
-                            modelManagementState.modelSizes[model] = estimatedSize
-                        }
-                    }
-                }
+    private func applyRemoteModels(
+        _ remoteModels: [String],
+        cachedSizes: [String: Int64],
+        forceRemoteSizeRefresh: Bool
+    ) {
+        modelManagementState.availableModels = mergedModelList(
+            localModels: modelManagementState.localModels,
+            remoteModels: remoteModels
+        )
 
-                for model in disabledModels {
-                    if !modelManagementState.disabledModels.contains(model) {
-                        modelManagementState.disabledModels.append(model)
-                    }
-                }
-
-                print(
-                    "Updated available model count: \(modelManagementState.availableModels.count)"
-                )
-                objectWillChange.send() // UI 갱신 강제
+        for model in remoteModels where !modelManagementState.localModels.contains(model) {
+            if !forceRemoteSizeRefresh,
+               let cachedSize = cachedSizes[model],
+               cachedSize > 0 {
+                modelManagementState.modelSizes[model] = cachedSize
+                modelManagementState.modelSizeSources[model] = .remote
+            } else if forceRemoteSizeRefresh || modelManagementState.modelSizes[model] == nil {
+                modelManagementState.modelSizes[model] = ModelCatalogService
+                    .estimatedDownloadSize(for: model)
+                modelManagementState.modelSizeSources[model] = .estimate
             }
         }
     }
 
-    /// 폴더 크기 계산 함수
-    private func calculateFolderSize(url: URL) -> Int64 {
-        let fileManager = FileManager.default
-        var folderSize: Int64 = 0
+    private func refreshRemoteModelSizes(for remoteModels: [String], repoName: String) {
+        remoteModelSizeTask?.cancel()
 
-        do {
-            let contents = try fileManager.contentsOfDirectory(
-                at: url,
-                includingPropertiesForKeys: nil
-            )
-
-            for fileURL in contents {
-                let fileAttributes = try fileURL.resourceValues(forKeys: [
-                    .isDirectoryKey,
-                    .fileSizeKey,
-                ])
-
-                if let isDirectory = fileAttributes.isDirectory, isDirectory {
-                    // 하위 폴더면 재귀적으로 계산
-                    folderSize += calculateFolderSize(url: fileURL)
-                } else if let fileSize = fileAttributes.fileSize {
-                    // 파일이면 크기 추가
-                    folderSize += Int64(fileSize)
-                }
-            }
-        } catch {
-            print("Error calculating folder size: \(error)")
+        let modelsNeedingRemoteSize = remoteModels.filter { model in
+            !modelManagementState.localModels.contains(model) &&
+                modelManagementState.modelSizeSources[model] != .remote
         }
 
-        return folderSize
+        guard !modelsNeedingRemoteSize.isEmpty else {
+            modelManagementState.isRemoteModelSizeLoading = false
+            return
+        }
+
+        modelManagementState.isRemoteModelSizeLoading = true
+        remoteModelSizeTask = Task { [weak self] in
+            guard let self else { return }
+            var cachedSizes = ModelCatalogService.cachedRemoteSizes(repoName: repoName)
+
+            for model in modelsNeedingRemoteSize {
+                guard !Task.isCancelled else { break }
+                do {
+                    let size = try await ModelCatalogService.remoteFolderSize(
+                        repoName: repoName,
+                        model: model
+                    )
+                    guard size > 0 else { continue }
+                    cachedSizes[model] = size
+                    self.modelManagementState.modelSizes[model] = size
+                    self.modelManagementState.modelSizeSources[model] = .remote
+                } catch {
+                    if self.modelManagementState.modelSizes[model] == nil {
+                        self.modelManagementState.modelSizes[model] = ModelCatalogService
+                            .estimatedDownloadSize(for: model)
+                        self.modelManagementState.modelSizeSources[model] = .estimate
+                    }
+                }
+            }
+
+            if !Task.isCancelled {
+                ModelCatalogService.saveCachedRemoteSizes(cachedSizes, repoName: repoName)
+            }
+            self.modelManagementState.isRemoteModelSizeLoading = false
+            self.remoteModelSizeTask = nil
+        }
+    }
+
+    private func mergedModelList(localModels: [String], remoteModels: [String]) -> [String] {
+        var seenModels: Set<String> = []
+        return (localModels + remoteModels).filter { model in
+            seenModels.insert(model).inserted
+        }
     }
 }

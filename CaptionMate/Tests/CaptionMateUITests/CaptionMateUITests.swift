@@ -23,6 +23,43 @@
 
 import XCTest
 
+private extension XCUIApplication {
+    static func captionMate(launchArguments extraArguments: [String] = []) -> XCUIApplication {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-CaptionMateUITestResetDefaults",
+            "-CaptionMateUITestDisableModelDownloads",
+            "-ApplePersistenceIgnoreState",
+            "YES",
+        ] + extraArguments
+        return app
+    }
+
+    func element(_ identifier: String) -> XCUIElement {
+        descendants(matching: .any)
+            .matching(identifier: identifier)
+            .firstMatch
+    }
+
+    func menuBarItem(matchingTitles titles: [String]) -> XCUIElement {
+        menuBarItems
+            .matching(NSPredicate(format: "title IN %@ OR label IN %@", titles, titles))
+            .firstMatch
+    }
+
+    func menuItem(matchingTitles titles: [String]) -> XCUIElement {
+        menuItems
+            .matching(NSPredicate(format: "title IN %@ OR label IN %@", titles, titles))
+            .firstMatch
+    }
+
+    func launchFreshForUITest() {
+        terminate()
+        _ = wait(for: .notRunning, timeout: 5.0)
+        launch()
+    }
+}
+
 // MARK: - 기본 UI 요소 테스트 (한 번만 앱 실행)
 
 final class BasicUITests: XCTestCase {
@@ -31,8 +68,8 @@ final class BasicUITests: XCTestCase {
     override class func setUp() {
         super.setUp()
         // 클래스당 한 번만 실행
-        app = XCUIApplication()
-        app.launch()
+        app = XCUIApplication.captionMate()
+        app.launchFreshForUITest()
 
         // 앱이 완전히 로드될 때까지 대기
         let window = app.windows.firstMatch
@@ -145,8 +182,8 @@ final class InteractionTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        app = XCUIApplication()
-        app.launch()
+        app = XCUIApplication.captionMate()
+        app.launchFreshForUITest()
 
         let window = app.windows.firstMatch
         _ = window.waitForExistence(timeout: 10.0)
@@ -224,7 +261,7 @@ final class InteractionTests: XCTestCase {
         }
 
         if !settingsViewOpened {
-            XCTSkip("Settings View가 열리지 않았습니다. UI 구조가 변경되었을 수 있습니다.")
+            throw XCTSkip("Settings View가 열리지 않았습니다. UI 구조가 변경되었을 수 있습니다.")
         }
 
         // Settings 닫기 (ESC 키 사용)
@@ -233,36 +270,150 @@ final class InteractionTests: XCTestCase {
         // Settings가 닫혔는지 확인
         let settingsClosed = !app.sliders.firstMatch.exists && !app.toggles.firstMatch.exists
         if !settingsClosed {
-            XCTSkip("Settings View가 완전히 닫히지 않았습니다.")
+            throw XCTSkip("Settings View가 완전히 닫히지 않았습니다.")
         }
     }
 
     @MainActor
     func testModelManagerViewOpens() throws {
         // Manage Models 버튼 찾기
-        let manageModelsButton = app.buttons
-            .matching(NSPredicate(format: "label CONTAINS[c] 'Manage' OR label CONTAINS[c] '관리'"))
-            .firstMatch
+        let manageModelsButton = app.element("modelSelector.manageModelsButton")
 
-        if manageModelsButton.waitForExistence(timeout: 5.0) {
-            manageModelsButton.click()
+        XCTAssertTrue(
+            manageModelsButton.waitForExistence(timeout: 5.0),
+            "Manage Models 버튼이 표시되어야 합니다"
+        )
+        manageModelsButton.click()
 
-            // Model Manager View가 열리는지 확인
-            let modelManagerView = app.staticTexts
-                .matching(
-                    NSPredicate(format: "label CONTAINS[c] 'Model' OR label CONTAINS[c] '모델'")
-                )
-                .firstMatch
-            XCTAssertTrue(
-                modelManagerView.waitForExistence(timeout: 3.0),
-                "Model Manager View가 열려야 합니다"
-            )
+        // Model Manager View가 열리는지 확인
+        XCTAssertTrue(
+            app.element("modelManager.speakerDiarizationModelSection")
+                .waitForExistence(timeout: 3.0),
+            "화자분리 모델 섹션이 표시되어야 합니다"
+        )
+        XCTAssertTrue(
+            app.element("modelManager.speakerModelCaption")
+                .waitForExistence(timeout: 3.0),
+            "화자분리 모델의 오프라인 용도 설명이 표시되어야 합니다"
+        )
 
-            // 닫기
-            app.typeKey(.escape, modifierFlags: [])
-        } else {
-            throw XCTSkip("Manage Models 버튼이 표시되지 않음 (모델이 로드된 상태)")
+        // 닫기
+        app.typeKey(.escape, modifierFlags: [])
+    }
+}
+
+// MARK: - 화자분리 UX 테스트
+
+final class SpeakerDiarizationUXTests: XCTestCase {
+    var app: XCUIApplication!
+
+    override func setUpWithError() throws {
+        continueAfterFailure = false
+        let needsSpeakerFixture = name.contains("testSpeakerEditorRenameAndExportReview")
+        app = XCUIApplication.captionMate(
+            launchArguments: needsSpeakerFixture ? ["-CaptionMateUITestSpeakerFixture"] : []
+        )
+        app.launchFreshForUITest()
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(window.waitForExistence(timeout: 10.0), "메인 윈도우가 존재해야 합니다")
+    }
+
+    override func tearDownWithError() throws {
+        app.terminate()
+        app = nil
+    }
+
+    @MainActor
+    func testSettingsSpeakerDiarizationControls() throws {
+        let settingsButton = app.buttons["Settings"]
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5.0), "Settings 버튼이 존재해야 합니다")
+        settingsButton.click()
+
+        let settingsSheet = app.element("settings.sheet")
+        let speakerToggle = app.element("settings.speakerDiarizationToggle")
+        let speakerCountPicker = app.element("settings.speakerCountPicker")
+        let exportLabelsToggle = app.element("settings.exportSpeakerLabelsToggle")
+
+        let settingsOpened = settingsSheet.waitForExistence(timeout: 5.0) ||
+            speakerToggle.waitForExistence(timeout: 5.0)
+        XCTAssertTrue(settingsOpened, "Settings 시트가 열려야 합니다")
+
+        XCTAssertTrue(speakerToggle.waitForExistence(timeout: 3.0))
+        XCTAssertTrue(speakerCountPicker.waitForExistence(timeout: 3.0))
+        XCTAssertTrue(exportLabelsToggle.waitForExistence(timeout: 3.0))
+
+        XCTAssertFalse(speakerCountPicker.isEnabled)
+        XCTAssertFalse(exportLabelsToggle.isEnabled)
+
+        speakerToggle.click()
+        XCTAssertTrue(speakerCountPicker.isEnabled)
+        XCTAssertTrue(exportLabelsToggle.isEnabled)
+
+        speakerToggle.click()
+        XCTAssertFalse(speakerCountPicker.isEnabled)
+        XCTAssertFalse(exportLabelsToggle.isEnabled)
+    }
+
+    @MainActor
+    func testSpeakerEditorRenameAndExportReview() throws {
+        let transcriptionView = app.element("transcription.view")
+        XCTAssertTrue(transcriptionView.waitForExistence(timeout: 5.0), "전사 화면이 표시되어야 합니다")
+
+        let speakerEditor = app.element("speakerEditor.container")
+        XCTAssertTrue(speakerEditor.waitForExistence(timeout: 5.0), "화자 편집기가 표시되어야 합니다")
+
+        let reanalyzeButton = app.element("speakerEditor.reanalyzeButton")
+        XCTAssertTrue(reanalyzeButton.waitForExistence(timeout: 3.0))
+        XCTAssertTrue(reanalyzeButton.isEnabled)
+
+        let speakerOneNameField = app.element("speakerEditor.nameField.0")
+        XCTAssertTrue(speakerOneNameField.waitForExistence(timeout: 3.0))
+        speakerOneNameField.click()
+        speakerOneNameField.typeText("Host")
+
+        let assignedSegmentMenu = app.element("speakerAssignmentMenu.segment.1")
+        XCTAssertTrue(assignedSegmentMenu.waitForExistence(timeout: 3.0))
+        XCTAssertTrue(
+            assignedSegmentMenu.label.localizedCaseInsensitiveContains("Host"),
+            "화자 이름 변경이 배정된 세그먼트 라벨에 반영되어야 합니다"
+        )
+
+        let exportButton = app.element("transcription.exportButton")
+        XCTAssertTrue(exportButton.waitForExistence(timeout: 3.0))
+        exportButton.click()
+
+        let reviewSheet = app.element("subtitleReview.sheet")
+        XCTAssertTrue(reviewSheet.waitForExistence(timeout: 5.0), "Export 전 review 시트가 열려야 합니다")
+        XCTAssertTrue(app.staticTexts["Missing speaker label"].waitForExistence(timeout: 3.0))
+        XCTAssertFalse(app.staticTexts["Speaker 1 uses a default name"].exists)
+        XCTAssertTrue(app.element("subtitleReview.quickFixButton").waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.element("subtitleReview.exportAnywayButton").isEnabled)
+
+        app.element("subtitleReview.cancelButton").click()
+    }
+
+    @MainActor
+    func testLanguageMenuIncludesSupportedGrowthLanguages() throws {
+        let settingsMenu = app.menuBarItem(matchingTitles: ["Settings", "설정"])
+        XCTAssertTrue(settingsMenu.waitForExistence(timeout: 5.0), "Settings 메뉴가 있어야 합니다")
+        settingsMenu.click()
+
+        let languageMenu = app.menuItem(matchingTitles: ["Language", "언어"])
+        guard languageMenu.waitForExistence(timeout: 3.0) else {
+            throw XCTSkip("macOS 메뉴바 하위 메뉴 접근이 현재 테스트 환경에서 불안정합니다.")
         }
+        languageMenu.click()
+
+        XCTAssertTrue(app.menuItems["English (US)"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["English (UK)"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["日本語"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["Español"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["Deutsch"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["Français"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["Português (Brasil)"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["हिन्दी"].waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.menuItems["简体中文"].waitForExistence(timeout: 3.0))
     }
 }
 

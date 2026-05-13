@@ -26,14 +26,14 @@ import SwiftUI
 
 // 로딩 점 애니메이션을 위한 ViewModifier
 struct LoadingDotsModifier: ViewModifier {
-    let text: String
+    let text: Text
     @State private var dotsCount = 0
     @State private var timer: AnyCancellable?
     private let id = UUID() // 각 인스턴스를 구분하기 위한 고유 ID
 
     func body(content: Content) -> some View {
         HStack(spacing: 0) {
-            Text(text)
+            text
 
             // 점 애니메이션
             Text(dotString())
@@ -80,13 +80,33 @@ struct LoadingDotsModifier: ViewModifier {
 // 뷰에 로딩 점 애니메이션을 추가하는 확장
 extension View {
     func withLoadingDots(_ text: String) -> some View {
+        modifier(LoadingDotsModifier(text: Text(LocalizedStringKey(text))))
+    }
+
+    func withLoadingDots(_ text: LocalizedStringKey) -> some View {
+        modifier(LoadingDotsModifier(text: Text(text)))
+    }
+
+    func withLoadingDots(_ text: Text) -> some View {
         modifier(LoadingDotsModifier(text: text))
     }
 }
 
 // 기존 LoadingDotsView 유지 (하위 호환성)
 struct LoadingDotsView: View {
-    let text: String
+    let text: Text
+
+    init(text: String) {
+        self.text = Text(LocalizedStringKey(text))
+    }
+
+    init(text: LocalizedStringKey) {
+        self.text = Text(text)
+    }
+
+    init(text: Text) {
+        self.text = text
+    }
 
     var body: some View {
         EmptyView()

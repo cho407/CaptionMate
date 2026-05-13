@@ -58,14 +58,14 @@ struct ControlsView: View {
                             viewModel.selectFile()
                         }
                     } label: {
-                        Text("Import File")
+                        Text("Import Files")
                             .font(.headline)
                             .padding(8)
                     }
                     .fileImporter(
                         isPresented: $viewModel.uiState.isFilePickerPresented,
                         allowedContentTypes: [.audio],
-                        allowsMultipleSelection: false,
+                        allowsMultipleSelection: true,
                         onCompletion: viewModel.handleFilePicker
                     )
                     .lineLimit(1)

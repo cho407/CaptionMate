@@ -233,9 +233,18 @@ struct AudioControlView: View {
                             }
                         }
                     } else {
-                        VStack(alignment: .center) {
+                        VStack(alignment: .center, spacing: 8) {
                             Spacer()
-                            ProgressView()
+                            if contentViewModel.audioState.isWaveformProcessing {
+                                ProgressView()
+                                Text("Preparing waveform")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Image(systemName: "waveform.path")
+                                    .font(.title2)
+                                    .foregroundStyle(.secondary)
+                            }
                             Spacer()
                         }
                     }
@@ -310,6 +319,9 @@ struct AudioControlView: View {
             } else {
                 AudioPlaceholderView(isTargeted: contentViewModel.uiState.isTargeted)
             }
+            if !contentViewModel.batchQueue.isEmpty {
+                BatchQueueView(viewModel: contentViewModel)
+            }
             // 하단 컨드롤러
             ControlsView(viewModel: contentViewModel)
         }
@@ -331,6 +343,66 @@ struct AudioControlView: View {
         } else {
             return "speaker.wave.3.fill"
         }
+    }
+}
+
+private struct BatchQueueView: View {
+    @ObservedObject var viewModel: ContentViewModel
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Label("Batch \(viewModel.batchProgressText)", systemImage: "tray.2")
+                .font(.caption.weight(.medium))
+                .lineLimit(1)
+
+            Spacer()
+
+            Button {
+                viewModel.loadPreviousBatchItem()
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(viewModel.currentBatchIndex == nil || viewModel.currentBatchIndex == 0)
+            .help("Previous File")
+
+            Menu {
+                ForEach(viewModel.batchQueue.indices, id: \.self) { index in
+                    Button {
+                        Task {
+                            await viewModel.loadBatchItem(at: index)
+                        }
+                    } label: {
+                        Text(viewModel.batchQueue[index].displayName)
+                    }
+                }
+            } label: {
+                Image(systemName: "list.bullet")
+            }
+            .help("Batch Files")
+
+            Button {
+                viewModel.loadNextBatchItem()
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(
+                viewModel.currentBatchIndex == nil ||
+                    viewModel.currentBatchIndex == viewModel.batchQueue.count - 1
+            )
+            .help("Next File")
+
+            Button {
+                viewModel.clearBatchQueue()
+            } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .help("Clear Batch")
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.65))
     }
 }
 

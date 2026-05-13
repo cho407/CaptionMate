@@ -38,46 +38,86 @@ struct ModelManagerView: View {
         modelState = viewModel.modelManagementState
     }
 
+    private var activeDownloadModels: [String] {
+        viewModel.modelManagementState.trackedDownloadModels(
+            orderedBy: viewModel.modelManagementState.availableModels
+        )
+    }
+
     // 다운로드 진행 상황 - 가중 평균 (모델 크기 고려)
     private var totalDownloadProgress: Double {
-        let downloadingModels = viewModel.modelManagementState.currentDownloadingModels
-        if downloadingModels.isEmpty { return 0 }
-
-        var totalSize: Int64 = 0
-        var downloadedSize: Double = 0
-
-        for model in downloadingModels {
-            let modelSize = viewModel.modelManagementState.modelSizes[model] ?? 0
-            let progress = Double(viewModel.modelManagementState.downloadProgress[model] ?? 0)
-
-            totalSize += modelSize
-            downloadedSize += Double(modelSize) * progress
-        }
-
-        return totalSize > 0 ? downloadedSize / Double(totalSize) : 0
+        viewModel.modelManagementState.weightedDownloadProgress(for: activeDownloadModels)
     }
 
     // 다운로드 중인 총 크기
     private var totalDownloadingSize: String {
-        let downloadingModels = viewModel.modelManagementState.currentDownloadingModels
-        let totalSize = downloadingModels.reduce(Int64(0)) { total, model in
-            total + (viewModel.modelManagementState.modelSizes[model] ?? 0)
-        }
+        let totalSize = viewModel.modelManagementState
+            .totalDownloadByteCount(for: activeDownloadModels)
         return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
     // 다운로드된 크기 계산
     private var downloadedSize: String {
-        let downloadingModels = viewModel.modelManagementState.currentDownloadingModels
-        var downloaded: Int64 = 0
-
-        for model in downloadingModels {
-            let modelSize = viewModel.modelManagementState.modelSizes[model] ?? 0
-            let progress = Double(viewModel.modelManagementState.downloadProgress[model] ?? 0)
-            downloaded += Int64(Double(modelSize) * progress)
-        }
-
+        let downloaded = viewModel.modelManagementState
+            .downloadedByteCount(for: activeDownloadModels)
         return ByteCountFormatter.string(fromByteCount: downloaded, countStyle: .file)
+    }
+
+    private var speakerModelStatusText: Text {
+        if modelState.speakerDiarizationModelNeedsRepair {
+            return Text("Needs repair")
+        }
+        if modelState.speakerDiarizationModelNeedsUpdate {
+            return Text("Update available")
+        }
+        switch modelState.speakerDiarizationModelState {
+        case .downloaded:
+            return Text("Offline ready")
+        case .downloading:
+            if modelState.speakerDiarizationModelProgress == nil {
+                return Text("Downloading")
+            }
+            return Text("Downloading \(modelState.formattedSpeakerDiarizationProgress)")
+        case .loading, .prewarming:
+            return Text("Preparing")
+        default:
+            return Text("Not downloaded")
+        }
+    }
+
+    private var speakerModelStatusSymbol: String {
+        if modelState.speakerDiarizationModelNeedsRepair ||
+            modelState.speakerDiarizationModelNeedsUpdate {
+            return "exclamationmark.triangle.fill"
+        }
+        switch modelState.speakerDiarizationModelState {
+        case .downloaded:
+            return "checkmark.circle.fill"
+        case .downloading, .loading, .prewarming:
+            return "arrow.down.circle.fill"
+        default:
+            return "person.2.wave.2.fill"
+        }
+    }
+
+    private var speakerModelActionLabel: String {
+        if modelState.speakerDiarizationModelNeedsUpdate {
+            return "Update speaker model"
+        }
+        if modelState.speakerDiarizationModelNeedsRepair {
+            return "Repair speaker model"
+        }
+        return "Download speaker model"
+    }
+
+    private var speakerModelActionSymbol: String {
+        if modelState.speakerDiarizationModelNeedsUpdate {
+            return "arrow.triangle.2.circlepath"
+        }
+        if modelState.speakerDiarizationModelNeedsRepair {
+            return "wrench.and.screwdriver"
+        }
+        return "arrow.down.circle"
     }
 
     var body: some View {
@@ -93,7 +133,17 @@ struct ModelManagerView: View {
                 }
                 Spacer()
                 Button {
-                    viewModel.fetchModels()
+                    viewModel.fetchModels(forceRefresh: true)
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .imageScale(.medium)
+                        .accessibilityLabel(Text("Refresh models"))
+                }
+                .buttonStyle(.plain)
+                .disabled(modelState.catalogLoadState.isLoading)
+                .help("Refresh model catalog")
+
+                Button {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -122,10 +172,28 @@ struct ModelManagerView: View {
 
             // 로컬 모델 / 다운로드 가능 모델 섹션 분리
             let allModels = viewModel.modelManagementState.availableModels
+            let activeDownloadModelSet = Set(activeDownloadModels)
             let localModels = allModels
-                .filter { viewModel.modelManagementState.localModels.contains($0) }
+                .filter {
+                    viewModel.modelManagementState.localModels.contains($0) &&
+                        !activeDownloadModelSet.contains($0)
+                }
             let remoteModels = allModels
-                .filter { !viewModel.modelManagementState.localModels.contains($0) }
+                .filter {
+                    !viewModel.modelManagementState.localModels.contains($0) &&
+                        !activeDownloadModelSet.contains($0)
+                }
+
+            let filteredDownloadingModels = activeDownloadModels.filter { model in
+                let matchesFilter = searchText.isEmpty ||
+                    model.lowercased().contains(searchText.lowercased())
+
+                let notFiltered = !filterWords.contains { filter in
+                    model.lowercased().contains(filter.lowercased())
+                }
+
+                return matchesFilter && notFiltered
+            }
 
             // 필터링된 모델 목록
             let filteredLocalModels = localModels.filter { model in
@@ -162,7 +230,7 @@ struct ModelManagerView: View {
                         Label("total_models", systemImage: "square.stack.3d.up")
                             .font(.caption)
                         Spacer()
-                        Text("\(filteredLocalModels.count + filteredRemoteModels.count)")
+                        Text("\(filteredDownloadingModels.count + filteredLocalModels.count + filteredRemoteModels.count)")
                             .font(.caption.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
@@ -178,12 +246,20 @@ struct ModelManagerView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if viewModel.modelManagementState.availableModels.isEmpty {
+                    if viewModel.modelManagementState.availableModels.isEmpty ||
+                        modelState.catalogLoadState.isLoading ||
+                        modelState.isRemoteModelSizeLoading {
                         Divider()
                         HStack {
-                            Text("loading_model_info")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
+                            if modelState.isRemoteModelSizeLoading {
+                                Text("Updating download sizes")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            } else {
+                                Text(LocalizedStringKey(modelState.catalogLoadState.statusText))
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
                             Spacer()
                             ProgressView()
                                 .scaleEffect(0.6)
@@ -199,8 +275,91 @@ struct ModelManagerView: View {
             .backgroundStyle(Color(nsColor: .controlBackgroundColor))
             .padding(.horizontal, 16)
 
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        Label {
+                            speakerModelStatusText
+                        } icon: {
+                            Image(systemName: speakerModelStatusSymbol)
+                        }
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(modelState.isSpeakerDiarizationModelReady ? .green : .secondary)
+                            .accessibilityIdentifier("modelManager.speakerModelStatus")
+                        Spacer()
+                        Text(modelState.formattedSpeakerDiarizationModelSize)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(Text("Speaker model size"))
+
+                        if modelState.isSpeakerDiarizationModelPreparing {
+                            if let progress = modelState.speakerDiarizationModelProgress {
+                                ProgressView(value: Double(progress))
+                                    .frame(width: 90)
+                                    .accessibilityIdentifier("modelManager.speakerModelProgress")
+                            } else {
+                                ProgressView()
+                                    .frame(width: 90)
+                                    .accessibilityIdentifier("modelManager.speakerModelProgress")
+                            }
+                            Button {
+                                viewModel.cancelDefaultSpeakerDiarizationModelDownload()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Cancel speaker model download")
+                            .accessibilityLabel(Text("Cancel speaker model download"))
+                        } else if !modelState.isSpeakerDiarizationModelReady {
+                            Button {
+                                viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded(
+                                    showSuccessMessage: true
+                                )
+                            } label: {
+                                Image(systemName: speakerModelActionSymbol)
+                            }
+                            .buttonStyle(.borderless)
+                            .help(speakerModelActionLabel)
+                            .accessibilityLabel(Text(speakerModelActionLabel))
+                            .accessibilityHint(
+                                Text("Repairs the local offline speaker model used by speaker diarization.")
+                            )
+                            .accessibilityIdentifier("modelManager.speakerModelActionButton")
+                        } else {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .accessibilityHidden(true)
+                        }
+                    }
+
+                    Text("Required for speaker diarization. Stored locally for offline speaker labels.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                        .accessibilityIdentifier("modelManager.speakerModelCaption")
+
+                    if let error = modelState.speakerDiarizationModelError,
+                       !modelState.isSpeakerDiarizationModelReady {
+                        Text(LocalizedStringKey(error))
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.vertical, 4)
+            } label: {
+                Label("speaker_diarization_model", systemImage: "person.2.wave.2")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .accessibilityIdentifier("modelManager.speakerDiarizationModelSection")
+
             // 다운로드 총 진행 상황 표시
-            if !viewModel.modelManagementState.currentDownloadingModels.isEmpty {
+            if modelState.hasVisibleDownloadActivity, !activeDownloadModels.isEmpty {
                 GroupBox {
                     VStack(spacing: 10) {
                         // 상단 정보 행
@@ -210,9 +369,7 @@ struct ModelManagerView: View {
                                 .symbolEffect(.pulse)
 
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(
-                                    "downloading_models_count \(viewModel.modelManagementState.currentDownloadingModels.count)"
-                                )
+                                Text("downloading_models_count \(activeDownloadModels.count)")
                                 .font(.caption.weight(.medium))
 
                                 HStack(spacing: 4) {
@@ -225,6 +382,11 @@ struct ModelManagerView: View {
                                     Text(totalDownloadingSize)
                                         .font(.caption2.monospacedDigit())
                                         .foregroundStyle(.secondary)
+                                    if !modelState.queuedDownloadModels.isEmpty {
+                                        Text("Queued \(modelState.queuedDownloadModels.count)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
 
@@ -281,7 +443,7 @@ struct ModelManagerView: View {
 
             // 메인 콘텐츠 영역
             ScrollView {
-                if allModels.isEmpty {
+                if allModels.isEmpty && filteredDownloadingModels.isEmpty {
                     // 모델이 없는 경우 로딩 표시
                     VStack(spacing: 16) {
                         Spacer()
@@ -299,6 +461,30 @@ struct ModelManagerView: View {
                     }
                 } else {
                     LazyVStack(spacing: 16, pinnedViews: []) {
+                        if !filteredDownloadingModels.isEmpty {
+                            GroupBox {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(filteredDownloadingModels, id: \.self) { model in
+                                        ModelRowView(model: model, viewModel: viewModel)
+
+                                        if model != filteredDownloadingModels.last {
+                                            Divider()
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                            } label: {
+                                Label("downloading_models", systemImage: "arrow.down.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.blue)
+                            }
+                            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .accessibilityIdentifier("modelManager.downloadingModelsSection")
+                        }
+
                         // 로컬에 있는 모델 섹션
                         if !filteredLocalModels.isEmpty {
                             GroupBox {
@@ -311,7 +497,8 @@ struct ModelManagerView: View {
                                         }
                                     }
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
                             } label: {
                                 Label("downloaded_models", systemImage: "checkmark.circle.fill")
                                     .font(.subheadline)
@@ -319,7 +506,7 @@ struct ModelManagerView: View {
                             }
                             .backgroundStyle(Color(nsColor: .controlBackgroundColor))
                             .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.top, filteredDownloadingModels.isEmpty ? 12 : 0)
                         }
 
                         // 다운로드 가능한 모델 섹션
@@ -334,7 +521,8 @@ struct ModelManagerView: View {
                                         }
                                     }
                                 }
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
                             } label: {
                                 HStack {
                                     Label("available_models", systemImage: "arrow.down.circle")
@@ -350,7 +538,7 @@ struct ModelManagerView: View {
                             }
                             .backgroundStyle(Color(nsColor: .controlBackgroundColor))
                             .padding(.horizontal, 16)
-                            .padding(.top, filteredLocalModels.isEmpty ? 12 : 0)
+                            .padding(.top, filteredDownloadingModels.isEmpty && filteredLocalModels.isEmpty ? 12 : 0)
                         }
                     }
                     .padding(.bottom, 16)
@@ -382,6 +570,7 @@ struct ModelManagerView: View {
 struct ModelRowView: View {
     let model: String
     @ObservedObject var viewModel: ContentViewModel
+    @State private var isDeleteConfirmationPresented = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -412,8 +601,12 @@ struct ModelRowView: View {
                         LoadingDotsView(text: "Downloading")
                             .font(.caption2)
                             .foregroundStyle(.blue)
+                    } else if viewModel.modelManagementState.isQueued(model: model) {
+                        Text("Queued")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     } else {
-                        Text(viewModel.modelManagementState.formattedModelSize(for: model))
+                        Text(viewModel.modelManagementState.formattedModelSizeWithSource(for: model))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -497,20 +690,67 @@ struct ModelRowView: View {
                                     width: geometry.size
                                         .width *
                                         CGFloat(viewModel.modelManagementState
-                                            .downloadProgress[model] ?? 0),
+                                            .downloadProgressValue(for: model)),
                                     height: 6
                                 )
                                 .animation(
                                     .easeInOut(duration: 0.3),
-                                    value: viewModel.modelManagementState.downloadProgress[model]
+                                    value: viewModel.modelManagementState
+                                        .downloadProgressValue(for: model)
                                 )
                         }
                         .frame(height: 6)
                     }
                 }
+            } else if viewModel.modelManagementState.isQueued(model: model) {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                        .foregroundStyle(.secondary)
+                    Text("Waiting for an available download slot")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        viewModel.cancelDownload(model)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .imageScale(.small)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Cancel queued download")
+                }
+            } else if let error = viewModel.modelManagementState.downloadErrors[model] {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(LocalizedStringKey(error))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+
+                    Spacer()
+
+                    Button {
+                        viewModel.downloadModel(model)
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.modelManagementState.canStartDownload(model: model))
+                    .help("Retry Download")
+                }
             }
         }
         .padding(.vertical, 6)
+        .alert("Delete Model", isPresented: $isDeleteConfirmationPresented) {
+            Button("Delete", role: .destructive) {
+                viewModel.deleteModel(model)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Delete \(viewModel.modelManagementState.displayName(for: model)) from this Mac?")
+        }
     }
 
     // 모델 상태에 따른 동작 버튼
@@ -571,7 +811,7 @@ struct ModelRowView: View {
             } else {
                 // 로드되지 않은 로컬 모델 - 삭제 버튼
                 Button {
-                    viewModel.deleteModel(model)
+                    isDeleteConfirmationPresented = true
                 } label: {
                     Image(systemName: "trash")
                         .foregroundStyle(.red)
@@ -591,6 +831,10 @@ struct ModelRowView: View {
                         .scaleEffect(0.4)
                 )
                 .help("Cancelling download...")
+        } else if viewModel.modelManagementState.isQueued(model: model) {
+            Image(systemName: "clock")
+                .foregroundStyle(.secondary)
+                .help("Queued for download")
         } else if viewModel.modelManagementState.isDownloading(model: model) {
             // 다운로드 중 - 상태 아이콘
             Image(systemName: "arrow.down.circle")
@@ -612,8 +856,8 @@ struct ModelRowView: View {
             }
             .buttonStyle(.plain)
             .disabled(!viewModel.modelManagementState.canStartDownload(model: model))
-            .help(!viewModel.modelManagementState.canStartDownload(model: model) ?
-                "Maximum simultaneous downloads reached" : "Download Model")
+            .help(viewModel.modelManagementState.canStartDownload(model: model) ?
+                "Download Model" : "Download already scheduled")
         }
     }
 }

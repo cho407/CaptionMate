@@ -67,6 +67,7 @@ struct SettingsView: View {
                             .foregroundStyle(.secondary)
                         Text("decoding_options")
                             .font(.title3.weight(.semibold))
+                            .accessibilityIdentifier("settings.sheet")
                     }
                     Spacer()
                     Button {
@@ -78,6 +79,7 @@ struct SettingsView: View {
                             .accessibilityLabel(Text("Close"))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityIdentifier("settings.closeButton")
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
@@ -97,6 +99,36 @@ struct SettingsView: View {
                             Toggle("", isOn: $viewModel.enableWordTimestamp).labelsHidden()
                         }
                         Divider()
+                        SettingRow(title: "Speaker Diarization", infoKey: "info.speaker_diarization") {
+                            Toggle("", isOn: Binding(
+                                get: { viewModel.enableSpeakerDiarization },
+                                set: { viewModel.setSpeakerDiarizationEnabled($0) }
+                            ))
+                            .labelsHidden()
+                            .accessibilityLabel(Text("Speaker Diarization"))
+                            .accessibilityIdentifier("settings.speakerDiarizationToggle")
+                        }
+                        Divider()
+                        SettingRow(title: "Speaker Count", infoKey: "info.speaker_count") {
+                            Picker("", selection: $viewModel.speakerDiarizationSpeakerCount) {
+                                ForEach(0 ... 8, id: \.self) { count in
+                                    Text(viewModel.speakerCountOptionTitleKey(for: count)).tag(count)
+                                }
+                            }
+                            .frame(width: 104)
+                            .disabled(!viewModel.enableSpeakerDiarization)
+                            .accessibilityLabel(Text("Speaker Count"))
+                            .accessibilityIdentifier("settings.speakerCountPicker")
+                        }
+                        Divider()
+                        SettingRow(title: "Include Speaker Names", infoKey: "info.include_speaker_names") {
+                            Toggle("", isOn: $viewModel.includeSpeakerLabelsInExport)
+                                .labelsHidden()
+                                .disabled(!viewModel.enableSpeakerDiarization)
+                                .accessibilityLabel(Text("Include Speaker Names"))
+                                .accessibilityIdentifier("settings.exportSpeakerLabelsToggle")
+                        }
+                        Divider()
                         SettingRow(title: "Special Characters",
                                    infoKey: "info.special_characters") {
                             Toggle("", isOn: $viewModel.enableSpecialCharacters).labelsHidden()
@@ -107,6 +139,28 @@ struct SettingsView: View {
                             infoKey: "info.show_decoder_preview"
                         ) {
                             Toggle("", isOn: $viewModel.enableDecoderPreview).labelsHidden()
+                        }
+                        Divider()
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 10) {
+                                Text("Export Preset")
+                                Spacer()
+                                Picker("", selection: Binding(
+                                    get: { viewModel.selectedExportPreset },
+                                    set: { preset in
+                                        viewModel.selectedExportPreset = preset
+                                        viewModel.applySelectedExportPreset()
+                                    }
+                                )) {
+                                    ForEach(SubtitleExportPreset.allCases) { preset in
+                                        Text(preset.displayNameKey).tag(preset)
+                                    }
+                                }
+                                .frame(width: 190)
+                            }
+                            Text(viewModel.selectedExportPreset.summaryKey)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
                         Divider()
                         HStack(spacing: 10) {
@@ -227,6 +281,14 @@ struct SettingsView: View {
                                 .frame(width: 36, alignment: .trailing)
                                 .foregroundStyle(.secondary)
                         }
+
+                        Button {
+                            viewModel.applyRecommendedPerformanceSettings()
+                        } label: {
+                            Label("Auto Tune Performance", systemImage: "wand.and.stars")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderless)
 
                         Divider()
 

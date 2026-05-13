@@ -55,7 +55,8 @@ struct BasicSettingsView: View {
                     Picker("", selection: $viewModel.selectedLanguage) {
                         ForEach(viewModel.modelManagementState.availableLanguages,
                                 id: \.self) { language in
-                            Text(language.description).tag(language.description)
+                            Text(verbatim: viewModel.transcriptionLanguageTitle(for: language.description))
+                                .tag(language.description)
                         }
                     }
                     .disabled(!(viewModel.whisperKit?.modelVariant.isMultilingual ?? false))

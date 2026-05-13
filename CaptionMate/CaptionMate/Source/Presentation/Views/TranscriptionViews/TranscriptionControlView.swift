@@ -76,13 +76,21 @@ struct TranscriptionControlView: View {
                     }
                 } label: {
                     HStack {
-                        Label("Export Subtitle", systemImage: "laptopcomputer.and.arrow.down")
-                            .font(.headline)
-                            .padding(8)
+                        if viewModel.isExporting {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                        }
+                        Label(
+                            viewModel.isExporting ? "Exporting" : "Export Subtitle",
+                            systemImage: "laptopcomputer.and.arrow.down"
+                        )
+                        .font(.headline)
+                        .padding(8)
                     }
                 }
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
-                .disabled(viewModel.transcriptionResult == nil)
+                .disabled(viewModel.transcriptionResult == nil || viewModel.isExporting)
+                .accessibilityIdentifier("transcription.exportButton")
             }
         }
         .frame(maxWidth: .infinity)

@@ -49,7 +49,7 @@ struct ModelSelectorView: View {
                         isActive: viewModel.modelManagementState.modelState != .loaded && viewModel
                             .modelManagementState.modelState != .unloaded
                     )
-                Text(viewModel.modelManagementState.modelState.description)
+                Text(viewModel.modelManagementState.modelState.captionMateLocalizedKey)
 
                 Spacer()
 
@@ -65,9 +65,7 @@ struct ModelSelectorView: View {
                         ForEach(filteredModels, id: \.self) { model in
                             let isLocalModel = viewModel.modelManagementState.localModels
                                 .contains(model)
-                            let modelName = model.components(separatedBy: "_").dropFirst()
-                                .joined(separator: " ")
-                                .replacingOccurrences(of: "-", with: " ")
+                            let modelName = viewModel.modelManagementState.displayName(for: model)
                             let modelSymbolName: String = model == viewModel
                                 .selectedModel ? "circle.fill" : "checkmark.circle"
 
@@ -94,9 +92,8 @@ struct ModelSelectorView: View {
                         }
                     } label: {
                         HStack {
-                            let selectedModelName = viewModel.selectedModel
-                                .components(separatedBy: "_").dropFirst().joined(separator: " ")
-                                .replacingOccurrences(of: "-", with: " ")
+                            let selectedModelName = viewModel.modelManagementState
+                                .displayName(for: viewModel.selectedModel)
                             Text(selectedModelName)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
@@ -128,6 +125,8 @@ struct ModelSelectorView: View {
                     Image(systemName: "tray.and.arrow.down.fill")
                 }
                 .buttonStyle(BorderlessButtonStyle())
+                .accessibilityLabel(Text("Manage Models"))
+                .accessibilityIdentifier("modelSelector.manageModelsButton")
                 .help("Manage Models")
             }
 
@@ -144,6 +143,8 @@ struct ModelSelectorView: View {
                         .padding(.top, 2)
                 }
             } else if viewModel.modelManagementState.loadingProgressValue < 1.0 {
+                let selectedModelName = viewModel.modelManagementState
+                    .displayName(for: viewModel.selectedModel)
                 VStack {
                     HStack {
                         ProgressView(
@@ -172,28 +173,28 @@ struct ModelSelectorView: View {
                     } else if viewModel.modelManagementState.modelState == .loading {
                         // 로딩 텍스트와 점 애니메이션만 표시
                         LoadingDotsView(
-                            text: "Loading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                            text: Text("Loading \(selectedModelName)")
                         )
                         .font(.callout)
                         .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .prewarming {
                         // 로딩 텍스트와 점 애니메이션만 표시
                         LoadingDotsView(
-                            text: "Specializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                            text: Text("Specializing \(selectedModelName)")
                         )
                         .font(.callout)
                         .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .unloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
                         LoadingDotsView(
-                            text: "Initializing \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                            text: Text("Initializing \(selectedModelName)")
                         )
                         .font(.callout)
                         .foregroundColor(.middleDarkGray)
                     } else if viewModel.modelManagementState.modelState == .downloading {
                         // 로딩 텍스트와 점 애니메이션만 표시
                         LoadingDotsView(
-                            text: "Downloading \(viewModel.selectedModel.components(separatedBy: "_").dropFirst().joined(separator: " "))"
+                            text: Text("Downloading \(selectedModelName)")
                         )
                         .font(.callout)
                         .foregroundColor(.middleDarkGray)
@@ -204,6 +205,12 @@ struct ModelSelectorView: View {
         .onAppear {
             // 모델 목록 갱신
             viewModel.fetchModels()
+
+#if DEBUG
+            if viewModel.shouldSkipModelSelectorAutoActionsForUITesting {
+                return
+            }
+#endif
 
             // 자동 로드 기능 - 선택된 모델이 로컬에 있으면 자동으로 로드
             if viewModel.modelManagementState.localModels.isEmpty {

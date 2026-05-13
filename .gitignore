@@ -18,12 +18,17 @@ build/
 *.hmap
 
 # App packaging
+*.app/
 *.ipa
 *.dSYM.zip
 *.dSYM
 
 # Swift Package Manager
 Package.resolved
+!CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/
+!CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/xcshareddata/
+!CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+!CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 **/.build
 **/.swiftpm
 .build/

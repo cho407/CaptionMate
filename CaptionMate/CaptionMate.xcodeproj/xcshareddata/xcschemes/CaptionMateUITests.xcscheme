@@ -31,13 +31,12 @@
       shouldAutocreateTestPlan = "YES">
       <Testables>
          <TestableReference
-            skipped = "NO"
-            parallelizable = "YES">
+            skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "9941C9AA2D6A137A0086EB91"
-               BuildableName = "CaptionMateTests.xctest"
-               BlueprintName = "CaptionMateTests"
+               BlueprintIdentifier = "9941C9B42D6A137A0086EB91"
+               BuildableName = "CaptionMateUITests.xctest"
+               BlueprintName = "CaptionMateUITests"
                ReferencedContainer = "container:CaptionMate.xcodeproj">
             </BuildableReference>
          </TestableReference>

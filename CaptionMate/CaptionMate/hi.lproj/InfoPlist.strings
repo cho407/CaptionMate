@@ -1,0 +1,18 @@
+/*
+  InfoPlist.strings
+  CaptionMate
+
+  Hindi localization for Info.plist
+*/
+
+/* Copyright */
+"NSHumanReadableCopyright" = "Copyright © 2025 Harrison Cho. सर्वाधिकार सुरक्षित.";
+
+/* File Type Descriptions */
+"Final Cut Pro XML" = "Final Cut Pro XML";
+"SRT" = "SRT उपशीर्षक";
+"webVTT" = "WebVTT उपशीर्षक";
+"JSON" = "JSON उपशीर्षक";
+
+/* Document Type Name */
+"Final Cut Pro XML Subtitle" = "Final Cut Pro XML उपशीर्षक";

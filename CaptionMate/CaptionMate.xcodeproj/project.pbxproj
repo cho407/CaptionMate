@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		99193C782D8BC069008B205B /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = 99193C772D8BC069008B205B /* WhisperKit */; };
+		99D100012F00000000000001 /* SpeakerKit in Frameworks */ = {isa = PBXBuildFile; productRef = 99D100002F00000000000001 /* SpeakerKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -94,6 +95,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				99193C782D8BC069008B205B /* WhisperKit in Frameworks */,
+				99D100012F00000000000001 /* SpeakerKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -155,6 +157,7 @@
 			name = CaptionMate;
 			packageProductDependencies = (
 				99193C772D8BC069008B205B /* WhisperKit */,
+				99D100002F00000000000001 /* SpeakerKit */,
 			);
 			productName = CaptionMate;
 			productReference = 9941C9982D6A13770086EB91 /* CaptionMate.app */;
@@ -228,7 +231,15 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				"en-GB",
 				ko,
+				ja,
+				es,
+				de,
+				fr,
+				"pt-BR",
+				hi,
+				"zh-Hans",
 				Base,
 			);
 			mainGroup = 9941C98F2D6A13770086EB91;
@@ -642,8 +653,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/argmaxinc/WhisperKit";
 			requirement = {
-				branch = main;
-				kind = branch;
+				kind = revision;
+				revision = 80d96762fa727f816ffceab76a6529cd12c2726f;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -653,6 +664,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 99193C762D8BC069008B205B /* XCRemoteSwiftPackageReference "WhisperKit" */;
 			productName = WhisperKit;
+		};
+		99D100002F00000000000001 /* SpeakerKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 99193C762D8BC069008B205B /* XCRemoteSwiftPackageReference "WhisperKit" */;
+			productName = SpeakerKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
