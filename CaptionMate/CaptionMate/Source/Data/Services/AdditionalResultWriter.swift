@@ -26,6 +26,20 @@ import Foundation
 import WhisperKit
 // TODO: - ASS, SCC, XML파일 형식에대한 로직 검증이 덜됨. 복잡성 증가하기때문에 지원보류
 
+enum AdditionalResultWriterError: LocalizedError, Equatable {
+    case unsafeOutputFileName(String)
+    case invalidFrameRate(Double)
+
+    var errorDescription: String? {
+        switch self {
+        case let .unsafeOutputFileName(fileName):
+            return "Unsafe output file name: \(fileName)"
+        case let .invalidFrameRate(frameRate):
+            return "Invalid FCPXML frame rate: \(frameRate)"
+        }
+    }
+}
+
 // MARK: - Helper Functions
 
 /// 주어진 초를 프레임 레이트를 반영한 타임코드 (HH:MM:SS:FF) 문자열로 변환 (FCPXML, SCC 등에서 사용)
@@ -136,8 +150,46 @@ open class WriteFCPXML: ResultWriting {
             .replacingOccurrences(of: ">", with: "&gt;")
     }
 
+    private func validatedFrameRate() throws {
+        guard frameRate.isFinite,
+              frameRate >= 1,
+              frameRate <= 240 else {
+            throw AdditionalResultWriterError.invalidFrameRate(frameRate)
+        }
+    }
+
+    private func outputURL(for file: String) throws -> URL {
+        let trimmedFileName = file.trimmingCharacters(in: .whitespacesAndNewlines)
+        let disallowedCharacters = CharacterSet(charactersIn: "/\\:")
+            .union(.controlCharacters)
+        guard !trimmedFileName.isEmpty,
+              trimmedFileName == file,
+              trimmedFileName != ".",
+              trimmedFileName != "..",
+              trimmedFileName.rangeOfCharacter(from: disallowedCharacters) == nil else {
+            throw AdditionalResultWriterError.unsafeOutputFileName(file)
+        }
+
+        let outputDirectoryURL = URL(fileURLWithPath: outputDir, isDirectory: true)
+            .standardizedFileURL
+        let reportURL = outputDirectoryURL
+            .appendingPathComponent(trimmedFileName, isDirectory: false)
+            .appendingPathExtension("fcpxml")
+            .standardizedFileURL
+        guard reportURL.deletingLastPathComponent().standardizedFileURL == outputDirectoryURL else {
+            throw AdditionalResultWriterError.unsafeOutputFileName(file)
+        }
+        return reportURL
+    }
+
     public func write(result: TranscriptionResult, to file: String,
                       options: [String: Any]? = nil) -> Result<String, Error> {
+        do {
+            try validatedFrameRate()
+        } catch {
+            return .failure(error)
+        }
+
         // 프레임 레이트에 따른 frameDuration 계산
         let frameDurationString: String
         if abs(frameRate - 29.97) < 0.01 {
@@ -307,8 +359,8 @@ open class WriteFCPXML: ResultWriting {
         </fcpxml>
         """
 
-        let reportURL = URL(fileURLWithPath: outputDir).appendingPathComponent("\(file).fcpxml")
         do {
+            let reportURL = try outputURL(for: file)
             try xmlContent.write(to: reportURL, atomically: true, encoding: .utf8)
             return .success(reportURL.absoluteString)
         } catch {

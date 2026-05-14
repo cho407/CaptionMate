@@ -49,6 +49,7 @@ enum ModelCatalogService {
     }
 
     private static let remoteSizeCacheMaxAge: TimeInterval = 60 * 60 * 24
+    static let maxRemoteTreeResponseBytes: Int64 = 8 * 1024 * 1024
 
     static func localModelDirectoryURL(
         modelStorage: String,
@@ -218,6 +219,13 @@ enum ModelCatalogService {
         if let httpResponse = response as? HTTPURLResponse,
            !(200 ..< 300).contains(httpResponse.statusCode) {
             throw URLError(.badServerResponse)
+        }
+        if let httpResponse = response as? HTTPURLResponse,
+           httpResponse.expectedContentLength > maxRemoteTreeResponseBytes {
+            throw URLError(.dataLengthExceedsMaximum)
+        }
+        guard data.count <= maxRemoteTreeResponseBytes else {
+            throw URLError(.dataLengthExceedsMaximum)
         }
 
         let entries = try JSONDecoder().decode([HuggingFaceTreeEntry].self, from: data)

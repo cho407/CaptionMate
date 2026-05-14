@@ -473,6 +473,43 @@ struct ContentViewModelTests {
         #expect(viewModel.uiState.isTranscribingView == true)
     }
 
+    @Test("Sidecar 복원은 비정상 화자 ID를 허용 범위로 제한한다") @MainActor
+    func testRestoreTranscriptionSidecarClampsUnsafeSpeakerIDs() throws {
+        let viewModel = ContentViewModel()
+        let sidecar = CaptionMateSidecar(
+            version: CaptionMateSidecar.currentVersion,
+            audioFileName: "clip",
+            language: "ko",
+            segments: [
+                .init(start: 0, end: 1, text: "invalid", speakerID: Int.max),
+                .init(start: 1, end: 2, text: "valid", speakerID: 7),
+                .init(start: 2, end: 3, text: "negative", speakerID: -1),
+            ],
+            speakerNames: [
+                "\(Int.max)": "Huge",
+                "-1": "Negative",
+                "7": "Panelist",
+            ],
+            exportSettings: .init(
+                selectedExportPreset: SubtitleExportPreset.general.rawValue,
+                frameRate: 30,
+                includeSpeakerLabelsInExport: true,
+                speakerDiarizationSpeakerCount: 0
+            )
+        )
+
+        viewModel.restoreTranscriptionSidecar(sidecar)
+
+        #expect(viewModel.transcriptionState.speakerAssignments == [
+            nil,
+            SpeakerSegmentAssignment(speakerID: 7),
+            nil,
+        ])
+        #expect(viewModel.transcriptionState.speakerNames == [7: "Panelist"])
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 8)
+        #expect(viewModel.availableSpeakerIDs() == Array(0 ..< 8))
+    }
+
     @Test("Batch queue 상태 테스트") @MainActor
     func testBatchQueueState() throws {
         let viewModel = ContentViewModel()
@@ -741,6 +778,33 @@ struct ContentViewModelTests {
             } catch {
                 Issue.record("Unexpected error for \(unsafeName): \(error)")
             }
+        }
+    }
+
+    @Test("원격 모델 크기 응답이 과도하게 크면 디코딩 전에 거부한다")
+    func testRemoteFolderSizeRejectsOversizedResponses() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OversizedRemoteSizeURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer {
+            session.finishTasksAndInvalidate()
+            OversizedRemoteSizeURLProtocol.responseData = Data()
+        }
+
+        OversizedRemoteSizeURLProtocol.responseData = Data(
+            repeating: UInt8(ascii: "["),
+            count: Int(ModelCatalogService.maxRemoteTreeResponseBytes) + 1
+        )
+
+        do {
+            _ = try await ModelCatalogService.remoteFolderSize(
+                repoName: "argmaxinc/whisperkit-coreml",
+                model: "openai_whisper-tiny",
+                session: session
+            )
+            Issue.record("Oversized remote model metadata should throw before JSON decode.")
+        } catch let error as URLError {
+            #expect(error.code == .dataLengthExceedsMaximum)
         }
     }
 
@@ -1467,6 +1531,65 @@ struct FCPXMLWriterTests {
         _ = try XMLDocument(xmlString: xml)
     }
 
+    @Test("FCPXML writer는 저장 파일명이 출력 폴더 밖으로 벗어나지 못하게 한다")
+    func testFCPXMLWriterRejectsPathTraversalFileName() throws {
+        let outputDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateFCPXML-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: outputDirectory)
+            try? FileManager.default.removeItem(
+                at: outputDirectory.deletingLastPathComponent().appendingPathComponent("escape.fcpxml")
+            )
+        }
+
+        let writer = WriteFCPXML(outputDir: outputDirectory.path, frameRate: 30)
+        let result = TranscriptionResult(
+            text: "escape",
+            segments: [TranscriptionSegment(start: 0, end: 1, text: "escape")],
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+
+        switch writer.write(result: result, to: "../escape", options: nil) {
+        case .success:
+            Issue.record("Path traversal file names should not be accepted.")
+        case .failure:
+            #expect(!FileManager.default.fileExists(
+                atPath: outputDirectory.deletingLastPathComponent()
+                    .appendingPathComponent("escape.fcpxml")
+                    .path
+            ))
+        }
+    }
+
+    @Test("FCPXML writer는 비정상 프레임레이트를 거부한다")
+    func testFCPXMLWriterRejectsInvalidFrameRates() throws {
+        let outputDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateFCPXML-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(at: outputDirectory)
+        }
+
+        for frameRate in [0.0, -24.0, Double.nan, Double.infinity] {
+            let writer = WriteFCPXML(outputDir: outputDirectory.path, frameRate: frameRate)
+            let result = TranscriptionResult(
+                text: "invalid",
+                segments: [TranscriptionSegment(start: 0, end: 1, text: "invalid")],
+                language: "en",
+                timings: TranscriptionTimings()
+            )
+
+            switch writer.write(result: result, to: "invalid", options: nil) {
+            case .success:
+                Issue.record("Invalid frame rate should not be accepted: \(frameRate)")
+            case .failure:
+                continue
+            }
+        }
+    }
+
     private func writeFCPXML(
         segments: [TranscriptionSegment],
         frameRate: Double,
@@ -1942,4 +2065,76 @@ struct StringExtensionTests {
         let invalid3 = "".srtTimestampToSeconds()
         #expect(invalid3 == nil)
     }
+}
+
+// MARK: - Release Gate Tests
+
+struct ReleaseGateTests {
+    @Test("v2 릴리스 버전과 빌드 번호가 프로젝트 설정에 반영되어야 한다")
+    func testProjectVersionIsPreparedForV2Release() throws {
+        let project = try Self.readRepositoryFile("CaptionMate/CaptionMate.xcodeproj/project.pbxproj")
+
+        #expect(project.contains("MARKETING_VERSION = 2.0.0;"))
+        #expect(!project.contains("MARKETING_VERSION = 1.0;"))
+        #expect(!project.contains("CURRENT_PROJECT_VERSION = 1;"))
+    }
+
+    @Test("ContentViewModel은 UI 상태를 MainActor에 격리하고 장시간 다운로드는 detached worker로 실행한다")
+    func testContentViewModelConcurrencyReleaseGate() throws {
+        let source = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(source.contains("@MainActor\nclass ContentViewModel"))
+        #expect(source.contains("speakerDiarizationModelTask = Task.detached(priority: .background)"))
+        #expect(source.contains("let task = Task.detached(priority: .background)"))
+        #expect(source.contains("try Task.checkCancellation()"))
+    }
+
+    private static func readRepositoryFile(_ relativePath: String) throws -> String {
+        let url = try repositoryRoot().appendingPathComponent(relativePath)
+        return try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private static func repositoryRoot() throws -> URL {
+        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+        let fileManager = FileManager.default
+
+        while directory.path != "/" {
+            if fileManager.fileExists(atPath: directory.appendingPathComponent(".git").path) {
+                return directory
+            }
+            directory.deleteLastPathComponent()
+        }
+
+        throw CocoaError(.fileNoSuchFile)
+    }
+}
+
+final class OversizedRemoteSizeURLProtocol: URLProtocol {
+    static var responseData = Data()
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        let response = HTTPURLResponse(
+            url: request.url ?? URL(string: "https://huggingface.co")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: [
+                "Content-Length": "\(Self.responseData.count)",
+            ]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
 }

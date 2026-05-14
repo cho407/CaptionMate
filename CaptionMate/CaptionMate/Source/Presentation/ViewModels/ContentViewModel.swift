@@ -126,6 +126,8 @@ enum AppLanguageResolver {
 
 @MainActor
 class ContentViewModel: ObservableObject {
+    private static let supportedSpeakerIDRange = 0 ..< 8
+
     private var isLoadingModel = false
     private var activeTranscribeTaskID: UUID?
     private var activeSpeakerDiarizationTaskID: UUID?
@@ -898,7 +900,7 @@ class ContentViewModel: ObservableObject {
     }
 
     /// 디스크 여유 공간 확인 함수
-    func checkDiskSpace() -> (available: Int64, required: Int64, isEnough: Bool) {
+    nonisolated func checkDiskSpace() -> (available: Int64, required: Int64, isEnough: Bool) {
         let fileManager = FileManager.default
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
             .first else {
@@ -1481,7 +1483,7 @@ class ContentViewModel: ObservableObject {
         modelManagementState.speakerDiarizationModelNeedsUpdate = false
         modelManagementState.speakerDiarizationModelPath = modelRoot.path
 
-        speakerDiarizationModelTask = Task(priority: .background) { [weak self] in
+        speakerDiarizationModelTask = Task.detached(priority: .background) { [weak self] in
             guard let self else { return }
 
             do {
@@ -1505,7 +1507,7 @@ class ContentViewModel: ObservableObject {
                 )
                 let diarizer = SpeakerKitDiarizer.pyannote(config: config)
                 let progressCallback: (Progress) -> Void = { [weak self] progress in
-                    Task<Void, Never> { [weak self] in
+                    Task<Void, Never> { @MainActor [weak self] in
                         self?.updateSpeakerDiarizationDownloadProgress(progress)
                     }
                 }
@@ -1513,42 +1515,49 @@ class ContentViewModel: ObservableObject {
                     downloader: diarizer.downloader,
                     progressCallback: progressCallback
                 )
-                self.modelManagementState.speakerDiarizationModelProgress = 1.0
+                try Task.checkCancellation()
 
-                self.refreshSpeakerDiarizationModelState()
                 let report = SpeakerDiarizationModelStore.validationReport(for: modelRoot)
                 guard report.isValid else {
                     throw CocoaError(.fileReadCorruptFile)
                 }
 
-                self.speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore
-                    .manifestVersion
-                self.refreshSpeakerDiarizationModelState()
-                self.speakerDiarizationDownloadProgress = nil
-                self.speakerDiarizationModelTask = nil
+                await MainActor.run {
+                    self.modelManagementState.speakerDiarizationModelProgress = 1.0
+                    self.refreshSpeakerDiarizationModelState()
+                    self.speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore
+                        .manifestVersion
+                    self.refreshSpeakerDiarizationModelState()
+                    self.speakerDiarizationDownloadProgress = nil
+                    self.speakerDiarizationModelTask = nil
 
-                if showSuccessMessage {
-                    self.showUserMessage(
-                        .success,
-                        title: "Speaker Model Ready",
-                        detail: self.modelManagementState.formattedSpeakerDiarizationModelSize
-                    )
+                    if showSuccessMessage {
+                        self.showUserMessage(
+                            .success,
+                            title: "Speaker Model Ready",
+                            detail: self.modelManagementState.formattedSpeakerDiarizationModelSize
+                        )
+                    }
                 }
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: modelRoot)
-                self.modelManagementState.speakerDiarizationModelState = .unloaded
-                self.modelManagementState.speakerDiarizationModelProgress = nil
-                self.modelManagementState.speakerDiarizationModelError = "Download cancelled."
-                self.speakerDiarizationDownloadProgress = nil
-                self.speakerDiarizationModelTask = nil
+                await MainActor.run {
+                    self.modelManagementState.speakerDiarizationModelState = .unloaded
+                    self.modelManagementState.speakerDiarizationModelProgress = nil
+                    self.modelManagementState.speakerDiarizationModelError = "Download cancelled."
+                    self.speakerDiarizationDownloadProgress = nil
+                    self.speakerDiarizationModelTask = nil
+                }
             } catch {
-                self.modelManagementState.speakerDiarizationModelState = .unloaded
-                self.modelManagementState.speakerDiarizationModelProgress = nil
-                self.modelManagementState.speakerDiarizationModelError = error.localizedDescription
-                self.modelManagementState.speakerDiarizationModelNeedsRepair =
-                    FileManager.default.fileExists(atPath: modelRoot.path)
-                self.speakerDiarizationDownloadProgress = nil
-                self.speakerDiarizationModelTask = nil
+                let modelExists = FileManager.default.fileExists(atPath: modelRoot.path)
+                await MainActor.run {
+                    self.modelManagementState.speakerDiarizationModelState = .unloaded
+                    self.modelManagementState.speakerDiarizationModelProgress = nil
+                    self.modelManagementState.speakerDiarizationModelError = error.localizedDescription
+                    self.modelManagementState.speakerDiarizationModelNeedsRepair = modelExists
+                    self.speakerDiarizationDownloadProgress = nil
+                    self.speakerDiarizationModelTask = nil
+                }
             }
         }
     }
@@ -1678,7 +1687,14 @@ class ContentViewModel: ObservableObject {
             modelManagementState.downloadTasks[model] = nil
         }
 
-        let task = Task(priority: .background) { [weak self] in
+        let repoName = repoName
+        let estimatedSize = estimatedDownloadSize(for: model)
+        let requiredSpace = estimatedRequiredDownloadSpace(for: model)
+        let reservedSpaceForOtherDownloads =
+            estimatedRemainingDownloadSpaceForOtherActiveDownloads(excluding: model)
+        let localModelPath = modelManagementState.localModelPath
+
+        let task = Task.detached(priority: .background) { [weak self] in
             guard let self = self else { return }
 
             do {
@@ -1702,10 +1718,6 @@ class ContentViewModel: ObservableObject {
                     return
                 }
 
-                let estimatedSize = self.estimatedDownloadSize(for: model)
-                let requiredSpace = self.estimatedRequiredDownloadSpace(for: model)
-                let reservedSpaceForOtherDownloads = self
-                    .estimatedRemainingDownloadSpaceForOtherActiveDownloads(excluding: model)
                 let totalRequiredSpace = requiredSpace + reservedSpaceForOtherDownloads
 
                 if availableSpace < totalRequiredSpace {
@@ -1734,7 +1746,7 @@ class ContentViewModel: ObservableObject {
 
                 let modelFolder = try await WhisperKit.download(
                     variant: model,
-                    from: self.repoName,
+                    from: repoName,
                     progressCallback: { [weak self] progress in
                         guard let self = self else { return }
 
@@ -1761,8 +1773,11 @@ class ContentViewModel: ObservableObject {
                                     .removeValue(forKey: model)
 
                                 // 부분 다운로드 파일 정리 (비동기)
-                                Task {
-                                    await self.cleanupPartialDownload(model)
+                                Task.detached {
+                                    Self.cleanupPartialDownload(
+                                        model,
+                                        localModelPath: localModelPath
+                                    )
                                 }
                             }
                         }
@@ -1793,8 +1808,11 @@ class ContentViewModel: ObservableObject {
                                     )
 
                                     // 즉시 부분 다운로드 파일 정리
-                                    Task {
-                                        await self.cleanupPartialDownload(model)
+                                    Task.detached {
+                                        Self.cleanupPartialDownload(
+                                            model,
+                                            localModelPath: localModelPath
+                                        )
                                     }
 
                                     // 마지막 취소 완료 콜백까지 기다리기 위해 타임스탬프만 업데이트
@@ -1896,7 +1914,7 @@ class ContentViewModel: ObservableObject {
                 let isCancelling = await MainActor
                     .run { self.modelManagementState.cancellingModels.contains(model) }
                 if !isCancelling {
-                    await cleanupPartialDownload(model)
+                    Self.cleanupPartialDownload(model, localModelPath: localModelPath)
                     await MainActor.run {
                         self.modelManagementState.currentDownloadingModels.remove(model)
                         self.modelManagementState.downloadProgress[model] = nil
@@ -1937,7 +1955,7 @@ class ContentViewModel: ObservableObject {
                     self.startNextQueuedDownloadIfPossible()
                     self.updateDownloadActivityState()
                 }
-                await cleanupPartialDownload(model)
+                Self.cleanupPartialDownload(model, localModelPath: localModelPath)
             }
         }
 
@@ -1946,10 +1964,17 @@ class ContentViewModel: ObservableObject {
 
     /// 부분 다운로드 파일 정리 헬퍼 메서드
     private func cleanupPartialDownload(_ model: String) async {
+        Self.cleanupPartialDownload(model, localModelPath: modelManagementState.localModelPath)
+    }
+
+    private nonisolated static func cleanupPartialDownload(
+        _ model: String,
+        localModelPath: String
+    ) {
         // 부분적으로 다운로드된 파일 삭제
         guard let modelFolder = try? ModelCatalogService.modelFolderURL(
             for: model,
-            in: modelManagementState.localModelPath
+            in: localModelPath
         ) else {
             print("Skipped partial download cleanup for unsafe model name: \(model)")
             return
@@ -2582,9 +2607,14 @@ class ContentViewModel: ObservableObject {
     }
 
     func availableSpeakerIDs() -> [Int] {
-        let detectedIDs = Array(0 ..< transcriptionState.speakerDiarization.detectedSpeakerCount)
+        let detectedSpeakerCount = min(
+            max(transcriptionState.speakerDiarization.detectedSpeakerCount, 0),
+            Self.supportedSpeakerIDRange.count
+        )
+        let detectedIDs = Array(0 ..< detectedSpeakerCount)
         let configuredIDs = Array(0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0))
-        let assignedIDs = transcriptionState.speakerAssignments.compactMap { $0?.speakerID }
+        let assignedIDs = transcriptionState.speakerAssignments
+            .compactMap { Self.normalizedSpeakerID($0?.speakerID) }
         return Array(Set(detectedIDs + configuredIDs + assignedIDs)).sorted()
     }
 
@@ -2629,11 +2659,11 @@ class ContentViewModel: ObservableObject {
         transcriptionState.currentText = ""
         transcriptionState.confirmedSegments = restoredSegments
         transcriptionState.speakerAssignments = sidecar.segments.map { segment in
-            segment.speakerID.map(SpeakerSegmentAssignment.init)
+            Self.normalizedSpeakerID(segment.speakerID).map(SpeakerSegmentAssignment.init)
         }
         transcriptionState.speakerNames = Dictionary(
             uniqueKeysWithValues: sidecar.speakerNames.compactMap { key, value in
-                guard let speakerID = Int(key) else { return nil }
+                guard let speakerID = Self.normalizedSpeakerID(Int(key)) else { return nil }
                 return (speakerID, value)
             }
         )
@@ -2651,7 +2681,11 @@ class ContentViewModel: ObservableObject {
             transcriptionState.speakerAssignments.compactMap { $0?.speakerID } +
                 Array(transcriptionState.speakerNames.keys)
         )
-        let detectedCount = max(restoredSpeakerCount, (restoredSpeakerIDs.max() ?? -1) + 1)
+        let highestRestoredSpeakerID = restoredSpeakerIDs.max() ?? -1
+        let detectedCount = min(
+            Self.supportedSpeakerIDRange.count,
+            max(restoredSpeakerCount, highestRestoredSpeakerID + 1)
+        )
         transcriptionState.speakerDiarization = SpeakerDiarizationState(
             detectedSpeakerCount: detectedCount
         )
@@ -2661,6 +2695,14 @@ class ContentViewModel: ObservableObject {
 
         uiState.isTranscribingView = !restoredSegments.isEmpty
         refreshSubtitleQualityIssues()
+    }
+
+    private static func normalizedSpeakerID(_ speakerID: Int?) -> Int? {
+        guard let speakerID,
+              supportedSpeakerIDRange.contains(speakerID) else {
+            return nil
+        }
+        return speakerID
     }
 
     func setSpeakerName(_ name: String, for speakerID: Int) {
