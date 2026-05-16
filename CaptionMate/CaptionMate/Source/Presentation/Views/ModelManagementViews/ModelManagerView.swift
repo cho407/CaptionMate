@@ -38,28 +38,34 @@ struct ModelManagerView: View {
         modelState = viewModel.modelManagementState
     }
 
-    private var activeDownloadModels: [String] {
+    private var downloadStatusModels: [String] {
         viewModel.modelManagementState.trackedDownloadModels(
+            orderedBy: viewModel.modelManagementState.availableModels
+        )
+    }
+
+    private var activeDownloadModels: [String] {
+        viewModel.modelManagementState.downloadActivityModels(
             orderedBy: viewModel.modelManagementState.availableModels
         )
     }
 
     // 다운로드 진행 상황 - 가중 평균 (모델 크기 고려)
     private var totalDownloadProgress: Double {
-        viewModel.modelManagementState.weightedDownloadProgress(for: activeDownloadModels)
+        viewModel.modelManagementState.weightedDownloadProgress(for: downloadStatusModels)
     }
 
     // 다운로드 중인 총 크기
     private var totalDownloadingSize: String {
         let totalSize = viewModel.modelManagementState
-            .totalDownloadByteCount(for: activeDownloadModels)
+            .totalDownloadByteCount(for: downloadStatusModels)
         return ByteCountFormatter.string(fromByteCount: totalSize, countStyle: .file)
     }
 
     // 다운로드된 크기 계산
     private var downloadedSize: String {
         let downloaded = viewModel.modelManagementState
-            .downloadedByteCount(for: activeDownloadModels)
+            .downloadedByteCount(for: downloadStatusModels)
         return ByteCountFormatter.string(fromByteCount: downloaded, countStyle: .file)
     }
 
@@ -172,17 +178,12 @@ struct ModelManagerView: View {
 
             // 로컬 모델 / 다운로드 가능 모델 섹션 분리
             let allModels = viewModel.modelManagementState.availableModels
-            let activeDownloadModelSet = Set(activeDownloadModels)
-            let localModels = allModels
-                .filter {
-                    viewModel.modelManagementState.localModels.contains($0) &&
-                        !activeDownloadModelSet.contains($0)
-                }
-            let remoteModels = allModels
-                .filter {
-                    !viewModel.modelManagementState.localModels.contains($0) &&
-                        !activeDownloadModelSet.contains($0)
-                }
+            let localModels = viewModel.modelManagementState.downloadedSectionModels(
+                orderedBy: allModels
+            )
+            let remoteModels = viewModel.modelManagementState.availableSectionModels(
+                orderedBy: allModels
+            )
 
             let filteredDownloadingModels = activeDownloadModels.filter { model in
                 let matchesFilter = searchText.isEmpty ||
@@ -461,30 +462,6 @@ struct ModelManagerView: View {
                     }
                 } else {
                     LazyVStack(spacing: 16, pinnedViews: []) {
-                        if !filteredDownloadingModels.isEmpty {
-                            GroupBox {
-                                LazyVStack(spacing: 8) {
-                                    ForEach(filteredDownloadingModels, id: \.self) { model in
-                                        ModelRowView(model: model, viewModel: viewModel)
-
-                                        if model != filteredDownloadingModels.last {
-                                            Divider()
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                            } label: {
-                                Label("downloading_models", systemImage: "arrow.down.circle.fill")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.blue)
-                            }
-                            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
-                            .padding(.horizontal, 16)
-                            .padding(.top, 12)
-                            .accessibilityIdentifier("modelManager.downloadingModelsSection")
-                        }
-
                         // 로컬에 있는 모델 섹션
                         if !filteredLocalModels.isEmpty {
                             GroupBox {
@@ -506,7 +483,31 @@ struct ModelManagerView: View {
                             }
                             .backgroundStyle(Color(nsColor: .controlBackgroundColor))
                             .padding(.horizontal, 16)
-                            .padding(.top, filteredDownloadingModels.isEmpty ? 12 : 0)
+                            .padding(.top, 12)
+                        }
+
+                        if !filteredDownloadingModels.isEmpty {
+                            GroupBox {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(filteredDownloadingModels, id: \.self) { model in
+                                        ModelRowView(model: model, viewModel: viewModel)
+
+                                        if model != filteredDownloadingModels.last {
+                                            Divider()
+                                        }
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                            } label: {
+                                Label("downloading_models", systemImage: "arrow.down.circle.fill")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.blue)
+                            }
+                            .backgroundStyle(Color(nsColor: .controlBackgroundColor))
+                            .padding(.horizontal, 16)
+                            .padding(.top, filteredLocalModels.isEmpty ? 12 : 0)
+                            .accessibilityIdentifier("modelManager.downloadingModelsSection")
                         }
 
                         // 다운로드 가능한 모델 섹션
@@ -538,7 +539,7 @@ struct ModelManagerView: View {
                             }
                             .backgroundStyle(Color(nsColor: .controlBackgroundColor))
                             .padding(.horizontal, 16)
-                            .padding(.top, filteredDownloadingModels.isEmpty && filteredLocalModels.isEmpty ? 12 : 0)
+                            .padding(.top, filteredLocalModels.isEmpty && filteredDownloadingModels.isEmpty ? 12 : 0)
                         }
                     }
                     .padding(.bottom, 16)
@@ -571,6 +572,7 @@ struct ModelRowView: View {
     let model: String
     @ObservedObject var viewModel: ContentViewModel
     @State private var isDeleteConfirmationPresented = false
+    @State private var observedDownloadProgress: Float = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -654,7 +656,7 @@ struct ModelRowView: View {
             } else if viewModel.modelManagementState.isDownloading(model: model) {
                 VStack(spacing: 6) {
                     HStack {
-                        Text(viewModel.modelManagementState.formattedDownloadProgress(for: model))
+                        Text(String(format: "%.1f%%", observedDownloadProgress * 100))
                             .font(.caption2.monospacedDigit())
                             .foregroundStyle(.blue)
 
@@ -689,14 +691,12 @@ struct ModelRowView: View {
                                 .frame(
                                     width: geometry.size
                                         .width *
-                                        CGFloat(viewModel.modelManagementState
-                                            .downloadProgressValue(for: model)),
+                                        CGFloat(observedDownloadProgress),
                                     height: 6
                                 )
                                 .animation(
                                     .easeInOut(duration: 0.3),
-                                    value: viewModel.modelManagementState
-                                        .downloadProgressValue(for: model)
+                                    value: observedDownloadProgress
                                 )
                         }
                         .frame(height: 6)
@@ -750,6 +750,9 @@ struct ModelRowView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Delete \(viewModel.modelManagementState.displayName(for: model)) from this Mac?")
+        }
+        .onReceive(viewModel.modelManagementState.downloadProgressPublisher(for: model)) { progress in
+            observedDownloadProgress = progress
         }
     }
 

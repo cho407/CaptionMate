@@ -136,6 +136,7 @@ class ContentViewModel: ObservableObject {
     private var modelLoadTask: Task<Void, Never>?
     private var modelCatalogTask: Task<Void, Never>?
     private var remoteModelSizeTask: Task<Void, Never>?
+    private var languageChangeNotificationTask: Task<Void, Never>?
     private var waveformProcessingTask: Task<Void, Never>?
     private var waveformProcessingTaskID: UUID?
     private var normalizationTask: Task<Void, Never>?
@@ -693,9 +694,20 @@ class ContentViewModel: ObservableObject {
 
         print("App language changed to: \(languageCode)")
 
-        // 언어 변경 후 잠시 지연을 두고 Alert 표시
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-            self?.uiState.isLanguageChanged.toggle()
+        scheduleLanguageChangeNotification()
+    }
+
+    private func scheduleLanguageChangeNotification() {
+        languageChangeNotificationTask?.cancel()
+        languageChangeNotificationTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                guard !Task.isCancelled else { return }
+                self?.uiState.isLanguageChanged.toggle()
+                self?.languageChangeNotificationTask = nil
+            }
         }
     }
 
@@ -809,6 +821,8 @@ class ContentViewModel: ObservableObject {
         cancelAudioProcessingTasks()
         uiState.transcriptionTask?.cancel()
         uiState.transcriptionTask = nil
+        languageChangeNotificationTask?.cancel()
+        languageChangeNotificationTask = nil
 
         for task in modelManagementState.downloadTasks.values {
             task.cancel()
@@ -1606,8 +1620,7 @@ class ContentViewModel: ObservableObject {
         modelManagementState.beginDownloadBatchIfIdle()
         modelManagementState.trackDownloadRequest(model)
 
-        if modelManagementState.currentDownloadingModels.count >=
-            modelManagementState.maxConcurrentDownloads {
+        if !modelManagementState.hasAvailableDownloadSlot {
             modelManagementState.queuedDownloadModels.append(model)
             modelManagementState.downloadProgress[model] = 0.0
             modelManagementState.downloadErrors.removeValue(forKey: model)
@@ -1623,18 +1636,15 @@ class ContentViewModel: ObservableObject {
     }
 
     private func startNextQueuedDownloadIfPossible() {
-        while modelManagementState.currentDownloadingModels.count <
-            modelManagementState.maxConcurrentDownloads,
-            !modelManagementState.queuedDownloadModels.isEmpty {
+        while modelManagementState.hasAvailableDownloadSlot,
+              !modelManagementState.queuedDownloadModels.isEmpty {
             let nextModel = modelManagementState.queuedDownloadModels.removeFirst()
             startModelDownload(nextModel)
         }
     }
 
     private func updateDownloadActivityState() {
-        modelManagementState.isDownloading =
-            !modelManagementState.currentDownloadingModels.isEmpty ||
-            !modelManagementState.queuedDownloadModels.isEmpty
+        modelManagementState.isDownloading = modelManagementState.hasVisibleDownloadActivity
         modelManagementState.clearDownloadBatchIfIdle()
     }
 

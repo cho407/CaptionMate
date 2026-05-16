@@ -23,6 +23,7 @@
 
 @testable import CaptionMate
 import AVFoundation
+import Combine
 import Foundation
 import SwiftUI
 import Testing
@@ -84,6 +85,35 @@ struct ContentViewModelTests {
 
         viewModel.changeAppLanguage(to: "zh-Hans")
         #expect(viewModel.appLanguage == "zh-Hans")
+    }
+
+    @Test("빠른 언어 변경은 지연 알림 작업을 하나로 합친다") @MainActor
+    func testRapidLanguageChangesCoalesceDelayedNotification() async throws {
+        let viewModel = ContentViewModel()
+        var languageChangedValues: [Bool] = []
+
+        let cancellable = viewModel.$uiState
+            .map(\.isLanguageChanged)
+            .removeDuplicates()
+            .sink { value in
+                languageChangedValues.append(value)
+            }
+
+        viewModel.changeAppLanguage(to: "ko")
+        viewModel.changeAppLanguage(to: "ja")
+        viewModel.changeAppLanguage(to: "es")
+
+        for _ in 0 ..< 20 {
+            if languageChangedValues.count >= 2 {
+                break
+            }
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        try await Task.sleep(nanoseconds: 250_000_000)
+
+        #expect(languageChangedValues == [false, true])
+
+        _ = cancellable
     }
 
     @Test("테마 변경 기능 테스트") @MainActor
@@ -918,6 +948,73 @@ struct ContentViewModelTests {
             state.weightedDownloadProgress(for: [tinyModel, largeModel]) ==
                 Double(tinyEstimate + 250) / Double(tinyEstimate + 1_000)
         )
+    }
+
+    @Test("완료된 모델은 진행 중 배치가 남아 있어도 다운로드 완료 섹션으로 이동한다") @MainActor
+    func testCompletedBatchModelMovesToDownloadedSectionDuringActiveDownloads() throws {
+        let state = ModelManagementState()
+        let completedModel = "openai_whisper-tiny"
+        let activeModel = "openai_whisper-base"
+        let remoteModel = "openai_whisper-small"
+
+        state.availableModels = [completedModel, activeModel, remoteModel]
+        state.localModels = [completedModel]
+        state.downloadBatchModels = [completedModel, activeModel]
+        state.currentDownloadingModels = [activeModel]
+        state.downloadProgress[completedModel] = 1.0
+        state.downloadProgress[activeModel] = 0.35
+
+        #expect(state.trackedDownloadModels(orderedBy: state.availableModels) == [
+            completedModel,
+            activeModel,
+        ])
+        #expect(state.downloadActivityModels(orderedBy: state.availableModels) == [activeModel])
+        #expect(state.downloadedSectionModels(orderedBy: state.availableModels) == [completedModel])
+        #expect(state.availableSectionModels(orderedBy: state.availableModels) == [remoteModel])
+    }
+
+    @Test("동시 다운로드 슬롯은 maxConcurrentDownloads까지 즉시 시작을 허용한다") @MainActor
+    func testDownloadSlotsAllowParallelStartsBeforeQueueing() throws {
+        let state = ModelManagementState()
+        state.maxConcurrentDownloads = 2
+
+        #expect(state.availableDownloadSlotCount == 2)
+        #expect(state.hasAvailableDownloadSlot)
+
+        state.currentDownloadingModels.insert("openai_whisper-tiny")
+
+        #expect(state.availableDownloadSlotCount == 1)
+        #expect(state.hasAvailableDownloadSlot)
+
+        state.currentDownloadingModels.insert("openai_whisper-base")
+
+        #expect(state.availableDownloadSlotCount == 0)
+        #expect(!state.hasAvailableDownloadSlot)
+    }
+
+    @Test("모델 다운로드 진행률 publisher는 공유 상태 변경을 전달한다") @MainActor
+    func testDownloadProgressPublisherEmitsSharedStateChanges() async throws {
+        let state = ModelManagementState()
+        let model = "openai_whisper-large-v2"
+        var values: [Float] = []
+
+        let cancellable = state.downloadProgressPublisher(for: model)
+            .sink { progress in
+                values.append(progress)
+            }
+
+        state.downloadProgress[model] = 0.493
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        #expect(values.first == 0)
+        #expect(values.last == 0.493)
+
+        state.downloadProgress[model] = 1.5
+        try await Task.sleep(nanoseconds: 10_000_000)
+
+        #expect(values.last == 1.0)
+
+        _ = cancellable
     }
 
     @Test("취소 중 다운로드는 다운로드 섹션에 남아 진행 상태 계산에 포함된다") @MainActor

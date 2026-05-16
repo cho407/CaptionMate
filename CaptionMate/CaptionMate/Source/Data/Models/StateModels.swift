@@ -470,6 +470,14 @@ class ModelManagementState: ObservableObject {
     // 다운로드 관리
     @Published var maxConcurrentDownloads: Int = 2
 
+    var availableDownloadSlotCount: Int {
+        max(maxConcurrentDownloads - currentDownloadingModels.count, 0)
+    }
+
+    var hasAvailableDownloadSlot: Bool {
+        availableDownloadSlotCount > 0
+    }
+
     // 화자분리 모델 상태
     @Published var speakerDiarizationModelState: ModelState = .unloaded
     @Published var speakerDiarizationModelPath: String = ""
@@ -509,11 +517,36 @@ class ModelManagementState: ObservableObject {
     }
 
     func downloadProgressValue(for model: String) -> Float {
+        Self.normalizedDownloadProgress(
+            for: model,
+            progressByModel: downloadProgress,
+            queuedDownloadModels: queuedDownloadModels
+        )
+    }
+
+    func downloadProgressPublisher(for model: String) -> AnyPublisher<Float, Never> {
+        Publishers.CombineLatest($downloadProgress, $queuedDownloadModels)
+            .map { progressByModel, queuedDownloadModels in
+                Self.normalizedDownloadProgress(
+                    for: model,
+                    progressByModel: progressByModel,
+                    queuedDownloadModels: queuedDownloadModels
+                )
+            }
+            .removeDuplicates()
+            .eraseToAnyPublisher()
+    }
+
+    private static func normalizedDownloadProgress(
+        for model: String,
+        progressByModel: [String: Float],
+        queuedDownloadModels: [String]
+    ) -> Float {
         if queuedDownloadModels.contains(model) {
             return 0
         }
 
-        let progress = downloadProgress[model] ?? 0
+        let progress = progressByModel[model] ?? 0
         guard progress.isFinite else { return 0 }
         return min(max(progress, 0), 1)
     }
@@ -577,10 +610,41 @@ class ModelManagementState: ObservableObject {
             .union(currentDownloadingModels)
             .union(queuedDownloadModels)
             .union(cancellingModels)
-        guard !trackedModels.isEmpty else { return [] }
+        return orderedModels(trackedModels, orderedBy: availableModels)
+    }
 
-        let orderedModels = availableModels.filter { trackedModels.contains($0) }
-        let missingModels = trackedModels
+    func downloadActivityModels(orderedBy availableModels: [String]) -> [String] {
+        orderedModels(downloadActivityModelSet, orderedBy: availableModels)
+    }
+
+    func downloadedSectionModels(orderedBy availableModels: [String]) -> [String] {
+        availableModels.filter {
+            localModels.contains($0) &&
+                !downloadActivityModelSet.contains($0)
+        }
+    }
+
+    func availableSectionModels(orderedBy availableModels: [String]) -> [String] {
+        availableModels.filter {
+            !localModels.contains($0) &&
+                !downloadActivityModelSet.contains($0)
+        }
+    }
+
+    private var downloadActivityModelSet: Set<String> {
+        currentDownloadingModels
+            .union(queuedDownloadModels)
+            .union(cancellingModels)
+    }
+
+    private func orderedModels(
+        _ models: Set<String>,
+        orderedBy availableModels: [String]
+    ) -> [String] {
+        guard !models.isEmpty else { return [] }
+
+        let orderedModels = availableModels.filter { models.contains($0) }
+        let missingModels = models
             .subtracting(Set(orderedModels))
             .sorted()
         return orderedModels + missingModels
