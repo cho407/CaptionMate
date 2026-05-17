@@ -2188,6 +2188,17 @@ struct ReleaseGateTests {
         #expect(source.contains("try Task.checkCancellation()"))
     }
 
+    @Test("화자분리 모델 다운로드 Task는 ViewModel을 전체 작업 동안 강하게 보유하지 않는다")
+    func testSpeakerModelDownloadTaskAvoidsLongLivedStrongSelfCapture() throws {
+        let source = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        let longLivedCapturePattern =
+            #"speakerDiarizationModelTask = Task\.detached\(priority: \.background\) \{ \[weak self\] in\s+guard let self else \{ return \}"#
+        #expect(source.range(of: longLivedCapturePattern, options: .regularExpression) == nil)
+    }
+
     private static func readRepositoryFile(_ relativePath: String) throws -> String {
         let url = try repositoryRoot().appendingPathComponent(relativePath)
         return try String(contentsOf: url, encoding: .utf8)

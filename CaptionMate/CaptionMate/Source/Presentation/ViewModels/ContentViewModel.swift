@@ -874,6 +874,10 @@ class ContentViewModel: ObservableObject {
 
     /// 앱 소유 CoreML 런타임 캐시만 정리한다.
     nonisolated func clearCoreMLRuntimeCache() {
+        Self.clearCoreMLRuntimeCacheContents()
+    }
+
+    private nonisolated static func clearCoreMLRuntimeCacheContents() {
         let fileManager = FileManager.default
 
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
@@ -915,6 +919,14 @@ class ContentViewModel: ObservableObject {
 
     /// 디스크 여유 공간 확인 함수
     nonisolated func checkDiskSpace() -> (available: Int64, required: Int64, isEnough: Bool) {
+        Self.diskSpaceStatus()
+    }
+
+    private nonisolated static func diskSpaceStatus() -> (
+        available: Int64,
+        required: Int64,
+        isEnough: Bool
+    ) {
         let fileManager = FileManager.default
         guard let cachesDirectory = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
             .first else {
@@ -1498,16 +1510,14 @@ class ContentViewModel: ObservableObject {
         modelManagementState.speakerDiarizationModelPath = modelRoot.path
 
         speakerDiarizationModelTask = Task.detached(priority: .background) { [weak self] in
-            guard let self else { return }
-
             do {
                 if shouldResetLocalCache {
                     try? FileManager.default.removeItem(at: modelRoot)
                 }
 
-                let diskSpace = self.checkDiskSpace()
+                let diskSpace = Self.diskSpaceStatus()
                 if !diskSpace.isEnough {
-                    self.clearCoreMLRuntimeCache()
+                    Self.clearCoreMLRuntimeCacheContents()
                 }
 
                 let config = PyannoteConfig(
@@ -1536,7 +1546,8 @@ class ContentViewModel: ObservableObject {
                     throw CocoaError(.fileReadCorruptFile)
                 }
 
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
                     self.modelManagementState.speakerDiarizationModelProgress = 1.0
                     self.refreshSpeakerDiarizationModelState()
                     self.speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore
@@ -1555,7 +1566,8 @@ class ContentViewModel: ObservableObject {
                 }
             } catch is CancellationError {
                 try? FileManager.default.removeItem(at: modelRoot)
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
                     self.modelManagementState.speakerDiarizationModelState = .unloaded
                     self.modelManagementState.speakerDiarizationModelProgress = nil
                     self.modelManagementState.speakerDiarizationModelError = "Download cancelled."
@@ -1564,7 +1576,8 @@ class ContentViewModel: ObservableObject {
                 }
             } catch {
                 let modelExists = FileManager.default.fileExists(atPath: modelRoot.path)
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
                     self.modelManagementState.speakerDiarizationModelState = .unloaded
                     self.modelManagementState.speakerDiarizationModelProgress = nil
                     self.modelManagementState.speakerDiarizationModelError = error.localizedDescription
