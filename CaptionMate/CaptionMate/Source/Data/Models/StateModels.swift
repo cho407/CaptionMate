@@ -690,6 +690,27 @@ class ModelManagementState: ObservableObject {
         return String(format: "%.1f%%", progress * 100)
     }
 
+    func beginSpeakerDiarizationModelDownload(path: String) {
+        speakerDiarizationModelState = .downloading
+        speakerDiarizationModelProgress = nil
+        speakerDiarizationModelError = nil
+        speakerDiarizationModelNeedsRepair = false
+        speakerDiarizationModelNeedsUpdate = false
+        speakerDiarizationModelPath = path
+    }
+
+    func applySpeakerDiarizationDownloadProgress(_ progress: Progress) {
+        let fraction = progress.fractionCompleted
+        guard fraction.isFinite else { return }
+
+        let normalizedProgress = Float(min(max(fraction, 0), 1))
+        if normalizedProgress <= 0, speakerDiarizationModelProgress == nil {
+            return
+        }
+
+        speakerDiarizationModelProgress = normalizedProgress
+    }
+
     func displayName(for model: String) -> String {
         return model.components(separatedBy: "_").dropFirst().joined(separator: " ")
             .replacingOccurrences(of: "-", with: " ")

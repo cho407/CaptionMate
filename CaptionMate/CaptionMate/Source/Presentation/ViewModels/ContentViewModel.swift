@@ -1502,12 +1502,7 @@ class ContentViewModel: ObservableObject {
 
         speakerDiarizationModelTask?.cancel()
         speakerDiarizationDownloadProgress = nil
-        modelManagementState.speakerDiarizationModelState = .downloading
-        modelManagementState.speakerDiarizationModelProgress = 0.0
-        modelManagementState.speakerDiarizationModelError = nil
-        modelManagementState.speakerDiarizationModelNeedsRepair = false
-        modelManagementState.speakerDiarizationModelNeedsUpdate = false
-        modelManagementState.speakerDiarizationModelPath = modelRoot.path
+        modelManagementState.beginSpeakerDiarizationModelDownload(path: modelRoot.path)
 
         speakerDiarizationModelTask = Task.detached(priority: .background) { [weak self] in
             do {
@@ -1598,10 +1593,7 @@ class ContentViewModel: ObservableObject {
 
     private func updateSpeakerDiarizationDownloadProgress(_ progress: Progress) {
         speakerDiarizationDownloadProgress = progress
-        let fraction = progress.fractionCompleted
-        guard fraction.isFinite else { return }
-        modelManagementState.speakerDiarizationModelProgress =
-            Float(min(max(fraction, 0), 1))
+        modelManagementState.applySpeakerDiarizationDownloadProgress(progress)
     }
 
     func cancelDefaultSpeakerDiarizationModelDownload() {

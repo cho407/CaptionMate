@@ -1800,6 +1800,7 @@ struct TimeFormatterTests {
         let result = TimeInterval(36000.0).toHMSFormat() // 10시간
         #expect(result.hasPrefix("10:00:00"))
     }
+
 }
 
 // MARK: - State Models Tests
@@ -1829,6 +1830,25 @@ struct StateModelsTests {
         #expect(state.isDownloading == false)
         #expect(state.downloadProgress.isEmpty)
         #expect(state.currentDownloadingModels.isEmpty)
+    }
+
+    @Test("화자분리 모델은 실제 진행률이 들어오기 전까지 결정형 0%로 표시하지 않는다") @MainActor
+    func testSpeakerDiarizationProgressStaysIndeterminateUntilProgressAdvances() throws {
+        let state = ModelManagementState()
+        let progress = Progress(totalUnitCount: 100)
+
+        state.beginSpeakerDiarizationModelDownload(path: "/tmp/speakerkit")
+
+        #expect(state.speakerDiarizationModelState == .downloading)
+        #expect(state.speakerDiarizationModelPath == "/tmp/speakerkit")
+        state.applySpeakerDiarizationDownloadProgress(progress)
+
+        #expect(state.speakerDiarizationModelProgress == nil)
+
+        progress.completedUnitCount = 25
+        state.applySpeakerDiarizationDownloadProgress(progress)
+
+        #expect(state.speakerDiarizationModelProgress == 0.25)
     }
 
     @Test("AudioState 초기화 테스트")
