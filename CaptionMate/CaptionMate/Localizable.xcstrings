@@ -21,6 +21,12 @@
             "value" : ""
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ""
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -84,6 +90,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "**%@** / %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "**%1$@** / %2$@"
           }
         },
         "es" : {
@@ -150,6 +162,12 @@
             "value" : "%.0f tok/s"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.0f رمز/ث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -212,6 +230,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%.1f Speed Factor"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معامل السرعة %.1f"
           }
         },
         "es" : {
@@ -278,6 +302,12 @@
             "value" : "%.3f RTF"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%.3f RTF"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -337,6 +367,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%@"
@@ -408,6 +444,12 @@
             "value" : "%@: %@"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@: %2$@"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -467,6 +509,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld"
@@ -537,6 +585,12 @@
             "value" : "%lld errors · %lld warnings"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld أخطاء · %lld تحذيرات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -600,6 +654,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%lld notes"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld ملاحظات"
           }
         },
         "es" : {
@@ -667,6 +727,12 @@
             "value" : "%lld warnings"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld تحذيرات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -726,6 +792,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "•"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "•"
@@ -795,6 +867,12 @@
             "value" : "© 2025 Harrison Cho. All rights reserved."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "© 2025 Harrison Cho. جميع الحقوق محفوظة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -854,6 +932,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "30"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "30"
@@ -924,6 +1008,12 @@
             "value" : "Adjust the subtitle timing before export."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اضبط توقيت الترجمة قبل التصدير."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -988,6 +1078,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Adjust Timing"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ضبط التوقيت"
           }
         },
         "es" : {
@@ -1056,6 +1152,12 @@
             "value" : "All"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الكل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1119,6 +1221,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "All segments are empty."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كل المقاطع فارغة."
           }
         },
         "es" : {
@@ -1185,6 +1293,12 @@
             "value" : "Analyzing Speakers"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحليل المتحدثين"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1247,6 +1361,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Apache License 2.0"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رخصة Apache 2.0"
           }
         },
         "es" : {
@@ -1313,6 +1433,12 @@
             "value" : "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُخزَّن تفضيلات التطبيق وإعداداته محليًا باستخدام UserDefaults. تُنزَّل نماذج الذكاء الاصطناعي وتُخزَّن مؤقتًا محليًا على جهازك."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1377,6 +1503,12 @@
             "value" : "App Version: %@ (%@)"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إصدار التطبيق: %1$@ (%2$@)"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1439,6 +1571,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Assign Speaker"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعيين المتحدث"
           }
         },
         "es" : {
@@ -1506,6 +1644,12 @@
             "value" : "Audio"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصوت"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1568,6 +1712,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Audio Encoder"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مشفر الصوت"
           }
         },
         "es" : {
@@ -1635,6 +1785,12 @@
             "value" : "Audio Ready"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الصوت جاهز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1698,6 +1854,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auto"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تلقائي"
           }
         },
         "es" : {
@@ -1764,6 +1926,12 @@
             "value" : "Auto Language"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اللغة التلقائية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1826,6 +1994,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Auto Tune Performance"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ضبط الأداء تلقائيًا"
           }
         },
         "es" : {
@@ -1892,6 +2066,12 @@
             "value" : "Available Models"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النماذج المتاحة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -1954,6 +2134,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Back"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رجوع"
           }
         },
         "es" : {
@@ -2022,6 +2208,12 @@
             "value" : "Batch %@"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دفعة %@"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2086,6 +2278,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Batch Files"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ملفات الدفعة"
           }
         },
         "es" : {
@@ -2153,6 +2351,12 @@
             "value" : "Batch Queue Ready"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قائمة الدفعة جاهزة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2215,6 +2419,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cache Prefill"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعبئة ذاكرة التخزين المؤقت مسبقًا"
           }
         },
         "es" : {
@@ -2283,6 +2493,12 @@
             "value" : "Cancel"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2345,6 +2561,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancel queued download"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء التنزيل في قائمة الانتظار"
           }
         },
         "es" : {
@@ -2411,6 +2633,12 @@
             "value" : "Cancel speaker model download"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء تنزيل نموذج المتحدث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2475,6 +2703,12 @@
             "value" : "Cancelling download..."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ إلغاء التنزيل..."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2537,6 +2771,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Cancelling..."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ الإلغاء..."
           }
         },
         "es" : {
@@ -2604,6 +2844,12 @@
             "value" : "Cannot check disk space."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر فحص مساحة القرص."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2663,6 +2909,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "CaptionMate"
@@ -2732,6 +2984,12 @@
             "value" : "CaptionMate does not collect, store, or transmit any personal data. All processing is done locally on your device."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يجمع CaptionMate أي بيانات شخصية أو يخزنها أو يرسلها. تتم كل المعالجة محليًا على جهازك."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2794,6 +3052,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CaptionMate uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم CaptionMate ‏WhisperKit للتعرف على الكلام، ويعالج كل البيانات محليًا على جهازك. لا تُرسل أي بيانات إلى خوادم خارجية للتفريغ."
           }
         },
         "es" : {
@@ -2861,6 +3125,12 @@
             "value" : "Checking local models"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ فحص النماذج المحلية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2925,6 +3195,12 @@
             "value" : "Choose the speaker name used for this subtitle and export."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر اسم المتحدث المستخدم لهذه الترجمة والتصدير."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -2987,6 +3263,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Chunking Strategy"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استراتيجية التقسيم"
           }
         },
         "es" : {
@@ -3055,6 +3337,12 @@
             "value" : "Clear Batch"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مسح الدفعة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3117,6 +3405,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Close"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إغلاق"
           }
         },
         "es" : {
@@ -3183,6 +3477,12 @@
             "value" : "Compression Check Tokens"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رموز فحص الضغط"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3247,6 +3547,12 @@
             "value" : "Compute Units"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وحدات الحوسبة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3306,6 +3612,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CPU"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "CPU"
@@ -3376,6 +3688,12 @@
             "value" : "Current Language: %@"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اللغة الحالية: %@"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3440,6 +3758,12 @@
             "value" : "Decoding Options"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خيارات فك الترميز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3502,6 +3826,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Decoding Quality"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جودة فك الترميز"
           }
         },
         "es" : {
@@ -3569,6 +3899,12 @@
             "value" : "Default offline model · %@"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذج الافتراضي دون اتصال · %@"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3631,6 +3967,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف"
           }
         },
         "es" : {
@@ -3699,6 +4041,12 @@
             "value" : "Delete %@ from this Mac?"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف %@ من هذا الجهاز؟"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3762,6 +4110,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete Failed"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل الحذف"
           }
         },
         "es" : {
@@ -3829,6 +4183,12 @@
             "value" : "Delete it or add text before export."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "احذفه أو أضف نصًا قبل التصدير."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -3891,6 +4251,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Delete Model"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف النموذج"
           }
         },
         "es" : {
@@ -3956,6 +4322,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Document directory not found."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على مجلد المستندات."
           }
         },
         "es" : {
@@ -4024,6 +4396,12 @@
             "value" : "Download already scheduled"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التنزيل مجدول بالفعل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4087,6 +4465,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Cancelled"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إلغاء التنزيل"
           }
         },
         "es" : {
@@ -4154,6 +4538,12 @@
             "value" : "Download cancelled."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إلغاء التنزيل."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4218,6 +4608,12 @@
             "value" : "Download Failed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4280,6 +4676,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Model"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تنزيل النموذج"
           }
         },
         "es" : {
@@ -4347,6 +4749,12 @@
             "value" : "Download Queued"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمت إضافة التنزيل إلى قائمة الانتظار"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4409,6 +4817,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Site: %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "موقع التنزيل: %@"
           }
         },
         "es" : {
@@ -4476,6 +4890,12 @@
             "value" : "Download speaker model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تنزيل نموذج المتحدث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4539,6 +4959,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Download Unavailable"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التنزيل غير متاح"
           }
         },
         "es" : {
@@ -4605,6 +5031,12 @@
             "value" : "Downloaded"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4669,6 +5101,12 @@
             "value" : "Downloaded"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4731,6 +5169,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloaded Models"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النماذج المنزّلة"
           }
         },
         "es" : {
@@ -4798,6 +5242,12 @@
             "value" : "Downloading"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4861,6 +5311,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloading %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تنزيل %@"
           }
         },
         "es" : {
@@ -4928,6 +5384,12 @@
             "value" : "Downloading Recommended Model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تنزيل النموذج الموصى به"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -4990,6 +5452,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloading Models"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النماذج قيد التنزيل"
           }
         },
         "es" : {
@@ -5056,6 +5524,12 @@
             "value" : "Downloading %lld Model(s)"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تنزيل %lld نموذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5118,6 +5592,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Downloading Status"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حالة التنزيل"
           }
         },
         "es" : {
@@ -5184,6 +5664,12 @@
             "value" : "Downloading..."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التنزيل..."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5246,6 +5732,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Drag and drop a file here"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اسحب ملفًا وأفلته هنا"
           }
         },
         "es" : {
@@ -5311,6 +5803,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Empty subtitle"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ترجمة فارغة"
           }
         },
         "es" : {
@@ -5379,6 +5877,12 @@
             "value" : "End"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النهاية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5443,6 +5947,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "End -0.1s"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النهاية -0.1ث"
           }
         },
         "es" : {
@@ -5511,6 +6021,12 @@
             "value" : "End +0.1s"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النهاية +0.1ث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5574,6 +6090,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "End of Batch"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نهاية الدفعة"
           }
         },
         "es" : {
@@ -5642,6 +6164,12 @@
             "value" : "End Time"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وقت النهاية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5705,6 +6233,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "English"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإنجليزية"
           }
         },
         "es" : {
@@ -5772,6 +6306,12 @@
             "value" : "Cannot connect to the server. Please try again later."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر الاتصال بالخادم. يرجى المحاولة لاحقًا."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5835,6 +6375,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Insufficient disk space. Please free up some space and try again."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مساحة القرص غير كافية. يرجى تحرير بعض المساحة ثم المحاولة مجددًا."
           }
         },
         "es" : {
@@ -5902,6 +6448,12 @@
             "value" : "File not found on the server."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم العثور على الملف على الخادم."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -5965,6 +6517,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Network connection was lost during download."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقطع اتصال الشبكة أثناء التنزيل."
           }
         },
         "es" : {
@@ -6032,6 +6590,12 @@
             "value" : "No internet connection. Please check your network settings."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يوجد اتصال بالإنترنت. يرجى التحقق من إعدادات الشبكة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6095,6 +6659,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Permission denied. Cannot write to the download folder."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم رفض الإذن. لا يمكن الكتابة إلى مجلد التنزيل."
           }
         },
         "es" : {
@@ -6162,6 +6732,12 @@
             "value" : "Download timed out. Please check your network connection."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انتهت مهلة التنزيل. يرجى التحقق من اتصال الشبكة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6227,6 +6803,12 @@
             "value" : "Errors"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أخطاء"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6290,6 +6872,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Spanish"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإسبانية"
           }
         },
         "es" : {
@@ -6358,6 +6946,12 @@
             "value" : "Export Anyway"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التصدير على أي حال"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6421,6 +7015,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Export Cancelled"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إلغاء التصدير"
           }
         },
         "es" : {
@@ -6488,6 +7088,12 @@
             "value" : "Export Complete"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتمل التصدير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6551,6 +7157,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Export Complete, Sidecar Failed"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتمل التصدير، وفشل الملف المرافق"
           }
         },
         "es" : {
@@ -6618,6 +7230,12 @@
             "value" : "Export Failed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التصدير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6680,6 +7298,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Export Preset"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعداد التصدير المسبق"
           }
         },
         "es" : {
@@ -6747,6 +7371,12 @@
             "value" : "Export Preset Applied"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تطبيق إعداد التصدير المسبق"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6812,6 +7442,12 @@
             "value" : "Export Speaker Labels"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تصدير تسميات المتحدثين"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -6874,6 +7510,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Export Subtitle"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تصدير الترجمة"
           }
         },
         "es" : {
@@ -6942,6 +7584,12 @@
             "value" : "Exporting"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التصدير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7005,6 +7653,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fast reading speed"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعة قراءة عالية"
           }
         },
         "es" : {
@@ -7073,6 +7727,12 @@
             "value" : "Find"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بحث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7137,6 +7797,12 @@
             "value" : "First token: %.2fs"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أول رمز: %.2fث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7199,6 +7865,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fix errors before export"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصلح الأخطاء قبل التصدير"
           }
         },
         "es" : {
@@ -7266,6 +7938,12 @@
             "value" : "Fix quality warnings before export."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أصلح تحذيرات الجودة قبل التصدير."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7329,6 +8007,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Fix Required Before Export"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإصلاح مطلوب قبل التصدير"
           }
         },
         "es" : {
@@ -7395,6 +8079,12 @@
             "value" : "Format & Preview"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التنسيق والمعاينة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7457,6 +8147,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Frame Rate (fps)"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معدل الإطارات (fps)"
           }
         },
         "es" : {
@@ -7525,6 +8221,12 @@
             "value" : "Go to Segment"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الانتقال إلى المقطع"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7591,6 +8293,12 @@
             "value" : "Go to Segment %lld"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الانتقال إلى المقطع %lld"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7650,6 +8358,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GPU"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "GPU"
@@ -7719,6 +8433,12 @@
             "value" : "If you have any questions about this Privacy Policy, please contact: parfume407@gmail.com"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إذا كانت لديك أي أسئلة حول سياسة الخصوصية هذه، يرجى التواصل: parfume407@gmail.com"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7784,6 +8504,12 @@
             "value" : "Import Failed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل الاستيراد"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7847,6 +8573,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Import File"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استيراد ملف"
           }
         },
         "es" : {
@@ -7915,6 +8647,12 @@
             "value" : "Import Files"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استيراد ملفات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -7980,6 +8718,12 @@
             "value" : "Import one file or a batch queue."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استورد ملفًا واحدًا أو قائمة دفعة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8042,6 +8786,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Include Speaker Names"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تضمين أسماء المتحدثين"
           }
         },
         "es" : {
@@ -8109,6 +8859,12 @@
             "value" : "When Cache Prefill is on, the decoder will try to use a lookup table of pre-computed KV caches instead of computing them during the decoding loop, which can speed up inference."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند تشغيل تعبئة ذاكرة التخزين المؤقت مسبقًا، سيحاول مفكك الترميز استخدام جدول بحث لذاكرات KV المحسوبة مسبقًا بدلًا من حسابها أثناء حلقة فك الترميز، مما قد يسرّع الاستدلال."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8172,6 +8928,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Select the strategy to use for chunking audio data. If VAD is selected, the audio will be chunked based on voice activity (split on silent portions)."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر استراتيجية تقسيم بيانات الصوت. عند اختيار VAD، سيُقسّم الصوت بناءً على نشاط الصوت (الفصل عند المقاطع الصامتة)."
           }
         },
         "es" : {
@@ -8239,6 +9001,12 @@
             "value" : "Number of tokens used to check for repetitive patterns via compression. This helps detect and prevent model hallucinations."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد الرموز المستخدمة لفحص الأنماط المتكررة عبر الضغط. يساعد ذلك في اكتشاف هلوسات النموذج ومنعها."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8302,6 +9070,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Frame rate for video subtitle export. This setting is only used when exporting to video subtitle formats (e.g., FCPXML)."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معدل إطارات تصدير ترجمة الفيديو. يُستخدم هذا الإعداد فقط عند التصدير إلى صيغ ترجمة الفيديو (مثل FCPXML)."
           }
         },
         "es" : {
@@ -8369,6 +9143,12 @@
             "value" : "Includes speaker names such as [Speaker 1] or your custom names in exported subtitles."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتضمن أسماء المتحدثين مثل [Speaker 1] أو أسماءك المخصصة في الترجمات المصدّرة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8432,6 +9212,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Number of fallback attempts for token selection when the initial temperature fails to produce valid tokens."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد المحاولات البديلة لاختيار الرمز عندما تفشل درجة الحرارة الأولية في إنتاج رموز صالحة."
           }
         },
         "es" : {
@@ -8499,6 +9285,12 @@
             "value" : "Maximum number of tokens generated per decoding loop. Lower values use less memory but may require more loops."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الحد الأقصى لعدد الرموز التي تُولّد في كل دورة فك ترميز. القيم الأقل تستخدم ذاكرة أقل لكنها قد تتطلب دورات أكثر."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8562,6 +9354,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "When Prompt Prefill is on, it forces the task, language, and timestamp tokens in the decoding loop. Toggle it off if you'd like the model to generate those tokens itself."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند تشغيل تعبئة الموجه مسبقًا، يفرض ذلك رموز المهمة واللغة والطوابع الزمنية في حلقة فك الترميز. أوقفه إذا أردت أن يولّد النموذج تلك الرموز بنفسه."
           }
         },
         "es" : {
@@ -8629,6 +9427,12 @@
             "value" : "Toggling this will show a small preview of the decoder output in the UI under the transcribe. This can be useful for debugging."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيُظهر هذا الخيار معاينة صغيرة لمخرجات مفكك الترميز في الواجهة أسفل التفريغ. قد يكون مفيدًا للتصحيح."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8692,6 +9496,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Toggling this will include/exclude timestamps in both the UI and the prefill tokens.\nEither <|notimestamps|> or <|0.00|> will be forced based on this setting unless \"Prompt Prefill\" is de-selected."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيؤدي هذا الخيار إلى تضمين/استبعاد الطوابع الزمنية في الواجهة ورموز التعبئة المسبقة.\nسيتم فرض إما <|notimestamps|> أو <|0.00|> بناءً على هذا الإعداد ما لم يتم إلغاء اختيار \"تعبئة الموجه مسبقًا\"."
           }
         },
         "es" : {
@@ -8759,6 +9569,12 @@
             "value" : "Auto lets the model estimate the number of speakers. Choose a fixed number when you already know it."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يسمح الوضع التلقائي للنموذج بتقدير عدد المتحدثين. اختر رقمًا ثابتًا عندما تعرفه مسبقًا."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8822,6 +9638,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Analyzes speaker changes locally when the offline speaker model is ready."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحلل تغيّرات المتحدثين محليًا عندما يكون نموذج المتحدث غير المتصل جاهزًا."
           }
         },
         "es" : {
@@ -8889,6 +9711,12 @@
             "value" : "Toggling this will include/exclude special characters in the transcription text."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيؤدي هذا الخيار إلى تضمين/استبعاد الأحرف الخاصة في نص التفريغ."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -8952,6 +9780,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Controls the initial randomness of token selection in the decoding loop. Higher values produce more random results."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتحكم في العشوائية الأولية لاختيار الرموز في حلقة فك الترميز. القيم الأعلى تنتج نتائج أكثر عشوائية."
           }
         },
         "es" : {
@@ -9019,6 +9853,12 @@
             "value" : "Toggling this will enable/disable word-level timestamps in the transcription output.\nWhen enabled, each transcription segment is split into individual words with precise start and end times calculated using dynamic alignment.\nDisabling this option will result in only segment-level timestamps."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيؤدي هذا الخيار إلى تفعيل/تعطيل الطوابع الزمنية على مستوى الكلمات في مخرجات التفريغ.\nعند التفعيل، يُقسّم كل مقطع تفريغ إلى كلمات منفردة مع أوقات بداية ونهاية دقيقة محسوبة باستخدام المحاذاة الديناميكية.\nإيقاف هذا الخيار سيؤدي إلى استخدام طوابع زمنية على مستوى المقاطع فقط."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9082,6 +9922,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Number of concurrent transcription workers. Higher values may increase memory usage but can improve speed."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد عمال التفريغ المتزامنين. القيم الأعلى قد تزيد استخدام الذاكرة لكنها قد تحسن السرعة."
           }
         },
         "es" : {
@@ -9149,6 +9995,12 @@
             "value" : "Initialising"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التهيئة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9211,6 +10063,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Initialising %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تهيئة %@"
           }
         },
         "es" : {
@@ -9278,6 +10136,12 @@
             "value" : "Invalid timing"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت غير صالح"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9341,6 +10205,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Language"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اللغة"
           }
         },
         "es" : {
@@ -9409,6 +10279,12 @@
             "value" : "Language Changed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تغيّرت اللغة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9471,6 +10347,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Last Updated: January 2025"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "آخر تحديث: يناير 2025"
           }
         },
         "es" : {
@@ -9539,6 +10421,12 @@
             "value" : "Later"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لاحقًا"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9601,6 +10489,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Security & Policies"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأمان والسياسات"
           }
         },
         "es" : {
@@ -9667,6 +10561,12 @@
             "value" : "License"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرخصة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9729,6 +10629,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "License: %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الرخصة: %@"
           }
         },
         "es" : {
@@ -9797,6 +10703,12 @@
             "value" : "Load Model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحميل النموذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9859,6 +10771,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Loaded"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم التحميل"
           }
         },
         "es" : {
@@ -9925,6 +10843,12 @@
             "value" : "Loading"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التحميل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -9987,6 +10911,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Loading %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحميل %@"
           }
         },
         "es" : {
@@ -10054,6 +10984,12 @@
             "value" : "Loading model catalog"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحميل فهرس النماذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10119,6 +11055,12 @@
             "value" : "Loading model information"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحميل معلومات النموذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10181,6 +11123,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Loading Model List..."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحميل قائمة النماذج..."
           }
         },
         "es" : {
@@ -10248,6 +11196,12 @@
             "value" : "Long display time"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدة عرض طويلة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10311,6 +11265,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Long subtitle line"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سطر ترجمة طويل"
           }
         },
         "es" : {
@@ -10377,6 +11337,12 @@
             "value" : "Manage Models"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إدارة النماذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10439,6 +11405,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Manage Models"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إدارة النماذج"
           }
         },
         "es" : {
@@ -10505,6 +11477,12 @@
             "value" : "Max Fallback Count"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الحد الأقصى لعدد المحاولات البديلة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10567,6 +11545,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Max Tokens Per Loop"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الحد الأقصى للرموز في كل دورة"
           }
         },
         "es" : {
@@ -10634,6 +11618,12 @@
             "value" : "Maximum simultaneous downloads reached"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم بلوغ الحد الأقصى للتنزيلات المتزامنة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10699,6 +11689,12 @@
             "value" : "Merge it with a neighboring subtitle or extend the timing."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ادمجه مع ترجمة مجاورة أو مدد التوقيت."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10762,6 +11758,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merge neighboring subtitles or review timing before export."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ادمج الترجمات المجاورة أو راجع التوقيت قبل التصدير."
           }
         },
         "es" : {
@@ -10830,6 +11832,12 @@
             "value" : "Merge Next"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دمج التالي"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -10894,6 +11902,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Merge Previous"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "دمج السابق"
           }
         },
         "es" : {
@@ -10961,6 +11975,12 @@
             "value" : "Merge Unavailable"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الدمج غير متاح"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11024,6 +12044,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model catalog ready"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فهرس النماذج جاهز"
           }
         },
         "es" : {
@@ -11091,6 +12117,12 @@
             "value" : "Model Deleted"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم حذف النموذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11154,6 +12186,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model Downloaded"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تنزيل النموذج"
           }
         },
         "es" : {
@@ -11221,6 +12259,12 @@
             "value" : "Model Ready"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذج جاهز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11283,6 +12327,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Model Info"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "معلومات النموذج"
           }
         },
         "es" : {
@@ -11351,6 +12401,12 @@
             "value" : "Models"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النماذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11415,6 +12471,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Name for %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اسم %@"
           }
         },
         "es" : {
@@ -11482,6 +12544,12 @@
             "value" : "Needs repair"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يحتاج إلى إصلاح"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11546,6 +12614,12 @@
             "value" : "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُستخدم الاتصال بالشبكة فقط لتنزيل نماذج الذكاء الاصطناعي من Hugging Face. لا تُرسل بيانات المستخدم أو تحليلات الاستخدام."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11608,6 +12682,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Neural Engine"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المحرك العصبي"
           }
         },
         "es" : {
@@ -11676,6 +12756,12 @@
             "value" : "Next File"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الملف التالي"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11740,6 +12826,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Next Match"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المطابقة التالية"
           }
         },
         "es" : {
@@ -11807,6 +12899,12 @@
             "value" : "No imported audio file."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يوجد ملف صوت مستورد."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -11869,6 +12967,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No issues in this filter"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد مشكلات في هذا المرشح"
           }
         },
         "es" : {
@@ -11936,6 +13040,12 @@
             "value" : "No Matches"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد مطابقات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12001,6 +13111,12 @@
             "value" : "No Quick Fixes Available"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد إصلاحات سريعة متاحة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12063,6 +13179,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No Speaker"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بلا متحدث"
           }
         },
         "es" : {
@@ -12130,6 +13252,12 @@
             "value" : "No speakers detected."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يتم اكتشاف متحدثين."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12195,6 +13323,12 @@
             "value" : "No subtitles are ready."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد ترجمات جاهزة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12257,6 +13391,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "None"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا شيء"
           }
         },
         "es" : {
@@ -12324,6 +13464,12 @@
             "value" : "Not downloaded"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "غير منزّل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12389,6 +13535,12 @@
             "value" : "Notes"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ملاحظات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12452,6 +13604,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nothing to Export"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا شيء للتصدير"
           }
         },
         "es" : {
@@ -12520,6 +13678,12 @@
             "value" : "Nudge Earlier"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقديم للخلف"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12586,6 +13750,12 @@
             "value" : "Nudge Later"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تأخير للأمام"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12648,6 +13818,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "of"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "من"
           }
         },
         "es" : {
@@ -12715,6 +13891,12 @@
             "value" : "Offline model is ready"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذج غير المتصل جاهز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12778,6 +13960,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Offline ready"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جاهز دون اتصال"
           }
         },
         "es" : {
@@ -12845,6 +14033,12 @@
             "value" : "OK"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "موافق"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -12908,6 +14102,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Open the listed segment to adjust it manually."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح المقطع المدرج لضبطه يدويًا."
           }
         },
         "es" : {
@@ -12975,6 +14175,12 @@
             "value" : "Overlapping timing"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت متداخل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13037,6 +14243,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Performance"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الأداء"
           }
         },
         "es" : {
@@ -13104,6 +14316,12 @@
             "value" : "Performance Tuned"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم ضبط الأداء"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13168,6 +14386,12 @@
             "value" : "Playback Speed: "
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سرعة التشغيل: "
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13230,6 +14454,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Please use parfume407@gmail.com to report security vulnerabilities."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يرجى استخدام parfume407@gmail.com للإبلاغ عن الثغرات الأمنية."
           }
         },
         "es" : {
@@ -13297,6 +14527,12 @@
             "value" : "Preparing"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التحضير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13361,6 +14597,12 @@
             "value" : "Preparing waveform"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحضير الموجة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13421,6 +14663,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Final Cut Pro"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Final Cut Pro"
@@ -13491,6 +14739,12 @@
             "value" : "General"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عام"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13551,6 +14805,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premiere / Resolve"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Premiere / Resolve"
@@ -13621,6 +14881,12 @@
             "value" : "Shorts / Reels"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Shorts / Reels"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13684,6 +14950,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "29.97 fps timing for FCPXML handoff."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت 29.97 fps لتسليم FCPXML."
           }
         },
         "es" : {
@@ -13751,6 +15023,12 @@
             "value" : "Balanced subtitle export defaults."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعدادات تصدير ترجمة متوازنة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13814,6 +15092,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "24 fps timing for editorial timelines."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت 24 fps للخطوط الزمنية للتحرير."
           }
         },
         "es" : {
@@ -13881,6 +15165,12 @@
             "value" : "30 fps timing for short-form vertical edits."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت 30 fps لمحتوى الفيديو الرأسي القصير."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -13946,6 +15236,12 @@
             "value" : "30 fps timing for platform subtitle uploads."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقيت 30 fps لرفع ترجمات المنصات."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14006,6 +15302,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "YouTube"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "YouTube"
@@ -14077,6 +15379,12 @@
             "value" : "Previous File"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الملف السابق"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14139,6 +15447,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Privacy Policy"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سياسة الخصوصية"
           }
         },
         "es" : {
@@ -14205,6 +15519,12 @@
             "value" : "Privacy Policy"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سياسة الخصوصية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14267,6 +15587,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Prompt Prefill"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعبئة الموجه مسبقًا"
           }
         },
         "es" : {
@@ -14333,6 +15659,12 @@
             "value" : "Queued"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في قائمة الانتظار"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14395,6 +15727,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Queued %lld"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في الانتظار %lld"
           }
         },
         "es" : {
@@ -14463,6 +15801,12 @@
             "value" : "Queued for download"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "في قائمة انتظار التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14527,6 +15871,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Quick Fix"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إصلاح سريع"
           }
         },
         "es" : {
@@ -14594,6 +15944,12 @@
             "value" : "Re-download speaker model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة تنزيل نموذج المتحدث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14657,6 +16013,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ready"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جاهز"
           }
         },
         "es" : {
@@ -14725,6 +16087,12 @@
             "value" : "Ready CaptionMate"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate جاهز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14787,6 +16155,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reanalyze"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة التحليل"
           }
         },
         "es" : {
@@ -14854,6 +16228,12 @@
             "value" : "Recommended model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذج الموصى به"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -14917,6 +16297,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Recommended model is local"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النموذج الموصى به محلي"
           }
         },
         "es" : {
@@ -14983,6 +16369,12 @@
             "value" : "Refresh model catalogue"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحديث فهرس النماذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15047,6 +16439,12 @@
             "value" : "Refresh models"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحديث النماذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15109,6 +16507,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Rename speakers used in subtitles and exports."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أعد تسمية المتحدثين المستخدمين في الترجمات والتصديرات."
           }
         },
         "es" : {
@@ -15176,6 +16580,12 @@
             "value" : "Repair speaker model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إصلاح نموذج المتحدث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15238,6 +16648,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Repairs the local offline speaker model used by speaker diarisation."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يصلح نموذج المتحدث المحلي غير المتصل المستخدم في فصل المتحدثين."
           }
         },
         "es" : {
@@ -15306,6 +16722,12 @@
             "value" : "Replace"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استبدال"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15370,6 +16792,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replace All"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استبدال الكل"
           }
         },
         "es" : {
@@ -15438,6 +16866,12 @@
             "value" : "Replace Next"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استبدال التالي"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15500,6 +16934,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Replace with New File"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استبدال بملف جديد"
           }
         },
         "es" : {
@@ -15566,6 +17006,12 @@
             "value" : "Required for speaker diarisation. Stored locally for offline speaker labels."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مطلوب لفصل المتحدثين. يُخزَّن محليًا لتسميات المتحدثين دون اتصال."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15628,6 +17074,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Reset"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة تعيين"
           }
         },
         "es" : {
@@ -15696,6 +17148,12 @@
             "value" : "Retry Download"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة محاولة التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15760,6 +17218,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Review"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مراجعة"
           }
         },
         "es" : {
@@ -15828,6 +17292,12 @@
             "value" : "Review Before Export"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المراجعة قبل التصدير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15893,6 +17363,12 @@
             "value" : "Review Subtitles Before Export"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مراجعة الترجمات قبل التصدير"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -15955,6 +17431,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Run speaker analysis again"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تشغيل تحليل المتحدثين مرة أخرى"
           }
         },
         "es" : {
@@ -16022,6 +17504,12 @@
             "value" : "Saved Subtitles Restored"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمت استعادة الترجمات المحفوظة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16085,6 +17573,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Search Text Required"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نص البحث مطلوب"
           }
         },
         "es" : {
@@ -16152,6 +17646,12 @@
             "value" : "Search Unavailable"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البحث غير متاح"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16214,6 +17714,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Search Models"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البحث في النماذج"
           }
         },
         "es" : {
@@ -16280,6 +17786,12 @@
             "value" : "Security Policy"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سياسة الأمان"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16342,6 +17854,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Security Policy"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سياسة الأمان"
           }
         },
         "es" : {
@@ -16410,6 +17928,12 @@
             "value" : "Segment %lld"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المقطع %lld"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16474,6 +17998,12 @@
             "value" : "Settings"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإعدادات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16536,6 +18066,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Shortcut: Space (Play/Pause), ←/→(Navigate), ↑/↓(Volume), ⌘ + ↑/↓(Playback Speed)"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الاختصار: مسافة (تشغيل/إيقاف مؤقت)، ←/→ (تنقل)، ↑/↓ (الصوت)، ⌘ + ↑/↓ (سرعة التشغيل)"
           }
         },
         "es" : {
@@ -16603,6 +18139,12 @@
             "value" : "Shortcuts"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الاختصارات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16667,6 +18209,12 @@
             "value" : "Show Decoder Preview"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار معاينة مفكك الترميز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16729,6 +18277,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Show Timestamps"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار الطوابع الزمنية"
           }
         },
         "es" : {
@@ -16796,6 +18350,12 @@
             "value" : "Sidecar Restore Failed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشلت استعادة الملف المرافق"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16860,6 +18420,12 @@
             "value" : "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بما أننا لا نجمع بيانات شخصية، فلا توجد بيانات لطلبها أو تعديلها أو حذفها. تتم كل المعالجة محليًا على جهازك، ولديك تحكم كامل في ملفاتك والترجمات المولدة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -16922,6 +18488,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Source Language"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لغة المصدر"
           }
         },
         "es" : {
@@ -16989,6 +18561,12 @@
             "value" : "Speaker %lld"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتحدث %lld"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17052,6 +18630,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker Analysis Failed"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل تحليل المتحدثين"
           }
         },
         "es" : {
@@ -17119,6 +18703,12 @@
             "value" : "Speaker Analysis Skipped"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تخطي تحليل المتحدثين"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17182,6 +18772,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker Analysis Unavailable"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحليل المتحدثين غير متاح"
           }
         },
         "es" : {
@@ -17251,6 +18847,12 @@
             "value" : "Speaker assignment for segment %lld"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعيين المتحدث للمقطع %lld"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17304,6 +18906,12 @@
             "state" : "new",
             "value" : "Speaker assignment for segment %1$lld: %2$@"
           }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعيين المتحدث للمقطع %1$lld: %2$@"
+          }
         }
       }
     },
@@ -17325,6 +18933,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker Count"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد المتحدثين"
           }
         },
         "es" : {
@@ -17393,6 +19007,12 @@
             "value" : "Speaker diarisation"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فصل المتحدثين"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17455,6 +19075,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker Diarization"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فصل المتحدثين"
           }
         },
         "es" : {
@@ -17522,6 +19148,12 @@
             "value" : "Speaker model is not ready."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج المتحدث غير جاهز."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17585,6 +19217,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker model is still preparing."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يزال نموذج المتحدث قيد التحضير."
           }
         },
         "es" : {
@@ -17652,6 +19290,12 @@
             "value" : "Speaker Model Ready"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج المتحدث جاهز"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17714,6 +19358,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speaker model size"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حجم نموذج المتحدث"
           }
         },
         "es" : {
@@ -17780,6 +19430,12 @@
             "value" : "Speaker Diarization Model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نموذج فصل المتحدثين"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17842,6 +19498,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Speakers"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المتحدثون"
           }
         },
         "es" : {
@@ -17908,6 +19570,12 @@
             "value" : "Special Characters"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أحرف خاصة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -17972,6 +19640,12 @@
             "value" : "Specialising"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التخصيص"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18034,6 +19708,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Specialising %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تخصيص %@"
           }
         },
         "es" : {
@@ -18102,6 +19782,12 @@
             "value" : "Split"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقسيم"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18165,6 +19851,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Split it if the subtitle feels slow on screen."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قسّمه إذا بدت الترجمة بطيئة على الشاشة."
           }
         },
         "es" : {
@@ -18232,6 +19924,12 @@
             "value" : "Split it into shorter subtitles."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قسّمه إلى ترجمات أقصر."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18297,6 +19995,12 @@
             "value" : "Split the text or increase the display time."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "قسّم النص أو زد مدة العرض."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18360,6 +20064,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Split Unavailable"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التقسيم غير متاح"
           }
         },
         "es" : {
@@ -18428,6 +20138,12 @@
             "value" : "Start"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البداية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18492,6 +20208,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start -0.1s"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البداية -0.1ث"
           }
         },
         "es" : {
@@ -18560,6 +20282,12 @@
             "value" : "Start +0.1s"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "البداية +0.1ث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18623,6 +20351,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Start of Batch"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بداية الدفعة"
           }
         },
         "es" : {
@@ -18691,6 +20425,12 @@
             "value" : "Start Time"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "وقت البداية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18755,6 +20495,12 @@
             "value" : "Start Transcription"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بدء التفريغ"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18817,6 +20563,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Starting Temperature"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "درجة الحرارة الابتدائية"
           }
         },
         "es" : {
@@ -18884,6 +20636,12 @@
             "value" : "Subtitle Fixes Applied"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تطبيق إصلاحات الترجمة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -18947,6 +20705,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Subtitle review"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مراجعة الترجمة"
           }
         },
         "es" : {
@@ -19015,6 +20779,12 @@
             "value" : "Subtitle Review Filter"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرشح مراجعة الترجمة"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19077,6 +20847,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Text Decoder"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مفكك ترميز النص"
           }
         },
         "es" : {
@@ -19143,6 +20919,12 @@
             "value" : "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يصل التطبيق إلا إلى ملفات الصوت/الفيديو التي تختارها صراحة عبر منتقي الملفات. لا نصل إلى أي ملفات دون إجراء مباشر منك."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19207,6 +20989,12 @@
             "value" : "The following components are licensed under the MIT license reproduced below."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المكونات التالية مرخصة بموجب رخصة MIT المنسوخة أدناه."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19269,6 +21057,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "The following sets forth attribution notices for third party software that may be contained in portions of this CaptionMate product."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توضح البنود التالية إشعارات نسب برامج طرف ثالث قد تكون مضمنة في أجزاء من منتج CaptionMate هذا."
           }
         },
         "es" : {
@@ -19337,6 +21131,12 @@
             "value" : "The language has been changed."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تغيير اللغة."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19400,6 +21200,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Theme"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "السمة"
           }
         },
         "es" : {
@@ -19466,6 +21272,12 @@
             "value" : "Auto"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تلقائي"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19528,6 +21340,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Dark"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "داكن"
           }
         },
         "es" : {
@@ -19594,6 +21412,12 @@
             "value" : "Light"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فاتح"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19658,6 +21482,12 @@
             "value" : "Third Party Notices"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إشعارات الطرف الثالث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19720,6 +21550,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Third-Party Notices"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إشعارات الطرف الثالث"
           }
         },
         "es" : {
@@ -19788,6 +21624,12 @@
             "value" : "Timing"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التوقيت"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19854,6 +21696,12 @@
             "value" : "to"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلى"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19918,6 +21766,12 @@
             "value" : "total size: %@"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الحجم الإجمالي: %@"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -19980,6 +21834,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Total Models"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إجمالي النماذج"
           }
         },
         "es" : {
@@ -20047,6 +21907,12 @@
             "value" : "Transcribe"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تفريغ"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20110,6 +21976,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transcribing"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ التفريغ"
           }
         },
         "es" : {
@@ -20177,6 +22049,12 @@
             "value" : "Transcription Cancelled"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم إلغاء التفريغ"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20240,6 +22118,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Transcription Complete"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اكتمل التفريغ"
           }
         },
         "es" : {
@@ -20307,6 +22191,12 @@
             "value" : "Transcription Failed"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل التفريغ"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20370,6 +22260,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Translate"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ترجمة"
           }
         },
         "es" : {
@@ -20436,6 +22332,12 @@
             "value" : "Unload Model"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إلغاء تحميل النموذج"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20500,6 +22402,12 @@
             "value" : "Unloaded"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "غير محمّل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20562,6 +22470,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Unloading"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ إلغاء التحميل"
           }
         },
         "es" : {
@@ -20629,6 +22543,12 @@
             "value" : "Update available"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتوفر تحديث"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20692,6 +22612,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Update speaker model"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحديث نموذج المتحدث"
           }
         },
         "es" : {
@@ -20759,6 +22685,12 @@
             "value" : "Updating download sizes"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحديث أحجام التنزيل"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20818,6 +22750,12 @@
           }
         },
         "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "VAD"
+          }
+        },
+        "ar" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "VAD"
@@ -20888,6 +22826,12 @@
             "value" : "Very short display time"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مدة عرض قصيرة جدًا"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -20951,6 +22895,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Volume Down"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "خفض الصوت"
           }
         },
         "es" : {
@@ -21018,6 +22968,12 @@
             "value" : "Volume Up"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رفع الصوت"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21080,6 +23036,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Waiting for an available download slot"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بانتظار خانة تنزيل متاحة"
           }
         },
         "es" : {
@@ -21147,6 +23109,12 @@
             "value" : "Warnings"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحذيرات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21209,6 +23177,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "We release security updates for the latest version of CaptionMate. Please ensure you're using the most recent version available on the App Store."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نصدر تحديثات أمان لأحدث إصدار من CaptionMate. يرجى التأكد من استخدام أحدث إصدار متاح على App Store."
           }
         },
         "es" : {
@@ -21275,6 +23249,12 @@
             "value" : "We use parfume407@gmail.com for our intake and triage. For valid issues we will do coordination and disclosure here on GitHub (including using a GitHub Security Advisory when necessary)."
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نستخدم parfume407@gmail.com للاستقبال والفرز. بالنسبة للمشكلات الصحيحة، سننسق الإفصاح هنا على GitHub (بما في ذلك استخدام GitHub Security Advisory عند الحاجة)."
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21337,6 +23317,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "We will process your report within a day, and respond within a week (although it will depend on the severity of your report)."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سنعالج بلاغك خلال يوم، ونرد خلال أسبوع (وقد يختلف ذلك حسب خطورة البلاغ)."
           }
         },
         "es" : {
@@ -21403,6 +23389,12 @@
             "value" : "Word Timestamps"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "طوابع زمنية للكلمات"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21467,6 +23459,12 @@
             "value" : "Workers"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "العاملون"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21529,6 +23527,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "You must unload the model before deleting it"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يجب إلغاء تحميل النموذج قبل حذفه"
           }
         },
         "es" : {
@@ -21596,6 +23600,12 @@
             "value" : "Korean"
           }
         },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الكورية"
+          }
+        },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
@@ -21659,6 +23669,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Japanese"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اليابانية"
           }
         },
         "es" : {

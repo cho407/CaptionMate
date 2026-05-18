@@ -83,6 +83,9 @@ struct ContentViewModelTests {
         viewModel.changeAppLanguage(to: "hi")
         #expect(viewModel.appLanguage == "hi")
 
+        viewModel.changeAppLanguage(to: "ar")
+        #expect(viewModel.appLanguage == "ar")
+
         viewModel.changeAppLanguage(to: "zh-Hans")
         #expect(viewModel.appLanguage == "zh-Hans")
     }
@@ -168,6 +171,9 @@ struct ContentViewModelTests {
         viewModel.changeAppLanguage(to: "hi")
         #expect(viewModel.getCurrentLanguageDisplayName() == "हिन्दी")
 
+        viewModel.changeAppLanguage(to: "ar")
+        #expect(viewModel.getCurrentLanguageDisplayName() == "العربية")
+
         viewModel.changeAppLanguage(to: "zh-Hans")
         #expect(viewModel.getCurrentLanguageDisplayName() == "简体中文")
     }
@@ -189,6 +195,7 @@ struct ContentViewModelTests {
             "fr",
             "pt-BR",
             "hi",
+            "ar",
             "zh-Hans",
         ])
 
@@ -224,6 +231,7 @@ struct ContentViewModelTests {
             AppLanguageOption(code: "fr", displayName: "Français"),
             AppLanguageOption(code: "pt-BR", displayName: "Português (Brasil)"),
             AppLanguageOption(code: "hi", displayName: "हिन्दी"),
+            AppLanguageOption(code: "ar", displayName: "العربية"),
             AppLanguageOption(code: "zh-Hans", displayName: "简体中文"),
         ]
 
@@ -292,6 +300,12 @@ struct ContentViewModelTests {
                 from: ["hi-IN"],
                 supportedLanguages: supportedLanguages
             ) == "hi"
+        )
+        #expect(
+            AppLanguageResolver.preferredAppLanguage(
+                from: ["ar-SA"],
+                supportedLanguages: supportedLanguages
+            ) == "ar"
         )
         #expect(
             AppLanguageResolver.preferredAppLanguage(
@@ -1893,6 +1907,7 @@ struct LocalizationCatalogTests {
         "de",
         "en",
         "en-GB",
+        "ar",
         "es",
         "fr",
         "hi",

@@ -239,6 +239,7 @@
 				fr,
 				"pt-BR",
 				hi,
+				ar,
 				"zh-Hans",
 				Base,
 			);

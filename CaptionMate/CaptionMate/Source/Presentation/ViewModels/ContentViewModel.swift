@@ -295,6 +295,7 @@ class ContentViewModel: ObservableObject {
         .init(code: "fr", displayName: "Français"),
         .init(code: "pt-BR", displayName: "Português (Brasil)"),
         .init(code: "hi", displayName: "हिन्दी"),
+        .init(code: "ar", displayName: "العربية"),
         .init(code: "zh-Hans", displayName: "简体中文"),
     ]
 
