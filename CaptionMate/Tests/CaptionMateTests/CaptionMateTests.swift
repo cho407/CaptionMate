@@ -554,6 +554,197 @@ struct ContentViewModelTests {
         #expect(viewModel.availableSpeakerIDs() == Array(0 ..< 8))
     }
 
+    @Test("전사 프로젝트는 앱 안에 저장, 재열기, 삭제가 가능하다") @MainActor
+    func testSaveOpenAndDeleteTranscriptionProject() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateViewModelProject-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        let audioURL = rootURL.appendingPathComponent("interview-local-copy.wav")
+        let sourceAudioURL = rootURL.appendingPathComponent("interview-original.wav")
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try Data("audio".utf8).write(to: audioURL)
+        try Data("source-audio".utf8).write(to: sourceAudioURL)
+
+        let store = CaptionMateProjectStore(rootURL: rootURL.appendingPathComponent("Projects", isDirectory: true))
+        let viewModel = ContentViewModel(projectStore: store)
+        let segments = [
+            TranscriptionSegment(start: 0.0, end: 1.25, text: "Hello"),
+            TranscriptionSegment(start: 1.25, end: 2.5, text: "World"),
+        ]
+        viewModel.transcriptionResult = TranscriptionResult(
+            text: "Hello World",
+            segments: segments,
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+        viewModel.transcriptionState.confirmedSegments = segments
+        viewModel.transcriptionState.speakerAssignments = [
+            SpeakerSegmentAssignment(speakerID: 0),
+            SpeakerSegmentAssignment(speakerID: 1),
+        ]
+        viewModel.transcriptionState.speakerNames = [0: "Host", 1: "Guest"]
+        viewModel.transcriptionState.speakerDiarization = SpeakerDiarizationState(
+            detectedSpeakerCount: 2
+        )
+        viewModel.audioState.audioFileName = "Interview"
+        viewModel.audioState.importedAudioURL = audioURL
+        viewModel.audioState.sourceAudioURL = sourceAudioURL
+        viewModel.audioState.sourceAudioBookmarkData = Data("bookmark".utf8)
+        viewModel.selectedExportPreset = .finalCut
+        viewModel.frameRate = 29.97
+        viewModel.includeSpeakerLabelsInExport = true
+        viewModel.speakerDiarizationSpeakerCount = 2
+
+        let summary = viewModel.saveCurrentProject(showMessage: false)
+        #expect(summary?.displayName == "Interview")
+        #expect(viewModel.projectLibraryState.summaries.count == 1)
+        #expect(viewModel.projectLibraryState.activeProjectID == summary?.id)
+        let savedProject = try store.load(id: summary?.id ?? "")
+        #expect(savedProject.sourceAudioPath == sourceAudioURL.path)
+        #expect(savedProject.sourceAudioBookmarkData == Data("bookmark".utf8))
+
+        viewModel.updateTranscriptionSegmentText(at: 0, text: "Hello again")
+        _ = viewModel.saveCurrentProject(showMessage: false)
+
+        let restoredViewModel = ContentViewModel(projectStore: store)
+        restoredViewModel.refreshProjectLibrary()
+        #expect(restoredViewModel.projectLibraryState.summaries.map(\.id) == [summary?.id])
+
+        restoredViewModel.openProject(id: summary?.id ?? "", showMessage: false)
+        #expect(restoredViewModel.hasUnsavedProjectChanges == false)
+        #expect(restoredViewModel.transcriptionState.confirmedSegments.map(\.text) == [
+            "Hello again",
+            "World",
+        ])
+        #expect(restoredViewModel.transcriptionState.speakerNames == [0: "Host", 1: "Guest"])
+        #expect(restoredViewModel.selectedExportPreset == .finalCut)
+        #expect(restoredViewModel.frameRate == 29.97)
+        #expect(restoredViewModel.includeSpeakerLabelsInExport == true)
+        #expect(restoredViewModel.speakerDiarizationSpeakerCount == 2)
+        #expect(restoredViewModel.audioState.importedAudioURL == sourceAudioURL)
+        #expect(restoredViewModel.audioState.sourceAudioURL == sourceAudioURL)
+        #expect(restoredViewModel.audioState.sourceAudioBookmarkData == Data("bookmark".utf8))
+
+        restoredViewModel.updateTranscriptionSegmentText(at: 1, text: "World again")
+        #expect(restoredViewModel.hasUnsavedProjectChanges == true)
+
+        _ = restoredViewModel.saveCurrentProject(showMessage: false)
+        #expect(restoredViewModel.hasUnsavedProjectChanges == false)
+
+        restoredViewModel.setSpeakerName("Producer", for: 1)
+        #expect(restoredViewModel.hasUnsavedProjectChanges == true)
+
+        let renamed = restoredViewModel.renameProject(
+            id: summary?.id ?? "",
+            displayName: "Client Review",
+            showMessage: false
+        )
+        #expect(renamed == true)
+        #expect(try store.load(id: summary?.id ?? "").displayName == "Client Review")
+        #expect(restoredViewModel.projectLibraryState.activeProjectDisplayName == "Client Review")
+
+        _ = restoredViewModel.saveCurrentProject(showMessage: false)
+        #expect(try store.load(id: summary?.id ?? "").displayName == "Client Review")
+
+        let reconnectedAudioURL = rootURL.appendingPathComponent("interview-reconnected.wav")
+        try Data("reconnected-source-audio".utf8).write(to: reconnectedAudioURL)
+        let reconnected = restoredViewModel.relinkProjectAudio(
+            id: summary?.id ?? "",
+            to: reconnectedAudioURL,
+            needsSecurityScopedAccess: false,
+            showMessage: false
+        )
+        #expect(reconnected == true)
+        #expect(try store.load(id: summary?.id ?? "").sourceAudioPath == reconnectedAudioURL.path)
+        #expect(restoredViewModel.audioState.sourceAudioURL == reconnectedAudioURL)
+        #expect(restoredViewModel.audioState.importedAudioURL == reconnectedAudioURL)
+        #expect(restoredViewModel.hasUnsavedProjectChanges == false)
+
+        let duplicateSummary = try #require(restoredViewModel.duplicateProject(
+            id: summary?.id ?? "",
+            showMessage: false
+        ))
+        #expect(duplicateSummary.id != summary?.id)
+        #expect(duplicateSummary.displayName == "Client Review Copy")
+        #expect(try store.load(id: duplicateSummary.id).sidecar.segments.map(\.text) == [
+            "Hello again",
+            "World again",
+        ])
+
+        restoredViewModel.deleteProject(id: summary?.id ?? "", showMessage: false)
+        #expect(restoredViewModel.projectLibraryState.summaries.map(\.id) == [duplicateSummary.id])
+        #expect(restoredViewModel.projectLibraryState.activeProjectID == nil)
+        #expect(restoredViewModel.hasUnsavedProjectChanges == false)
+    }
+
+    @Test("저장된 프로젝트에 수정 사항이 있으면 열기 전에 확인하고 저장 후 열 수 있다") @MainActor
+    func testOpeningProjectWithUnsavedChangesCanSaveFirst() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateViewModelOpenConfirm-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        let store = CaptionMateProjectStore(rootURL: rootURL.appendingPathComponent("Projects", isDirectory: true))
+        let viewModel = ContentViewModel(projectStore: store)
+        let firstSegments = [
+            TranscriptionSegment(start: 0.0, end: 1.0, text: "First project"),
+        ]
+        viewModel.transcriptionResult = TranscriptionResult(
+            text: "First project",
+            segments: firstSegments,
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+        viewModel.transcriptionState.confirmedSegments = firstSegments
+        viewModel.audioState.audioFileName = "First"
+
+        let firstSummary = try #require(viewModel.saveCurrentProject(showMessage: false))
+        let secondProject = CaptionMateProject(
+            id: "second-project",
+            displayName: "Second",
+            createdAt: Date(timeIntervalSince1970: 100),
+            updatedAt: Date(timeIntervalSince1970: 100),
+            sourceAudioPath: nil,
+            lastExportedAt: nil,
+            sidecar: CaptionMateSidecar(
+                version: CaptionMateSidecar.currentVersion,
+                audioFileName: "Second",
+                language: "en",
+                segments: [.init(start: 0.0, end: 1.0, text: "Second project", speakerID: nil)],
+                speakerNames: [:],
+                exportSettings: .init(
+                    selectedExportPreset: SubtitleExportPreset.general.rawValue,
+                    frameRate: 30,
+                    includeSpeakerLabelsInExport: false,
+                    speakerDiarizationSpeakerCount: 0
+                )
+            )
+        )
+        try store.save(secondProject)
+        viewModel.refreshProjectLibrary()
+
+        viewModel.updateTranscriptionSegmentText(at: 0, text: "First project edited")
+        #expect(viewModel.hasUnsavedProjectChanges == true)
+        #expect(viewModel.shouldConfirmOpeningProject(id: firstSummary.id) == true)
+        #expect(viewModel.shouldConfirmOpeningProject(id: secondProject.id) == true)
+
+        let opened = viewModel.openProjectSavingCurrentChangesFirst(
+            id: secondProject.id,
+            showMessage: false
+        )
+
+        #expect(opened == true)
+        #expect(viewModel.projectLibraryState.activeProjectID == secondProject.id)
+        #expect(viewModel.transcriptionState.confirmedSegments.map(\.text) == ["Second project"])
+        #expect(viewModel.hasUnsavedProjectChanges == false)
+        #expect(try store.load(id: firstSummary.id).sidecar.segments.map(\.text) == ["First project edited"])
+    }
+
     @Test("Batch queue 상태 테스트") @MainActor
     func testBatchQueueState() throws {
         let viewModel = ContentViewModel()
@@ -1384,6 +1575,151 @@ struct CaptionMateSidecarServiceTests {
     }
 }
 
+// MARK: - CaptionMate Project Store Tests
+
+struct CaptionMateProjectStoreTests {
+    @Test("프로젝트는 저장, 목록 조회, 로드, 삭제가 가능하다")
+    func testProjectStoreSavesLoadsListsAndDeletesProjects() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateProjectStore-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        let store = CaptionMateProjectStore(rootURL: rootURL)
+        let sidecar = CaptionMateSidecar(
+            version: CaptionMateSidecar.currentVersion,
+            audioFileName: "interview.wav",
+            language: "en",
+            segments: [
+                .init(start: 0, end: 1.5, text: "Hello there", speakerID: 0),
+                .init(start: 1.5, end: 3.0, text: "Nice to meet you", speakerID: 1),
+            ],
+            speakerNames: [
+                "0": "Host",
+                "1": "Guest",
+            ],
+            exportSettings: .init(
+                selectedExportPreset: SubtitleExportPreset.finalCut.rawValue,
+                frameRate: 29.97,
+                includeSpeakerLabelsInExport: true,
+                speakerDiarizationSpeakerCount: 2
+            )
+        )
+        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let updatedAt = createdAt.addingTimeInterval(120)
+        let project = CaptionMateProject(
+            id: "project-1",
+            displayName: "Interview",
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            sourceAudioPath: "/tmp/interview.wav",
+            lastExportedAt: nil,
+            sidecar: sidecar
+        )
+
+        let savedURL = try store.save(project)
+        #expect(savedURL.lastPathComponent == "project-1.captionmateproject.json")
+
+        let summaries = try store.listSummaries()
+        #expect(summaries.count == 1)
+        #expect(summaries[0].id == "project-1")
+        #expect(summaries[0].displayName == "Interview")
+        #expect(summaries[0].segmentCount == 2)
+        #expect(summaries[0].speakerCount == 2)
+        #expect(summaries[0].speakerDisplayNames == ["Host", "Guest"])
+        #expect(summaries[0].sourceAudioFileName == "interview.wav")
+        #expect(summaries[0].sourceAudioExists == false)
+
+        let loaded = try store.load(id: "project-1")
+        #expect(loaded == project)
+
+        let renamed = try store.rename(
+            id: "project-1",
+            displayName: "  Client Review  ",
+            now: updatedAt.addingTimeInterval(60)
+        )
+        #expect(renamed.displayName == "Client Review")
+        #expect(renamed.createdAt == createdAt)
+        #expect(renamed.updatedAt == updatedAt.addingTimeInterval(60))
+        #expect(try store.load(id: "project-1").displayName == "Client Review")
+
+        let reconnectedAudioURL = rootURL.appendingPathComponent("interview-reconnected.wav")
+        try Data("reconnected-source-audio".utf8).write(to: reconnectedAudioURL)
+        let relinked = try store.relinkSourceAudio(
+            id: "project-1",
+            sourceAudioURL: reconnectedAudioURL,
+            bookmarkData: Data("reconnected-bookmark".utf8),
+            now: updatedAt.addingTimeInterval(120)
+        )
+        #expect(relinked.sourceAudioPath == reconnectedAudioURL.path)
+        #expect(relinked.sourceAudioBookmarkData == Data("reconnected-bookmark".utf8))
+        #expect(relinked.updatedAt == updatedAt.addingTimeInterval(120))
+
+        let duplicate = try store.duplicate(
+            id: "project-1",
+            displayName: "Client Review Copy",
+            now: updatedAt.addingTimeInterval(180),
+            newID: "project-1-copy"
+        )
+        #expect(duplicate.id == "project-1-copy")
+        #expect(duplicate.displayName == "Client Review Copy")
+        #expect(duplicate.createdAt == updatedAt.addingTimeInterval(180))
+        #expect(duplicate.updatedAt == updatedAt.addingTimeInterval(180))
+        #expect(duplicate.sourceAudioPath == reconnectedAudioURL.path)
+        #expect(duplicate.sidecar == sidecar)
+        #expect(try store.listSummaries().map(\.id) == ["project-1-copy", "project-1"])
+
+        try store.delete(id: "project-1")
+        #expect(try store.listSummaries().map(\.id) == ["project-1-copy"])
+    }
+
+    @Test("프로젝트 목록은 최근 수정 순으로 정렬된다")
+    func testProjectStoreListsMostRecentlyUpdatedProjectFirst() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateProjectStoreSort-\(UUID().uuidString)", isDirectory: true)
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        let store = CaptionMateProjectStore(rootURL: rootURL)
+        let baseSidecar = CaptionMateSidecar(
+            version: CaptionMateSidecar.currentVersion,
+            audioFileName: "clip.wav",
+            language: "ko",
+            segments: [.init(start: 0, end: 1, text: "안녕하세요", speakerID: nil)],
+            speakerNames: [:],
+            exportSettings: .init(
+                selectedExportPreset: SubtitleExportPreset.general.rawValue,
+                frameRate: 30,
+                includeSpeakerLabelsInExport: false,
+                speakerDiarizationSpeakerCount: 0
+            )
+        )
+
+        try store.save(.init(
+            id: "older",
+            displayName: "Older",
+            createdAt: Date(timeIntervalSince1970: 10),
+            updatedAt: Date(timeIntervalSince1970: 20),
+            sourceAudioPath: nil,
+            lastExportedAt: nil,
+            sidecar: baseSidecar
+        ))
+        try store.save(.init(
+            id: "newer",
+            displayName: "Newer",
+            createdAt: Date(timeIntervalSince1970: 10),
+            updatedAt: Date(timeIntervalSince1970: 30),
+            sourceAudioPath: nil,
+            lastExportedAt: nil,
+            sidecar: baseSidecar
+        ))
+
+        #expect(try store.listSummaries().map(\.id) == ["newer", "older"])
+    }
+}
+
 final class SpeakerDiarizationIntegrationSmokeTests: XCTestCase {
     func testOfflineSpeakerDiarizationWithInstalledModelAndFixtureAudio() async throws {
         let environment = ProcessInfo.processInfo.environment
@@ -1926,17 +2262,29 @@ struct LocalizationCatalogTests {
         "No speakers detected.",
         "No subtitles are ready.",
         "Open the listed segment to adjust it manually.",
+        "Original audio is missing. You can still edit and export subtitles.",
+        "Project name cannot be empty.",
+        "Project subtitles restored.",
         "Speaker model is not ready.",
         "Speaker model is still preparing.",
+        "This removes the saved subtitle project from CaptionMate. Your original audio file is not deleted.",
+        "Your current project has unsaved subtitle changes.",
     ]
 
     private let requiredCriticalUIKeys = [
         "App Version: %@ (%@)",
         "Audio Encoder",
         "Audio",
+        "Audio Missing",
+        "Audio Relink Failed",
+        "Audio Relinked",
         "Auto Language",
+        "Choose a short name for this saved subtitle project.",
         "Compute Units",
         "Default offline model · %@",
+        "Delete This Project?",
+        "Delete Project",
+        "Duplicate Project",
         "Download Model",
         "Downloading",
         "Drag and drop a file here",
@@ -1948,11 +2296,38 @@ struct LocalizationCatalogTests {
         "Load Model",
         "Manage Models",
         "Models",
+        "More Project Actions",
+        "No saved projects",
+        "Nothing to Save",
         "Offline model is ready",
+        "Open Without Saving",
+        "Project Delete Failed",
+        "Project Deleted",
+        "Project Duplicate Failed",
+        "Project Duplicated",
+        "Project List Unavailable",
+        "Project Name",
+        "Project Open Failed",
+        "Project Opened",
+        "Project Rename Failed",
+        "Project Renamed",
+        "Project Save Failed",
+        "Project Saved",
+        "Projects",
+        "Reconnect Audio",
         "Ready CaptionMate",
         "Recommended model",
         "Recommended model is local",
+        "Refresh Projects",
+        "Relink Audio",
+        "Rename",
+        "Rename Project",
+        "Save and Open",
+        "Save Changes Before Opening?",
+        "Save Project",
+        "Segments",
         "Settings",
+        "Speakers",
         "Speaker diarization",
         "Source Language",
         "Start Transcription",
@@ -1961,6 +2336,8 @@ struct LocalizationCatalogTests {
         "The language has been changed.",
         "Transcribe",
         "Translate",
+        "Unsaved changes",
+        "Unsaved transcript",
     ]
 
     private let requiredMenuAndModelManagementKeys = [

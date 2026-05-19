@@ -143,6 +143,15 @@ class ContentViewModel: ObservableObject {
     private var normalizationTaskID: UUID?
     private var speakerDiarizationDownloadProgress: Progress?
     private var downloadCancellationMonitorTasks: [String: Task<Void, Never>] = [:]
+    private var activeSourceAudioAccessURL: URL?
+    private let projectStore: CaptionMateProjectStore
+    private var lastSavedProjectSnapshot: ProjectSnapshot?
+
+    private struct ProjectSnapshot: Equatable {
+        let sidecar: CaptionMateSidecar
+        let sourceAudioPath: String?
+        let sourceAudioBookmarkData: Data?
+    }
 
 #if DEBUG
     var activeDownloadCancellationMonitorCountForTesting: Int {
@@ -184,6 +193,7 @@ class ContentViewModel: ObservableObject {
     let modelManagementState = ModelManagementState()
     @Published var audioState = AudioState()
     @Published var uiState = UIState()
+    @Published var projectLibraryState = ProjectLibraryState()
 
     /// 전사 결과
     @Published var transcriptionResult: TranscriptionResult?
@@ -279,6 +289,12 @@ class ContentViewModel: ObservableObject {
         return "\(currentBatchIndex + 1) of \(batchQueue.count)"
     }
 
+    var hasUnsavedProjectChanges: Bool {
+        guard projectLibraryState.hasActiveProject else { return false }
+        guard let currentProjectSnapshot = makeCurrentProjectSnapshot() else { return false }
+        return currentProjectSnapshot != lastSavedProjectSnapshot
+    }
+
     var supportedAppLanguages: [AppLanguageOption] {
         Self.supportedAppLanguages
     }
@@ -366,7 +382,8 @@ class ContentViewModel: ObservableObject {
     }
 #endif
 
-    init() {
+    init(projectStore: CaptionMateProjectStore = .liveStore()) {
+        self.projectStore = projectStore
 #if DEBUG
         if Self.launchArguments.contains(UITestArgument.resetDefaults) {
             Self.resetPersistentDefaultsForUITesting()
@@ -522,6 +539,363 @@ class ContentViewModel: ObservableObject {
         )
     }
 
+    // MARK: - Project Library
+
+    func refreshProjectLibrary() {
+        do {
+            projectLibraryState.summaries = try projectStore.listSummaries()
+            projectLibraryState.errorMessage = nil
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            showUserMessage(
+                .warning,
+                title: "Project List Unavailable",
+                detail: error.localizedDescription
+            )
+        }
+    }
+
+    @discardableResult
+    func saveCurrentProject(showMessage: Bool = true) -> CaptionMateProjectSummary? {
+        guard let projectSnapshot = makeCurrentProjectSnapshot() else {
+            if showMessage {
+                showUserMessage(.warning, title: "Nothing to Save", detail: "No subtitles are ready.")
+            }
+            return nil
+        }
+        let sidecar = projectSnapshot.sidecar
+
+        projectLibraryState.isSaving = true
+        defer {
+            projectLibraryState.isSaving = false
+        }
+
+        do {
+            let now = Date()
+            let existingProject = projectLibraryState.activeProjectID.flatMap {
+                try? projectStore.load(id: $0)
+            }
+            let projectID = existingProject?.id ?? UUID().uuidString
+            let displayName = projectDisplayName(from: sidecar)
+            let project = CaptionMateProject(
+                id: projectID,
+                displayName: displayName,
+                createdAt: existingProject?.createdAt ?? now,
+                updatedAt: now,
+                sourceAudioPath: projectSnapshot.sourceAudioPath,
+                sourceAudioBookmarkData: projectSnapshot.sourceAudioBookmarkData,
+                lastExportedAt: existingProject?.lastExportedAt,
+                sidecar: sidecar
+            )
+
+            try projectStore.save(project)
+            lastSavedProjectSnapshot = Self.snapshot(for: project)
+            refreshProjectLibrary()
+            projectLibraryState.activeProjectID = project.id
+            projectLibraryState.activeProjectDisplayName = project.displayName
+            projectLibraryState.lastSavedAt = project.updatedAt
+            projectLibraryState.errorMessage = nil
+
+            if showMessage {
+                showUserMessage(.success, title: "Project Saved", detail: project.displayName)
+            }
+
+            return projectLibraryState.summaries.first { $0.id == project.id }
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Project Save Failed", detail: error.localizedDescription)
+            }
+            return nil
+        }
+    }
+
+    func shouldConfirmOpeningProject(id _: String) -> Bool {
+        hasUnsavedProjectChanges
+    }
+
+    @discardableResult
+    func openProjectSavingCurrentChangesFirst(id: String, showMessage: Bool = true) -> Bool {
+        guard saveCurrentProject(showMessage: showMessage) != nil else {
+            return false
+        }
+        openProject(id: id, showMessage: showMessage)
+        return projectLibraryState.activeProjectID == id
+    }
+
+    func openProject(id: String, showMessage: Bool = true) {
+        do {
+            let project = try projectStore.load(id: id)
+            resetState()
+            restoreTranscriptionSidecar(project.sidecar)
+            audioState.audioFileName = project.sidecar.audioFileName
+            audioState.sourceAudioBookmarkData = project.sourceAudioBookmarkData
+
+            if let sourceAudioURL = resolveProjectAudioURL(project) {
+                audioState.importedAudioURL = sourceAudioURL
+                audioState.sourceAudioURL = sourceAudioURL
+            }
+
+            projectLibraryState.activeProjectID = project.id
+            projectLibraryState.activeProjectDisplayName = project.displayName
+            projectLibraryState.lastSavedAt = project.updatedAt
+            lastSavedProjectSnapshot = Self.snapshot(for: project)
+            projectLibraryState.errorMessage = nil
+            refreshProjectLibrary()
+
+            if showMessage {
+                let audioDetail = audioState.importedAudioURL == nil ?
+                    "Original audio is missing. You can still edit and export subtitles." :
+                    "Project subtitles restored."
+                showUserMessage(.success, title: "Project Opened", detail: audioDetail)
+            }
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Project Open Failed", detail: error.localizedDescription)
+            }
+        }
+    }
+
+    func deleteProject(id: String, showMessage: Bool = true) {
+        do {
+            let deletedActiveProject = projectLibraryState.activeProjectID == id
+            try projectStore.delete(id: id)
+
+            if deletedActiveProject {
+                projectLibraryState.activeProjectID = nil
+                projectLibraryState.activeProjectDisplayName = nil
+                projectLibraryState.lastSavedAt = nil
+                lastSavedProjectSnapshot = nil
+            }
+
+            refreshProjectLibrary()
+            projectLibraryState.errorMessage = nil
+
+            if showMessage {
+                showUserMessage(.success, title: "Project Deleted")
+            }
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Project Delete Failed", detail: error.localizedDescription)
+            }
+        }
+    }
+
+    @discardableResult
+    func renameProject(
+        id: String,
+        displayName: String,
+        showMessage: Bool = true
+    ) -> Bool {
+        do {
+            let renamedProject = try projectStore.rename(
+                id: id,
+                displayName: displayName
+            )
+            if projectLibraryState.activeProjectID == id {
+                projectLibraryState.activeProjectDisplayName = renamedProject.displayName
+                projectLibraryState.lastSavedAt = renamedProject.updatedAt
+                lastSavedProjectSnapshot = Self.snapshot(for: renamedProject)
+            }
+
+            refreshProjectLibrary()
+            projectLibraryState.errorMessage = nil
+
+            if showMessage {
+                showUserMessage(.success, title: "Project Renamed", detail: renamedProject.displayName)
+            }
+            return true
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Project Rename Failed", detail: error.localizedDescription)
+            }
+            return false
+        }
+    }
+
+    @discardableResult
+    func duplicateProject(
+        id: String,
+        showMessage: Bool = true
+    ) -> CaptionMateProjectSummary? {
+        do {
+            let sourceProject = try projectStore.load(id: id)
+            let duplicateName = Self.duplicateDisplayName(for: sourceProject.displayName)
+            let duplicatedProject = try projectStore.duplicate(
+                id: id,
+                displayName: duplicateName
+            )
+
+            refreshProjectLibrary()
+            projectLibraryState.errorMessage = nil
+
+            if showMessage {
+                showUserMessage(.success, title: "Project Duplicated", detail: duplicatedProject.displayName)
+            }
+            return projectLibraryState.summaries.first { $0.id == duplicatedProject.id }
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Project Duplicate Failed", detail: error.localizedDescription)
+            }
+            return nil
+        }
+    }
+
+    @discardableResult
+    func relinkProjectAudio(
+        id: String,
+        to sourceAudioURL: URL,
+        needsSecurityScopedAccess: Bool,
+        showMessage: Bool = true
+    ) -> Bool {
+        let didStartAccessing = needsSecurityScopedAccess ?
+            sourceAudioURL.startAccessingSecurityScopedResource() : false
+        var shouldKeepSecurityScopeOpen = false
+        defer {
+            if didStartAccessing && !shouldKeepSecurityScopeOpen {
+                sourceAudioURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let bookmarkData = try? sourceAudioURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            let relinkedProject = try projectStore.relinkSourceAudio(
+                id: id,
+                sourceAudioURL: sourceAudioURL,
+                bookmarkData: bookmarkData
+            )
+
+            if projectLibraryState.activeProjectID == id {
+                stopImportedAudio()
+                stopSourceAudioAccessIfNeeded()
+                audioPlayer = nil
+                audioState.sourceAudioURL = sourceAudioURL
+                audioState.importedAudioURL = sourceAudioURL
+                audioState.sourceAudioBookmarkData = bookmarkData
+                audioState.totalDuration = 0
+                audioPlaybackState.currentPlayerTime = 0
+                projectLibraryState.lastSavedAt = relinkedProject.updatedAt
+                lastSavedProjectSnapshot = Self.snapshot(for: relinkedProject)
+                if didStartAccessing {
+                    activeSourceAudioAccessURL = sourceAudioURL
+                    shouldKeepSecurityScopeOpen = true
+                }
+            }
+
+            refreshProjectLibrary()
+            projectLibraryState.errorMessage = nil
+
+            if showMessage {
+                showUserMessage(
+                    .success,
+                    title: "Audio Relinked",
+                    detail: sourceAudioURL.lastPathComponent
+                )
+            }
+            return true
+        } catch {
+            projectLibraryState.errorMessage = error.localizedDescription
+            if showMessage {
+                showUserMessage(.error, title: "Audio Relink Failed", detail: error.localizedDescription)
+            }
+            return false
+        }
+    }
+
+    private func resolveProjectAudioURL(_ project: CaptionMateProject) -> URL? {
+        if let bookmarkData = project.sourceAudioBookmarkData {
+            var isStale = false
+            if let bookmarkedURL = try? URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [.withSecurityScope],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            ) {
+                let didStartAccessing = bookmarkedURL.startAccessingSecurityScopedResource()
+                if FileManager.default.fileExists(atPath: bookmarkedURL.path) {
+                    if didStartAccessing {
+                        activeSourceAudioAccessURL = bookmarkedURL
+                    }
+                    return bookmarkedURL
+                }
+                if didStartAccessing {
+                    bookmarkedURL.stopAccessingSecurityScopedResource()
+                }
+            }
+        }
+
+        guard let sourceAudioPath = project.sourceAudioPath,
+              FileManager.default.fileExists(atPath: sourceAudioPath) else {
+            return nil
+        }
+        return URL(fileURLWithPath: sourceAudioPath)
+    }
+
+    private func makeCurrentProjectSidecar() -> CaptionMateSidecar? {
+        guard !transcriptionState.confirmedSegments.isEmpty else { return nil }
+
+        let language = transcriptionResult?.language ?? selectedLanguage
+        let timings = transcriptionResult?.timings ?? TranscriptionTimings()
+        let result = TranscriptionResult(
+            text: transcriptionState.confirmedSegments.map(\.text).joined(separator: " "),
+            segments: transcriptionState.confirmedSegments,
+            language: language,
+            timings: timings
+        )
+        return CaptionMateSidecar(
+            result: result,
+            audioFileName: audioState.audioFileName.isEmpty ? "Untitled Project" : audioState.audioFileName,
+            speakerAssignments: transcriptionState.speakerAssignments,
+            speakerNames: transcriptionState.speakerNames,
+            selectedExportPreset: selectedExportPreset,
+            frameRate: frameRate,
+            includeSpeakerLabelsInExport: includeSpeakerLabelsInExport,
+            speakerDiarizationSpeakerCount: speakerDiarizationSpeakerCount
+        )
+    }
+
+    private func makeCurrentProjectSnapshot() -> ProjectSnapshot? {
+        guard let sidecar = makeCurrentProjectSidecar() else { return nil }
+        return ProjectSnapshot(
+            sidecar: sidecar,
+            sourceAudioPath: (audioState.sourceAudioURL ?? audioState.importedAudioURL)?.path,
+            sourceAudioBookmarkData: audioState.sourceAudioBookmarkData
+        )
+    }
+
+    private static func snapshot(for project: CaptionMateProject) -> ProjectSnapshot {
+        ProjectSnapshot(
+            sidecar: project.sidecar,
+            sourceAudioPath: project.sourceAudioPath,
+            sourceAudioBookmarkData: project.sourceAudioBookmarkData
+        )
+    }
+
+    private func projectDisplayName(from sidecar: CaptionMateSidecar) -> String {
+        let candidates = [
+            projectLibraryState.activeProjectDisplayName ?? "",
+            audioState.audioFileName,
+            sidecar.audioFileName,
+        ]
+        return candidates
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty } ?? "Untitled Project"
+    }
+
+    private static func duplicateDisplayName(for displayName: String) -> String {
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let baseName = trimmedName.isEmpty ? "Untitled Project" : trimmedName
+        return "\(baseName) Copy"
+    }
+
     func applyRecommendedPerformanceSettings(showMessage: Bool = true) {
         let activeCores = max(1, ProcessInfo.processInfo.activeProcessorCount)
         let memoryGB = Double(ProcessInfo.processInfo.physicalMemory) / 1_073_741_824
@@ -541,6 +915,8 @@ class ContentViewModel: ObservableObject {
 
     private struct PreparedAudioImport {
         let localURL: URL
+        let sourceURL: URL
+        let sourceBookmarkData: Data?
         let displayName: String
         let sidecar: CaptionMateSidecar?
         let sidecarURL: URL?
@@ -567,9 +943,16 @@ class ContentViewModel: ObservableObject {
 
             let localURL = try copyAudioFileToTemporaryDirectory(from: sourceURL)
             let sidecarResult = loadSidecarIfPresent(nextTo: sourceURL)
+            let sourceBookmarkData = try? sourceURL.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
 
             return PreparedAudioImport(
                 localURL: localURL,
+                sourceURL: sourceURL,
+                sourceBookmarkData: sourceBookmarkData,
                 displayName: sourceURL.deletingPathExtension().lastPathComponent,
                 sidecar: sidecarResult.sidecar,
                 sidecarURL: sidecarResult.url,
@@ -759,12 +1142,15 @@ class ContentViewModel: ObservableObject {
             cancelAudioProcessingTasks()
             cleanupPreviousAudioFile()
             audioState.importedAudioURL = nil
+            audioState.sourceAudioURL = nil
+            audioState.sourceAudioBookmarkData = nil
             audioState.audioFileName = "Subtitle"
             audioState.waveformSamples = []
             audioState.isWaveformProcessing = false
             audioState.totalDuration = 0
             audioPlaybackState.currentPlayerTime = 0
             audioPlayer = nil
+            stopSourceAudioAccessIfNeeded()
         }
 
         transcriptionState.currentText = ""
@@ -791,6 +1177,10 @@ class ContentViewModel: ObservableObject {
         uiState.subtitleIssueFilter = .all
         uiState.subtitleSearchText = ""
         uiState.subtitleReplaceText = ""
+        projectLibraryState.activeProjectID = nil
+        projectLibraryState.activeProjectDisplayName = nil
+        projectLibraryState.lastSavedAt = nil
+        lastSavedProjectSnapshot = nil
         transcriptionResult = nil
     }
 
@@ -861,6 +1251,7 @@ class ContentViewModel: ObservableObject {
         speakerDiarizationDownloadProgress = nil
 
         stopImportedAudio()
+        stopSourceAudioAccessIfNeeded()
     }
 
     /// Compute 옵션 생성
@@ -2278,6 +2669,8 @@ class ContentViewModel: ObservableObject {
 
             // 파일 URL 저장
             audioState.importedAudioURL = importedAudio.localURL
+            audioState.sourceAudioURL = importedAudio.sourceURL
+            audioState.sourceAudioBookmarkData = importedAudio.sourceBookmarkData
 
             if let sidecar = importedAudio.sidecar {
                 restoreTranscriptionSidecar(sidecar, sourceURL: importedAudio.sidecarURL)
@@ -3689,11 +4082,14 @@ class ContentViewModel: ObservableObject {
 
         // 파일 삭제 대신 앱에서만 초기화
         audioState.importedAudioURL = nil
+        audioState.sourceAudioURL = nil
+        audioState.sourceAudioBookmarkData = nil
         audioState.audioFileName = ""
         audioState.waveformSamples = []
         audioState.isWaveformProcessing = false
         audioState.totalDuration = 0
         audioPlaybackState.currentPlayerTime = 0
+        stopSourceAudioAccessIfNeeded()
         print("Imported audio removed from app.")
     }
 
@@ -3712,6 +4108,11 @@ class ContentViewModel: ObservableObject {
             }
             audioState.temporaryAudioURL = nil
         }
+    }
+
+    private func stopSourceAudioAccessIfNeeded() {
+        activeSourceAudioAccessURL?.stopAccessingSecurityScopedResource()
+        activeSourceAudioAccessURL = nil
     }
 
     /// 앱이 직접 만든 오래된 임시 오디오 파일만 정리

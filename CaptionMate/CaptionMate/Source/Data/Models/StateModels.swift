@@ -725,6 +725,10 @@ struct AudioState {
 
     /// 파일 임포트 후 선택된 파일의 URL (미리듣기, 삭제, 파형 표시 등에 사용)
     var importedAudioURL: URL?
+    /// 사용자가 선택한 원본 파일 URL. 프로젝트 저장 시 앱 임시 복사본 대신 이 경로를 기록한다.
+    var sourceAudioURL: URL?
+    /// sandbox 환경에서 원본 파일을 다시 열기 위한 보안 범위 bookmark.
+    var sourceAudioBookmarkData: Data?
     var isPlaying: Bool = false
     var totalDuration: Double = 0.0
     var playbackTimer: Timer?
@@ -754,6 +758,19 @@ struct UIState {
     var subtitleIssueFilter: SubtitleIssueFilter = .all
     var subtitleSearchText: String = ""
     var subtitleReplaceText: String = ""
+}
+
+struct ProjectLibraryState {
+    var summaries: [CaptionMateProjectSummary] = []
+    var activeProjectID: String?
+    var activeProjectDisplayName: String?
+    var isSaving: Bool = false
+    var lastSavedAt: Date?
+    var errorMessage: String?
+
+    var hasActiveProject: Bool {
+        activeProjectID != nil
+    }
 }
 
 // MARK: - Audio Playback State

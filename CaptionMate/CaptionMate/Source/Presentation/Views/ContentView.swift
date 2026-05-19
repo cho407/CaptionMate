@@ -39,6 +39,9 @@ struct ContentView: View {
                         .modelManagementState.modelState != .unloaded)
                     .padding(.bottom)
 
+                ProjectLibraryView(viewModel: viewModel)
+                    .padding(.bottom)
+
                 Spacer()
 
                 // 앱 및 디바이스 정보
@@ -80,6 +83,7 @@ struct ContentView: View {
         }
         .onAppear {
             viewModel.fetchModels()
+            viewModel.refreshProjectLibrary()
             viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded()
             viewModel.presentFirstRunGuideIfNeeded()
 #if DEBUG
@@ -104,6 +108,367 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: viewModel.uiState.userMessage?.id)
+    }
+}
+
+private struct ProjectLibraryView: View {
+    @ObservedObject var viewModel: ContentViewModel
+    @State private var pendingProjectDeletion: CaptionMateProjectSummary?
+    @State private var pendingProjectOpen: CaptionMateProjectSummary?
+    @State private var pendingProjectRename: CaptionMateProjectSummary?
+    @State private var pendingAudioRelink: CaptionMateProjectSummary?
+    @State private var projectRenameText = ""
+    @State private var isAudioRelinkImporterPresented = false
+
+    private var canSaveCurrentProject: Bool {
+        !viewModel.transcriptionState.confirmedSegments.isEmpty
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Label("Projects", systemImage: "folder")
+                    .font(.headline)
+                    .accessibilityIdentifier("projectLibrary.container")
+                Spacer()
+                Button {
+                    viewModel.refreshProjectLibrary()
+                } label: {
+                    Label("Refresh Projects", systemImage: "arrow.clockwise")
+                        .labelStyle(.iconOnly)
+                }
+                .help("Refresh Projects")
+                .accessibilityLabel(Text("Refresh Projects"))
+                .accessibilityIdentifier("projectLibrary.refreshButton")
+                Button {
+                    viewModel.saveCurrentProject()
+                } label: {
+                    Label("Save Project", systemImage: "square.and.arrow.down")
+                        .labelStyle(.iconOnly)
+                }
+                .disabled(!canSaveCurrentProject || viewModel.projectLibraryState.isSaving)
+                .help("Save Project")
+                .accessibilityLabel(Text("Save Project"))
+                .accessibilityIdentifier("projectLibrary.saveButton")
+            }
+
+            if let activeName = viewModel.projectLibraryState.activeProjectDisplayName {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text(activeName)
+                        .lineLimit(1)
+                    Spacer()
+                    if viewModel.hasUnsavedProjectChanges {
+                        Label("Unsaved changes", systemImage: "pencil")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                            .labelStyle(.titleAndIcon)
+                    } else if let lastSavedAt = viewModel.projectLibraryState.lastSavedAt {
+                        Text(lastSavedAt, style: .time)
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .font(.caption)
+            } else if canSaveCurrentProject {
+                Text("Unsaved transcript")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if viewModel.projectLibraryState.summaries.isEmpty {
+                Text("No saved projects")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 6)
+                    .accessibilityIdentifier("projectLibrary.emptyState")
+            } else {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 6) {
+                        ForEach(viewModel.projectLibraryState.summaries) { summary in
+                            ProjectLibraryRow(
+                                summary: summary,
+                                isActive: viewModel.projectLibraryState.activeProjectID == summary.id,
+                                openAction: {
+                                    if viewModel.shouldConfirmOpeningProject(id: summary.id) {
+                                        pendingProjectOpen = summary
+                                    } else {
+                                        viewModel.openProject(id: summary.id)
+                                    }
+                                },
+                                renameAction: {
+                                    projectRenameText = summary.displayName
+                                    pendingProjectRename = summary
+                                },
+                                duplicateAction: {
+                                    viewModel.duplicateProject(id: summary.id)
+                                },
+                                relinkAudioAction: {
+                                    pendingAudioRelink = summary
+                                    isAudioRelinkImporterPresented = true
+                                },
+                                deleteAction: {
+                                    pendingProjectDeletion = summary
+                                }
+                            )
+                        }
+                    }
+                }
+                .frame(maxHeight: 180)
+            }
+        }
+        .buttonStyle(.borderless)
+        .controlSize(.small)
+        .padding(10)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .fileImporter(
+            isPresented: $isAudioRelinkImporterPresented,
+            allowedContentTypes: [.audio],
+            allowsMultipleSelection: false
+        ) { result in
+            guard let project = pendingAudioRelink else { return }
+            defer {
+                pendingAudioRelink = nil
+            }
+
+            switch result {
+            case let .success(urls):
+                guard let url = urls.first else { return }
+                viewModel.relinkProjectAudio(
+                    id: project.id,
+                    to: url,
+                    needsSecurityScopedAccess: true
+                )
+            case .failure:
+                break
+            }
+        }
+        .alert(
+            "Rename Project",
+            isPresented: Binding(
+                get: { pendingProjectRename != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingProjectRename = nil
+                        projectRenameText = ""
+                    }
+                }
+            )
+        ) {
+            TextField("Project Name", text: $projectRenameText)
+            Button("Cancel", role: .cancel) {
+                pendingProjectRename = nil
+                projectRenameText = ""
+            }
+            Button("Rename") {
+                guard let summary = pendingProjectRename else { return }
+                if viewModel.renameProject(
+                    id: summary.id,
+                    displayName: projectRenameText
+                ) {
+                    pendingProjectRename = nil
+                    projectRenameText = ""
+                }
+            }
+        } message: {
+            Text("Choose a short name for this saved subtitle project.")
+        }
+        .alert(
+            "Delete This Project?",
+            isPresented: Binding(
+                get: { pendingProjectDeletion != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingProjectDeletion = nil
+                    }
+                }
+            ),
+            presenting: pendingProjectDeletion
+        ) { summary in
+            Button("Cancel", role: .cancel) {
+                pendingProjectDeletion = nil
+            }
+            Button("Delete", role: .destructive) {
+                viewModel.deleteProject(id: summary.id)
+                pendingProjectDeletion = nil
+            }
+        } message: { summary in
+            Text(
+                "This removes the saved subtitle project from CaptionMate. Your original audio file is not deleted."
+            )
+            Text(summary.displayName)
+        }
+        .alert(
+            "Save Changes Before Opening?",
+            isPresented: Binding(
+                get: { pendingProjectOpen != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        pendingProjectOpen = nil
+                    }
+                }
+            ),
+            presenting: pendingProjectOpen
+        ) { summary in
+            Button("Cancel", role: .cancel) {
+                pendingProjectOpen = nil
+            }
+            Button("Open Without Saving", role: .destructive) {
+                viewModel.openProject(id: summary.id)
+                pendingProjectOpen = nil
+            }
+            Button("Save and Open") {
+                if viewModel.openProjectSavingCurrentChangesFirst(id: summary.id) {
+                    pendingProjectOpen = nil
+                }
+            }
+        } message: { summary in
+            Text("Your current project has unsaved subtitle changes.")
+            Text(summary.displayName)
+        }
+    }
+}
+
+private struct ProjectLibraryRow: View {
+    let summary: CaptionMateProjectSummary
+    let isActive: Bool
+    let openAction: () -> Void
+    let renameAction: () -> Void
+    let duplicateAction: () -> Void
+    let relinkAudioAction: () -> Void
+    let deleteAction: () -> Void
+
+    private var isMissingAudio: Bool {
+        summary.sourceAudioPath != nil && !summary.sourceAudioExists
+    }
+
+    private var speakerNamesPreview: String? {
+        let names = summary.speakerDisplayNames.prefix(3)
+        guard !names.isEmpty else { return nil }
+        let suffix = summary.speakerDisplayNames.count > names.count ? ", ..." : ""
+        return names.joined(separator: ", ") + suffix
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: openAction) {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: isActive ? "folder.fill" : "folder")
+                        .foregroundStyle(isActive ? Color.accentColor : .secondary)
+                        .frame(width: 18, height: 18)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(summary.displayName)
+                            .font(.caption.weight(.semibold))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+
+                        HStack(spacing: 10) {
+                            Label {
+                                HStack(spacing: 2) {
+                                    Text(summary.segmentCount, format: .number)
+                                    Text("Segments")
+                                }
+                            } icon: {
+                                Image(systemName: "text.alignleft")
+                            }
+                            .help("Segments")
+                            .accessibilityLabel(Text("Segments"))
+
+                            if summary.speakerCount > 0 {
+                                Label {
+                                    HStack(spacing: 2) {
+                                        Text(summary.speakerCount, format: .number)
+                                        Text("Speakers")
+                                    }
+                                } icon: {
+                                    Image(systemName: "person.2")
+                                }
+                                .help("Speakers")
+                                .accessibilityLabel(Text("Speakers"))
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+
+                        if let speakerNamesPreview {
+                            Text(speakerNamesPreview)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
+                                .accessibilityIdentifier("projectLibrary.speakerNames.\(summary.id)")
+                        }
+
+                        if let sourceAudioFileName = summary.sourceAudioFileName {
+                            HStack(spacing: 4) {
+                                Image(systemName: isMissingAudio ? "exclamationmark.triangle" : "waveform")
+                                    .frame(width: 12)
+                                if isMissingAudio {
+                                    Text("Audio Missing")
+                                } else {
+                                    Text("Audio")
+                                }
+                                Text(verbatim: sourceAudioFileName)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(isMissingAudio ? .orange : .secondary)
+                            .accessibilityIdentifier("projectLibrary.audioStatus.\(summary.id)")
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Spacer()
+                    Text(summary.updatedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("projectLibrary.open.\(summary.id)")
+
+            Menu {
+                Button(action: renameAction) {
+                    Label("Rename Project", systemImage: "pencil")
+                }
+                Button(action: duplicateAction) {
+                    Label("Duplicate Project", systemImage: "doc.on.doc")
+                }
+                Button(action: relinkAudioAction) {
+                    Label(
+                        isMissingAudio ? "Reconnect Audio" : "Relink Audio",
+                        systemImage: "waveform.badge.plus"
+                    )
+                }
+                Divider()
+                Button(role: .destructive, action: deleteAction) {
+                    Label("Delete Project", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 28, height: 28)
+            .help("More Project Actions")
+            .accessibilityLabel(Text("More Project Actions"))
+            .accessibilityIdentifier("projectLibrary.actions.\(summary.id)")
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(isActive ? Color.accentColor.opacity(0.10) : Color.clear)
+        )
     }
 }
 

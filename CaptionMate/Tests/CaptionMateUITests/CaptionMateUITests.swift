@@ -300,6 +300,25 @@ final class InteractionTests: XCTestCase {
         // 닫기
         app.typeKey(.escape, modifierFlags: [])
     }
+
+    @MainActor
+    func testProjectLibraryInitialState() throws {
+        let projectLibrary = app.element("projectLibrary.container")
+        XCTAssertTrue(projectLibrary.waitForExistence(timeout: 5.0), "프로젝트 라이브러리가 표시되어야 합니다")
+
+        let refreshButton = app.element("projectLibrary.refreshButton")
+        XCTAssertTrue(refreshButton.waitForExistence(timeout: 3.0), "프로젝트 새로고침 버튼이 표시되어야 합니다")
+        XCTAssertTrue(refreshButton.isEnabled, "프로젝트 새로고침은 항상 가능해야 합니다")
+
+        let saveButton = app.element("projectLibrary.saveButton")
+        XCTAssertTrue(saveButton.waitForExistence(timeout: 3.0), "프로젝트 저장 버튼이 표시되어야 합니다")
+        XCTAssertFalse(saveButton.isEnabled, "저장할 전사 내용이 없으면 저장 버튼은 비활성화되어야 합니다")
+
+        XCTAssertTrue(
+            app.element("projectLibrary.emptyState").waitForExistence(timeout: 3.0),
+            "저장된 프로젝트가 없을 때 빈 상태가 표시되어야 합니다"
+        )
+    }
 }
 
 // MARK: - 화자분리 UX 테스트
