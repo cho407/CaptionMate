@@ -1905,6 +1905,148 @@
         }
       }
     },
+    "Audio Relink Failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل إعادة ربط الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio konnte nicht neu verknüpft werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Relink Failed"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Relink Failed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo volver a vincular el audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec de la reconnexion audio"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो फिर से लिंक करने में विफल"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオの再リンクに失敗しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 재연결 실패"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao revincular áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新关联音频失败"
+          }
+        }
+      }
+    },
+    "Audio Relinked" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمت إعادة ربط الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio neu verknüpft"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Relinked"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Relinked"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio revinculado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio reconnecté"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो फिर से लिंक हो गया"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオを再リンクしました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 재연결 완료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áudio revinculado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已重新关联音频"
+          }
+        }
+      }
+    },
     "Auto" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3241,6 +3383,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在检查本地模型"
+          }
+        }
+      }
+    },
+    "Choose a short name for this saved subtitle project." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اختر اسمًا قصيرًا لمشروع الترجمة المحفوظ هذا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wähle einen kurzen Namen für dieses gespeicherte Untertitelprojekt."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a short name for this saved subtitle project."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a short name for this saved subtitle project."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elige un nombre corto para este proyecto de subtítulos guardado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez un nom court pour ce projet de sous-titres enregistré."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इस सहेजे गए उपशीर्षक प्रोजेक्ट के लिए छोटा नाम चुनें।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この保存済み字幕プロジェクトの短い名前を選択します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 자막 프로젝트의 짧은 이름을 입력하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escolha um nome curto para este projeto de legendas salvo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "为这个已保存的字幕项目选择一个简短名称。"
           }
         }
       }
@@ -5990,6 +6202,76 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将文件拖放到这里"
+          }
+        }
+      }
+    },
+    "Duplicate Project" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تكرار المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt duplizieren"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Project"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicate Project"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicar proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dupliquer le projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट डुप्लिकेट करें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトを複製"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 복제"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Duplicar projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制项目"
           }
         }
       }
@@ -12661,6 +12943,76 @@
         }
       }
     },
+    "More Project Actions" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المزيد من إجراءات المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Weitere Projektaktionen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More Project Actions"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "More Project Actions"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Más acciones del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus d’actions du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "और प्रोजेक्ट कार्रवाइयाँ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その他のプロジェクト操作"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 추가 작업"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mais ações do projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更多项目操作"
+          }
+        }
+      }
+    },
     "Name for %@" : {
       "comment" : "A field for the user to rename a speaker identified by the given ID.",
       "isCommentAutoGenerated" : true,
@@ -16203,6 +16555,148 @@
         }
       }
     },
+    "Project Duplicate Failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل تكرار المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt konnte nicht dupliziert werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Duplicate Failed"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Duplicate Failed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo duplicar el proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec de la duplication du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट डुप्लिकेट करने में विफल"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトの複製に失敗しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 복제 실패"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao duplicar projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "复制项目失败"
+          }
+        }
+      }
+    },
+    "Project Duplicated" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تكرار المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt dupliziert"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Duplicated"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Duplicated"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyecto duplicado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projet dupliqué"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट डुप्लिकेट हुआ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトを複製しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 복제 완료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projeto duplicado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目已复制"
+          }
+        }
+      }
+    },
     "Project List Unavailable" : {
       "extractionState" : "stale",
       "localizations" : {
@@ -16270,6 +16764,147 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "项目列表不可用"
+          }
+        }
+      }
+    },
+    "Project Name" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "اسم المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projektname"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Name"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Name"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट का नाम"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト名"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 이름"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nome do projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目名称"
+          }
+        }
+      }
+    },
+    "Project name cannot be empty." : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن أن يكون اسم المشروع فارغًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Projektname darf nicht leer sein."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project name cannot be empty."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project name cannot be empty."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre del proyecto no puede estar vacío."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom du projet ne peut pas être vide."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट का नाम खाली नहीं हो सकता।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト名は空にできません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 이름은 비워둘 수 없습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O nome do projeto não pode ficar vazio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目名称不能为空。"
           }
         }
       }
@@ -16412,6 +17047,148 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "项目已打开"
+          }
+        }
+      }
+    },
+    "Project Rename Failed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "فشل تغيير اسم المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt konnte nicht umbenannt werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Rename Failed"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Rename Failed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo cambiar el nombre del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échec du renommage du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट का नाम बदलने में विफल"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト名の変更に失敗しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 이름 변경 실패"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falha ao renomear projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名项目失败"
+          }
+        }
+      }
+    },
+    "Project Renamed" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تم تغيير اسم المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt umbenannt"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Renamed"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Renamed"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Proyecto renombrado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projet renommé"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट का नाम बदला गया"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト名を変更しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 이름 변경 완료"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projeto renomeado"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目已重命名"
           }
         }
       }
@@ -17479,6 +18256,76 @@
         }
       }
     },
+    "Reconnect Audio" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة توصيل الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio erneut verbinden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnect Audio"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnect Audio"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconectar audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnecter l’audio"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो फिर से कनेक्ट करें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオを再接続"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 다시 연결"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconectar áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新连接音频"
+          }
+        }
+      }
+    },
     "Refresh model catalog" : {
       "localizations" : {
         "ar" : {
@@ -17685,6 +18532,216 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刷新项目"
+          }
+        }
+      }
+    },
+    "Relink Audio" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة ربط الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio neu verknüpfen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relink Audio"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relink Audio"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revincular audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réassocier l’audio"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो फिर से लिंक करें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オーディオを再リンク"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 재연결"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revincular áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新关联音频"
+          }
+        }
+      }
+    },
+    "Rename" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة تسمية"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Umbenennen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "नाम बदलें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名"
+          }
+        }
+      }
+    },
+    "Rename Project" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة تسمية المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projekt umbenennen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename Project"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rename Project"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renombrar proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renommer le projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट का नाम बदलें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクト名を変更"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 이름 변경"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Renomear projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名项目"
           }
         }
       }
@@ -25481,21 +26538,6 @@
         }
       }
     },
-    "Audio Relink Failed" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "فشل إعادة ربط الصوت"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Audio konnte nicht neu verknüpft werden"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Audio Relink Failed"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Audio Relink Failed"}},"es" : {"stringUnit" : {"state" : "translated","value" : "No se pudo volver a vincular el audio"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Échec de la reconnexion audio"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "ऑडियो फिर से लिंक करने में विफल"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "オーディオの再リンクに失敗しました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "오디오 재연결 실패"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Falha ao revincular áudio"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重新关联音频失败"}}}},
-    "Audio Relinked" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "تمت إعادة ربط الصوت"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Audio neu verknüpft"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Audio Relinked"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Audio Relinked"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Audio revinculado"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Audio reconnecté"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "ऑडियो फिर से लिंक हो गया"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "オーディオを再リンクしました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "오디오 재연결 완료"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Áudio revinculado"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "已重新关联音频"}}}},
-    "Choose a short name for this saved subtitle project." : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "اختر اسمًا قصيرًا لمشروع الترجمة المحفوظ هذا."}},"de" : {"stringUnit" : {"state" : "translated","value" : "Wähle einen kurzen Namen für dieses gespeicherte Untertitelprojekt."}},"en" : {"stringUnit" : {"state" : "translated","value" : "Choose a short name for this saved subtitle project."}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Choose a short name for this saved subtitle project."}},"es" : {"stringUnit" : {"state" : "translated","value" : "Elige un nombre corto para este proyecto de subtítulos guardado."}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Choisissez un nom court pour ce projet de sous-titres enregistré."}},"hi" : {"stringUnit" : {"state" : "translated","value" : "इस सहेजे गए उपशीर्षक प्रोजेक्ट के लिए छोटा नाम चुनें।"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "この保存済み字幕プロジェクトの短い名前を選択します。"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "저장된 자막 프로젝트의 짧은 이름을 입력하세요."}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Escolha um nome curto para este projeto de legendas salvo."}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "为这个已保存的字幕项目选择一个简短名称。"}}}},
-    "Duplicate Project" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "تكرار المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt duplizieren"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Duplicate Project"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Duplicate Project"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Duplicar proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Dupliquer le projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट डुप्लिकेट करें"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクトを複製"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 복제"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Duplicar projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "复制项目"}}}},
-    "More Project Actions" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "المزيد من إجراءات المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Weitere Projektaktionen"}},"en" : {"stringUnit" : {"state" : "translated","value" : "More Project Actions"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "More Project Actions"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Más acciones del proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Plus d’actions du projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "और प्रोजेक्ट कार्रवाइयाँ"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "その他のプロジェクト操作"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 추가 작업"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Mais ações do projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "更多项目操作"}}}},
-    "Project Duplicate Failed" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "فشل تكرار المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt konnte nicht dupliziert werden"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project Duplicate Failed"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project Duplicate Failed"}},"es" : {"stringUnit" : {"state" : "translated","value" : "No se pudo duplicar el proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Échec de la duplication du projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट डुप्लिकेट करने में विफल"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクトの複製に失敗しました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 복제 실패"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Falha ao duplicar projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "复制项目失败"}}}},
-    "Project Duplicated" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "تم تكرار المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt dupliziert"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project Duplicated"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project Duplicated"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Proyecto duplicado"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Projet dupliqué"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट डुप्लिकेट हुआ"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクトを複製しました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 복제 완료"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Projeto duplicado"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "项目已复制"}}}},
-    "Project Name" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "اسم المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projektname"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project Name"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project Name"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Nombre del proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Nom du projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट का नाम"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクト名"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 이름"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Nome do projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "项目名称"}}}},
-    "Project Rename Failed" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "فشل تغيير اسم المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt konnte nicht umbenannt werden"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project Rename Failed"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project Rename Failed"}},"es" : {"stringUnit" : {"state" : "translated","value" : "No se pudo cambiar el nombre del proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Échec du renommage du projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट का नाम बदलने में विफल"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクト名の変更に失敗しました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 이름 변경 실패"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Falha ao renomear projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重命名项目失败"}}}},
-    "Project Renamed" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "تم تغيير اسم المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt umbenannt"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project Renamed"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project Renamed"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Proyecto renombrado"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Projet renommé"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट का नाम बदला गया"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクト名を変更しました"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 이름 변경 완료"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Projeto renomeado"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "项目已重命名"}}}},
-    "Project name cannot be empty." : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "لا يمكن أن يكون اسم المشروع فارغًا."}},"de" : {"stringUnit" : {"state" : "translated","value" : "Der Projektname darf nicht leer sein."}},"en" : {"stringUnit" : {"state" : "translated","value" : "Project name cannot be empty."}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Project name cannot be empty."}},"es" : {"stringUnit" : {"state" : "translated","value" : "El nombre del proyecto no puede estar vacío."}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Le nom du projet ne peut pas être vide."}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट का नाम खाली नहीं हो सकता।"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクト名は空にできません。"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 이름은 비워둘 수 없습니다."}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "O nome do projeto não pode ficar vazio."}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "项目名称不能为空。"}}}},
-    "Reconnect Audio" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "إعادة توصيل الصوت"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Audio erneut verbinden"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Reconnect Audio"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Reconnect Audio"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Reconectar audio"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Reconnecter l’audio"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "ऑडियो फिर से कनेक्ट करें"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "オーディオを再接続"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "오디오 다시 연결"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Reconectar áudio"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重新连接音频"}}}},
-    "Relink Audio" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "إعادة ربط الصوت"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Audio neu verknüpfen"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Relink Audio"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Relink Audio"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Revincular audio"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Réassocier l’audio"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "ऑडियो फिर से लिंक करें"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "オーディオを再リンク"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "오디오 재연결"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Revincular áudio"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重新关联音频"}}}},
-    "Rename" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "إعادة تسمية"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Umbenennen"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Rename"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Rename"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Renombrar"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Renommer"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "नाम बदलें"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "名前を変更"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "이름 변경"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Renomear"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重命名"}}}},
-    "Rename Project" : {"localizations" : {"ar" : {"stringUnit" : {"state" : "translated","value" : "إعادة تسمية المشروع"}},"de" : {"stringUnit" : {"state" : "translated","value" : "Projekt umbenennen"}},"en" : {"stringUnit" : {"state" : "translated","value" : "Rename Project"}},"en-GB" : {"stringUnit" : {"state" : "translated","value" : "Rename Project"}},"es" : {"stringUnit" : {"state" : "translated","value" : "Renombrar proyecto"}},"fr" : {"stringUnit" : {"state" : "translated","value" : "Renommer le projet"}},"hi" : {"stringUnit" : {"state" : "translated","value" : "प्रोजेक्ट का नाम बदलें"}},"ja" : {"stringUnit" : {"state" : "translated","value" : "プロジェクト名を変更"}},"ko" : {"stringUnit" : {"state" : "translated","value" : "프로젝트 이름 변경"}},"pt-BR" : {"stringUnit" : {"state" : "translated","value" : "Renomear projeto"}},"zh-Hans" : {"stringUnit" : {"state" : "translated","value" : "重命名项目"}}}},
     "日本語" : {
       "extractionState" : "stale",
       "localizations" : {
