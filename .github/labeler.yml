@@ -1,4 +1,4 @@
-# Configuration for PR labeler (actions/labeler@v5)
+# Configuration for PR labeler (actions/labeler@v6)
 # https://github.com/actions/labeler
 
 'status:awaiting review':
