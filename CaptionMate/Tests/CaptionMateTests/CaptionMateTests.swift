@@ -1877,11 +1877,14 @@ struct SubtitleFileTypeTests {
     @Test("SubtitleFileType allCases 테스트")
     func testSubtitleFileTypeAllCases() throws {
         let allCases = SubtitleFileType.allCases
-        #expect(allCases.count == 4)
+        let rawValues = allCases.map(\.rawValue)
+        #expect(allCases.count == 6)
         #expect(allCases.contains(.srt))
         #expect(allCases.contains(.fcpxml))
         #expect(allCases.contains(.vtt))
         #expect(allCases.contains(.json))
+        #expect(rawValues.contains("txt"))
+        #expect(rawValues.contains("doc"))
     }
 
     @Test("SubtitleFileType UTType 변환 테스트")
@@ -1894,6 +1897,9 @@ struct SubtitleFileTypeTests {
         // JSON - 시스템 정의 UTType과 비교
         #expect(SubtitleFileType.json.utType == .json)
 
+        // TXT - plain text UTType 확인
+        #expect(SubtitleFileType.from(utType: .plainText)?.rawValue == "txt")
+
         // VTT - UTType 생성하여 비교
         let expectedVTT = UTType(filenameExtension: "vtt")
         #expect(SubtitleFileType.vtt.utType == expectedVTT || SubtitleFileType.vtt
@@ -1902,6 +1908,79 @@ struct SubtitleFileTypeTests {
         // FCPXML - 커스텀 UTType 확인
         let fcpxmlType = SubtitleFileType.fcpxml.utType
         #expect(fcpxmlType == .fcpxml)
+
+        // DOC - Word-compatible document UTType 확인
+        let docType = UTType(filenameExtension: "doc") ?? .data
+        #expect(SubtitleFileType.from(utType: docType)?.rawValue == "doc")
+    }
+}
+
+// MARK: - Text Document Writer Tests
+
+struct TextDocumentWriterTests {
+    @Test("Plain text writer는 타임코드와 자막 텍스트를 txt 파일로 쓴다")
+    func testPlainTextWriterWritesReadableTranscript() throws {
+        let outputDirectory = try makeOutputDirectory()
+        defer { try? FileManager.default.removeItem(at: outputDirectory) }
+
+        let result = TranscriptionResult(
+            text: "Hello World",
+            segments: [
+                TranscriptionSegment(start: 0, end: 1.5, text: "Hello"),
+                TranscriptionSegment(start: 2, end: 3.25, text: "World"),
+            ],
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+        let writer = WritePlainText(outputDir: outputDirectory.path)
+
+        switch writer.write(result: result, to: "plain_text_export", options: nil) {
+        case .success:
+            let outputURL = outputDirectory.appendingPathComponent("plain_text_export.txt")
+            let text = try String(contentsOf: outputURL, encoding: .utf8)
+            #expect(text.contains("CaptionMate Transcript"))
+            #expect(text.contains("[00:00:00.00 - 00:00:01.50]"))
+            #expect(text.contains("Hello"))
+            #expect(text.contains("[00:00:02.00 - 00:00:03.25]"))
+            #expect(text.contains("World"))
+        case let .failure(error):
+            throw error
+        }
+    }
+
+    @Test("DOC writer는 Word-compatible HTML 문서를 doc 파일로 쓴다")
+    func testDocWriterWritesWordCompatibleDocument() throws {
+        let outputDirectory = try makeOutputDirectory()
+        defer { try? FileManager.default.removeItem(at: outputDirectory) }
+
+        let result = TranscriptionResult(
+            text: "A&B",
+            segments: [
+                TranscriptionSegment(start: 0, end: 1, text: "A&B <caption>"),
+            ],
+            language: "en",
+            timings: TranscriptionTimings()
+        )
+        let writer = WriteDOC(outputDir: outputDirectory.path)
+
+        switch writer.write(result: result, to: "word_export", options: nil) {
+        case .success:
+            let outputURL = outputDirectory.appendingPathComponent("word_export.doc")
+            let document = try String(contentsOf: outputURL, encoding: .utf8)
+            #expect(document.contains("<html"))
+            #expect(document.contains("CaptionMate Transcript"))
+            #expect(document.contains("A&amp;B &lt;caption&gt;"))
+            #expect(!document.contains("A&B <caption>"))
+        case let .failure(error):
+            throw error
+        }
+    }
+
+    private func makeOutputDirectory() throws -> URL {
+        let outputDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateTextExport-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        return outputDirectory
     }
 }
 

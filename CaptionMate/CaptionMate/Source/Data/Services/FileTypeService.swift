@@ -28,6 +28,8 @@ public enum SubtitleFileType: String, CaseIterable {
     case fcpxml
     case vtt
     case json
+    case txt
+    case doc
 
     public var utType: UTType {
         switch self {
@@ -39,6 +41,10 @@ public enum SubtitleFileType: String, CaseIterable {
             return UTType(filenameExtension: "vtt") ?? .plainText
         case .json:
             return UTType.json
+        case .txt:
+            return .plainText
+        case .doc:
+            return UTType(filenameExtension: "doc") ?? .data
         }
     }
 

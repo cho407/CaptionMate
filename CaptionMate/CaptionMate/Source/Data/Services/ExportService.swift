@@ -79,6 +79,10 @@ struct ExportService {
             writer = WriteVTT(outputDir: outputDir)
         case .json:
             writer = WriteJSON(outputDir: outputDir)
+        case .txt:
+            writer = WritePlainText(outputDir: outputDir)
+        case .doc:
+            writer = WriteDOC(outputDir: outputDir)
         }
 
         if let writer = writer {

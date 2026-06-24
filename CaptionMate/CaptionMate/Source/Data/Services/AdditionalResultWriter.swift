@@ -42,6 +42,73 @@ enum AdditionalResultWriterError: LocalizedError, Equatable {
 
 // MARK: - Helper Functions
 
+private func validatedExportOutputURL(
+    outputDir: String,
+    file: String,
+    fileExtension: String
+) throws -> URL {
+    let trimmedFileName = file.trimmingCharacters(in: .whitespacesAndNewlines)
+    let disallowedCharacters = CharacterSet(charactersIn: "/\\:")
+        .union(.controlCharacters)
+    guard !trimmedFileName.isEmpty,
+          trimmedFileName == file,
+          trimmedFileName != ".",
+          trimmedFileName != "..",
+          fileExtension.rangeOfCharacter(from: disallowedCharacters) == nil,
+          trimmedFileName.rangeOfCharacter(from: disallowedCharacters) == nil else {
+        throw AdditionalResultWriterError.unsafeOutputFileName(file)
+    }
+
+    let outputDirectoryURL = URL(fileURLWithPath: outputDir, isDirectory: true)
+        .standardizedFileURL
+    let reportURL = outputDirectoryURL
+        .appendingPathComponent(trimmedFileName, isDirectory: false)
+        .appendingPathExtension(fileExtension)
+        .standardizedFileURL
+    guard reportURL.deletingLastPathComponent().standardizedFileURL == outputDirectoryURL else {
+        throw AdditionalResultWriterError.unsafeOutputFileName(file)
+    }
+    return reportURL
+}
+
+private func readableTranscriptLines(for result: TranscriptionResult) -> [String] {
+    var lines = ["CaptionMate Transcript", ""]
+    let segments = result.segments
+        .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        .sorted { $0.start < $1.start }
+
+    if segments.isEmpty {
+        let text = result.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            lines.append(text)
+        }
+        return lines
+    }
+
+    for segment in segments {
+        lines.append(transcriptTimeRange(for: segment))
+        lines.append(segment.text.trimmingCharacters(in: .whitespacesAndNewlines))
+        lines.append("")
+    }
+
+    return lines
+}
+
+private func transcriptTimeRange(for segment: TranscriptionSegment) -> String {
+    let start = TimeInterval(segment.start).toHMSFormat()
+    let end = TimeInterval(segment.end).toHMSFormat()
+    return "[\(start) - \(end)]"
+}
+
+private func escapedHTML(_ text: String) -> String {
+    text
+        .replacingOccurrences(of: "&", with: "&amp;")
+        .replacingOccurrences(of: "\"", with: "&quot;")
+        .replacingOccurrences(of: "'", with: "&#39;")
+        .replacingOccurrences(of: "<", with: "&lt;")
+        .replacingOccurrences(of: ">", with: "&gt;")
+}
+
 /// 주어진 초를 프레임 레이트를 반영한 타임코드 (HH:MM:SS:FF) 문자열로 변환 (FCPXML, SCC 등에서 사용)
 func timecodeString(from seconds: Float, frameRate: Double) -> String {
     let sec = Double(seconds)
@@ -81,6 +148,83 @@ func timecodeString(from seconds: Float, frameRate: Double) -> String {
 //    // 소수점 3자리(밀리초)까지 표현. (오차를 줄이기 위해 floor 대신 truncatingRemainder 사용)
 //    return String(format: "%02d:%02d:%06.3f", hrs, mins, secs)
 // }
+
+// MARK: - WritePlainText
+
+open class WritePlainText: ResultWriting {
+    public let outputDir: String
+
+    public init(outputDir: String) {
+        self.outputDir = outputDir
+    }
+
+    public func write(result: TranscriptionResult, to file: String,
+                      options: [String: Any]? = nil) -> Result<String, Error> {
+        let textContent = readableTranscriptLines(for: result).joined(separator: "\n")
+
+        do {
+            let reportURL = try validatedExportOutputURL(
+                outputDir: outputDir,
+                file: file,
+                fileExtension: "txt"
+            )
+            try textContent.write(to: reportURL, atomically: true, encoding: .utf8)
+            return .success(reportURL.absoluteString)
+        } catch {
+            return .failure(error)
+        }
+    }
+}
+
+// MARK: - WriteDOC
+
+open class WriteDOC: ResultWriting {
+    public let outputDir: String
+
+    public init(outputDir: String) {
+        self.outputDir = outputDir
+    }
+
+    public func write(result: TranscriptionResult, to file: String,
+                      options: [String: Any]? = nil) -> Result<String, Error> {
+        let body = readableTranscriptLines(for: result)
+            .map { escapedHTML($0).replacingOccurrences(of: "\n", with: "<br/>") }
+            .map { line -> String in
+                if line.hasPrefix("[") && line.hasSuffix("]") {
+                    return "<p><strong>\(line)</strong></p>"
+                }
+                if line.isEmpty {
+                    return "<p></p>"
+                }
+                return "<p>\(line)</p>"
+            }
+            .joined(separator: "\n")
+
+        let document = """
+        <html>
+        <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+        <title>CaptionMate Transcript</title>
+        </head>
+        <body>
+        \(body)
+        </body>
+        </html>
+        """
+
+        do {
+            let reportURL = try validatedExportOutputURL(
+                outputDir: outputDir,
+                file: file,
+                fileExtension: "doc"
+            )
+            try document.write(to: reportURL, atomically: true, encoding: .utf8)
+            return .success(reportURL.absoluteString)
+        } catch {
+            return .failure(error)
+        }
+    }
+}
 
 // MARK: - WriteFCPXML
 
@@ -159,27 +303,7 @@ open class WriteFCPXML: ResultWriting {
     }
 
     private func outputURL(for file: String) throws -> URL {
-        let trimmedFileName = file.trimmingCharacters(in: .whitespacesAndNewlines)
-        let disallowedCharacters = CharacterSet(charactersIn: "/\\:")
-            .union(.controlCharacters)
-        guard !trimmedFileName.isEmpty,
-              trimmedFileName == file,
-              trimmedFileName != ".",
-              trimmedFileName != "..",
-              trimmedFileName.rangeOfCharacter(from: disallowedCharacters) == nil else {
-            throw AdditionalResultWriterError.unsafeOutputFileName(file)
-        }
-
-        let outputDirectoryURL = URL(fileURLWithPath: outputDir, isDirectory: true)
-            .standardizedFileURL
-        let reportURL = outputDirectoryURL
-            .appendingPathComponent(trimmedFileName, isDirectory: false)
-            .appendingPathExtension("fcpxml")
-            .standardizedFileURL
-        guard reportURL.deletingLastPathComponent().standardizedFileURL == outputDirectoryURL else {
-            throw AdditionalResultWriterError.unsafeOutputFileName(file)
-        }
-        return reportURL
+        try validatedExportOutputURL(outputDir: outputDir, file: file, fileExtension: "fcpxml")
     }
 
     public func write(result: TranscriptionResult, to file: String,
