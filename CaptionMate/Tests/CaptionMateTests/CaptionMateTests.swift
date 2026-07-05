@@ -1412,6 +1412,31 @@ struct ContentViewModelTests {
 // MARK: - Speaker Diarization Tests
 
 struct SpeakerDiarizationTests {
+    @Test("화자 매핑 기본 전략은 자막 편집 세그먼트를 보존한다")
+    func testSpeakerAssignmentMapperDefaultsToSegmentLevelMapping() throws {
+        #expect(SpeakerAssignmentMapper.defaultGranularity == .segmentOverlap)
+    }
+
+    @Test("화자 매핑은 세그먼트 내부 화자 변경보다 편집 가능한 자막 경계를 우선한다")
+    func testSegmentLevelMapperPreservesEditedCaptionBoundaries() throws {
+        let transcriptionSegments = [
+            TranscriptionSegment(start: 0, end: 10, text: "one edited caption"),
+        ]
+        let timelineSegments = [
+            SpeakerTimelineSegment(speakerID: 0, start: 0, end: 4),
+            SpeakerTimelineSegment(speakerID: 1, start: 4, end: 10),
+        ]
+
+        let assignments = SpeakerAssignmentMapper.assignments(
+            for: transcriptionSegments,
+            from: timelineSegments
+        )
+
+        #expect(assignments == [
+            SpeakerSegmentAssignment(speakerID: 1),
+        ])
+    }
+
     @Test("화자분리 세그먼트 매핑 테스트")
     func testSpeakerAssignmentMapperChoosesLargestOverlapAndCarriesPrevious() throws {
         let transcriptionSegments = [
@@ -2714,6 +2739,45 @@ struct StringExtensionTests {
 // MARK: - Release Gate Tests
 
 struct ReleaseGateTests {
+    @Test("Argmax SDK는 공식 argmax-oss-swift v1 패키지로 고정한다")
+    func testArgmaxSDKUsesCanonicalV1Package() throws {
+        let project = try Self.readRepositoryFile("CaptionMate/CaptionMate.xcodeproj/project.pbxproj")
+        let resolved = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        )
+
+        #expect(project.contains("XCRemoteSwiftPackageReference \"argmax-oss-swift\""))
+        #expect(project.contains("repositoryURL = \"https://github.com/argmaxinc/argmax-oss-swift.git\";"))
+        #expect(project.contains("minimumVersion = 1.0.0;"))
+        #expect(resolved.contains("\"identity\" : \"argmax-oss-swift\""))
+        #expect(resolved.contains("\"location\" : \"https://github.com/argmaxinc/argmax-oss-swift.git\""))
+        #expect(resolved.contains("\"version\" : \"1.0.0\""))
+        #expect(!project.contains("https://github.com/argmaxinc/WhisperKit"))
+        #expect(!resolved.contains("https://github.com/argmaxinc/WhisperKit"))
+    }
+
+    @Test("WhisperKit v1에서 제거된 prefill cache 옵션에 의존하지 않는다")
+    func testWhisperKitV1MigrationAvoidsRemovedPrefillCacheOption() throws {
+        let source = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(!source.contains("usePrefillCache:"))
+        #expect(!source.contains("prefillCompute"))
+        #expect(source.contains("let decodingCallback: TranscriptionCallback?"))
+        #expect(!source.contains("Int(self.compressionCheckWindow)"))
+    }
+
+    @Test("다운로드 progress throttling은 Sendable callback에서 mutable capture를 만들지 않는다")
+    func testDownloadProgressThrottleAvoidsMutableSendableCapture() throws {
+        let source = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(!source.contains("var lastUpdateTime = Date()"))
+        #expect(source.contains("private var modelDownloadLastProgressUIUpdateTime: [String: Date]"))
+    }
+
     @Test("v2 릴리스 버전과 빌드 번호가 프로젝트 설정에 반영되어야 한다")
     func testProjectVersionIsPreparedForV2Release() throws {
         let project = try Self.readRepositoryFile("CaptionMate/CaptionMate.xcodeproj/project.pbxproj")

@@ -24,6 +24,10 @@ struct SpeakerTimelineSegment: Equatable, Sendable {
     let end: Float
 }
 
+enum SpeakerAssignmentGranularity: Equatable, Sendable {
+    case segmentOverlap
+}
+
 enum SpeakerDiarizationServiceError: LocalizedError {
     case modelUnavailable([String])
 
@@ -87,6 +91,8 @@ struct SpeakerDiarizationService {
 }
 
 enum SpeakerAssignmentMapper {
+    static let defaultGranularity: SpeakerAssignmentGranularity = .segmentOverlap
+
     static func assignments(
         for transcriptionSegments: [TranscriptionSegment],
         from timelineSegments: [SpeakerTimelineSegment]

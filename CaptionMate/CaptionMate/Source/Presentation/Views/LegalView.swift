@@ -150,10 +150,10 @@ struct ThirdPartyNoticesView: View {
                     Divider()
 
                     LibraryInfo(
-                        name: "2. WhisperKit",
+                        name: "2. Argmax Open-Source SDK",
                         license: "MIT License",
                         copyright: "Copyright (c) 2024 argmax, inc.",
-                        url: "https://github.com/argmaxinc/WhisperKit"
+                        url: "https://github.com/argmaxinc/argmax-oss-swift"
                     )
                 }
                 .padding()

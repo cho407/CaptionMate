@@ -146,6 +146,7 @@ class ContentViewModel: ObservableObject {
     private var modelDownloadTasks: [String: Task<Void, Never>] = [:]
     private var modelDownloadProgressObjects: [String: Progress] = [:]
     private var modelDownloadLastProgressCallbackTime: [String: Date] = [:]
+    private var modelDownloadLastProgressUIUpdateTime: [String: Date] = [:]
     private var downloadCancellationMonitorTasks: [String: Task<Void, Never>] = [:]
     private var activeSourceAudioAccessURL: URL?
     private let projectStore: CaptionMateProjectStore
@@ -195,6 +196,7 @@ class ContentViewModel: ObservableObject {
         modelDownloadTasks[model] = task
         modelDownloadProgressObjects[model] = progress
         modelDownloadLastProgressCallbackTime[model] = lastProgressCallbackTime
+        modelDownloadLastProgressUIUpdateTime[model] = lastProgressCallbackTime
     }
 
     func setAudioProcessingTasksForTesting(
@@ -1268,6 +1270,7 @@ class ContentViewModel: ObservableObject {
         modelDownloadTasks.removeAll()
         modelDownloadProgressObjects.removeAll()
         modelDownloadLastProgressCallbackTime.removeAll()
+        modelDownloadLastProgressUIUpdateTime.removeAll()
         modelManagementState.currentDownloadingModels.removeAll()
         modelManagementState.cancellingModels.removeAll()
         modelManagementState.queuedDownloadModels.removeAll()
@@ -1525,7 +1528,6 @@ class ContentViewModel: ObservableObject {
                 - Mel Spectrogram:  \(computeOptions.melCompute.description)
                 - Audio Encoder:    \(computeOptions.audioEncoderCompute.description)
                 - Text Decoder:     \(computeOptions.textDecoderCompute.description)
-                - Prefill Data:     \(computeOptions.prefillCompute.description)
             """)
 
             // 2. WhisperKit 인스턴스 생성
@@ -2133,6 +2135,7 @@ class ContentViewModel: ObservableObject {
         }
         modelDownloadProgressObjects.removeValue(forKey: model)
         modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+        modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
 
         let repoName = repoName
         let estimatedSize = estimatedDownloadSize(for: model)
@@ -2189,7 +2192,6 @@ class ContentViewModel: ObservableObject {
                 }
 
                 let progressUpdateInterval: TimeInterval = 0.5
-                var lastUpdateTime = Date()
 
                 let modelFolder = try await WhisperKit.download(
                     variant: model,
@@ -2222,6 +2224,57 @@ class ContentViewModel: ObservableObject {
                                         model,
                                         localModelPath: localModelPath
                                     )
+                                }
+                            }
+
+                            // 진행률 업데이트 최적화
+                            let currentTime = Date()
+                            let lastUpdateTime = self.modelDownloadLastProgressUIUpdateTime[model]
+                                ?? .distantPast
+                            guard currentTime
+                                .timeIntervalSince(lastUpdateTime) >= progressUpdateInterval else {
+                                return
+                            }
+                            self.modelDownloadLastProgressUIUpdateTime[model] = currentTime
+
+                            // 취소 중인 상태라면 UI 업데이트 건너뛰기
+                            if self.modelManagementState.cancellingModels.contains(model) {
+                                print("Cancelling - skipping UI update: \(model)")
+                                return
+                            }
+
+                            // 다운로드 중이 아니면 종료
+                            guard self.modelManagementState.currentDownloadingModels
+                                .contains(model) else {
+                                return
+                            }
+
+                            self.modelManagementState
+                                .downloadProgress[model] = Float(progress.fractionCompleted)
+
+                            // 다운로드 중 디스크 공간 재확인 (50% 이상 다운로드된 경우에만)
+                            if progress.fractionCompleted > 0.5 {
+                                if let resourceValues = try? documents
+                                    .resourceValues(forKeys: [.volumeAvailableCapacityKey]),
+                                    let currentSpace = resourceValues.volumeAvailableCapacity,
+                                    currentSpace <
+                                    Int64(
+                                        Double(estimatedSize) *
+                                            max(1.0 - progress.fractionCompleted, 0) *
+                                            1.2
+                                    ) +
+                                    self.estimatedRemainingDownloadSpaceForOtherActiveDownloads(
+                                        excluding: model
+                                    ) {
+                                    progress.cancel()
+                                    self.modelManagementState
+                                        .downloadErrors[model] =
+                                        "Disk space became insufficient during download"
+                                    self.modelManagementState.currentDownloadingModels
+                                        .remove(model)
+                                    self.modelManagementState.untrackDownloadRequest(model)
+                                    self.updateDownloadActivityState()
+                                    return
                                 }
                             }
                         }
@@ -2269,55 +2322,6 @@ class ContentViewModel: ObservableObject {
                                 return
                             }
                         }
-
-                        // 진행률 업데이트 최적화
-                        let currentTime = Date()
-                        if currentTime.timeIntervalSince(lastUpdateTime) >= progressUpdateInterval {
-                            Task { @MainActor [weak self] in
-                                guard let self else { return }
-                                // 취소 중인 상태라면 UI 업데이트 건너뛰기
-                                if self.modelManagementState.cancellingModels.contains(model) {
-                                    print("Cancelling - skipping UI update: \(model)")
-                                    return
-                                }
-
-                                // 다운로드 중이 아니면 종료
-                                guard self.modelManagementState.currentDownloadingModels
-                                    .contains(model) else {
-                                    return
-                                }
-
-                                self.modelManagementState
-                                    .downloadProgress[model] = Float(progress.fractionCompleted)
-
-                                // 다운로드 중 디스크 공간 재확인 (50% 이상 다운로드된 경우에만)
-                                if progress.fractionCompleted > 0.5 {
-                                    if let resourceValues = try? documents
-                                        .resourceValues(forKeys: [.volumeAvailableCapacityKey]),
-                                        let currentSpace = resourceValues.volumeAvailableCapacity,
-                                        currentSpace <
-                                        Int64(
-                                            Double(estimatedSize) *
-                                                max(1.0 - progress.fractionCompleted, 0) *
-                                                1.2
-                                        ) +
-                                        self.estimatedRemainingDownloadSpaceForOtherActiveDownloads(
-                                            excluding: model
-                                        ) {
-                                        progress.cancel()
-                                        self.modelManagementState
-                                            .downloadErrors[model] =
-                                            "Disk space became insufficient during download"
-                                        self.modelManagementState.currentDownloadingModels
-                                            .remove(model)
-                                        self.modelManagementState.untrackDownloadRequest(model)
-                                        self.updateDownloadActivityState()
-                                        return
-                                    }
-                                }
-                            }
-                            lastUpdateTime = currentTime
-                        }
                     }
                 )
 
@@ -2337,6 +2341,7 @@ class ContentViewModel: ObservableObject {
                     self.modelDownloadTasks[model] = nil
                     self.modelDownloadProgressObjects.removeValue(forKey: model)
                     self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+                    self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
 
                     if !self.modelManagementState.localModels.contains(model) {
                         self.modelManagementState.localModels.append(model)
@@ -2369,6 +2374,7 @@ class ContentViewModel: ObservableObject {
                         self.modelDownloadTasks[model] = nil
                         self.modelDownloadProgressObjects.removeValue(forKey: model)
                         self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+                        self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
                         self.modelManagementState.untrackDownloadRequest(model)
                         self.startNextQueuedDownloadIfPossible()
                         self.updateDownloadActivityState()
@@ -2388,6 +2394,7 @@ class ContentViewModel: ObservableObject {
                     self.modelDownloadTasks[model] = nil
                     self.modelManagementState.cancellingModels.remove(model) // 에러 시 취소 상태도 해제
                     self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+                    self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
                     self.modelDownloadProgressObjects.removeValue(forKey: model)
                     self.modelManagementState.untrackDownloadRequest(model)
 
@@ -2544,6 +2551,7 @@ class ContentViewModel: ObservableObject {
             // 취소 중 상태 해제
             self.modelManagementState.cancellingModels.remove(model)
             self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+            self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
             self.modelDownloadProgressObjects.removeValue(forKey: model)
             self.modelManagementState.currentDownloadingModels.remove(model)
 
@@ -3854,7 +3862,6 @@ class ContentViewModel: ObservableObject {
             temperatureFallbackCount: Int(fallbackCount),
             sampleLength: sampleLength,
             usePrefillPrompt: enablePromptPrefill,
-            usePrefillCache: enableCachePrefill,
             detectLanguage: isAutoLanguageEnable,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: !enableTimestamps,
@@ -3863,8 +3870,11 @@ class ContentViewModel: ObservableObject {
             concurrentWorkerCount: Int(concurrentWorkerCount),
             chunkingStrategy: chunkingStrategy
         )
+        let compressionCheckWindow = Int(compressionCheckWindow)
+        let compressionRatioThreshold = options.compressionRatioThreshold
+        let logProbThreshold = options.logProbThreshold
 
-        let decodingCallback: ((TranscriptionProgress) -> Bool?) = { [weak self] progress in
+        let decodingCallback: TranscriptionCallback? = { [weak self] progress in
             guard let self else { return false }
 
             DispatchQueue.main.async { [weak self] in
@@ -3906,16 +3916,18 @@ class ContentViewModel: ObservableObject {
             }
 
             let currentTokens = progress.tokens
-            let checkWindow = Int(self.compressionCheckWindow)
-            if currentTokens.count > checkWindow {
-                let checkTokens: [Int] = Array(currentTokens.suffix(checkWindow))
+            if currentTokens.count > compressionCheckWindow {
+                let checkTokens: [Int] = Array(currentTokens.suffix(compressionCheckWindow))
                 let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
-                if compressionRatio > options.compressionRatioThreshold! {
+                if let compressionRatioThreshold,
+                   compressionRatio > compressionRatioThreshold {
                     Logging.debug("Early stopping due to compression threshold")
                     return false
                 }
             }
-            if progress.avgLogprob! < options.logProbThreshold! {
+            if let avgLogprob = progress.avgLogprob,
+               let logProbThreshold,
+               avgLogprob < logProbThreshold {
                 Logging.debug("Early stopping due to logprob threshold")
                 return false
             }
