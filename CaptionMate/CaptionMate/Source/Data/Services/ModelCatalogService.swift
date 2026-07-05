@@ -235,6 +235,51 @@ enum ModelCatalogService {
         }
     }
 
+    static func fetchRemoteFolderSizes(
+        repoName: String,
+        models: [String],
+        maxConcurrentRequests: Int = 3,
+        fetchSize: @escaping @Sendable (_ repoName: String, _ model: String) async throws -> Int64 = { repoName, model in
+            try await remoteFolderSize(repoName: repoName, model: model)
+        },
+        onResult: @escaping @Sendable (_ model: String, _ result: Result<Int64, Error>) async -> Void
+    ) async {
+        guard !models.isEmpty else { return }
+
+        let requestLimit = max(maxConcurrentRequests, 1)
+        await withTaskGroup(of: (String, Result<Int64, Error>).self) { group in
+            var nextIndex = 0
+
+            func enqueueNextModel() {
+                guard nextIndex < models.count else { return }
+
+                let model = models[nextIndex]
+                nextIndex += 1
+                group.addTask {
+                    do {
+                        let size = try await fetchSize(repoName, model)
+                        return (model, .success(size))
+                    } catch {
+                        return (model, .failure(error))
+                    }
+                }
+            }
+
+            for _ in 0 ..< min(requestLimit, models.count) {
+                enqueueNextModel()
+            }
+
+            while let (model, result) = await group.next() {
+                await onResult(model, result)
+                if Task.isCancelled {
+                    group.cancelAll()
+                    continue
+                }
+                enqueueNextModel()
+            }
+        }
+    }
+
     private static func sizeEncodedInModelName(_ model: String) -> Int64? {
         guard let regex = try? NSRegularExpression(pattern: #"_(\d+)(MB|GB)$"#) else {
             return nil

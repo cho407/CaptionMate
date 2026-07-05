@@ -91,10 +91,39 @@ enum SpeakerAssignmentMapper {
         for transcriptionSegments: [TranscriptionSegment],
         from timelineSegments: [SpeakerTimelineSegment]
     ) -> [SpeakerSegmentAssignment?] {
+        let sortedTimelineSegments = timelineSegments.sorted {
+            if $0.start == $1.start {
+                return $0.end < $1.end
+            }
+            return $0.start < $1.start
+        }
         var previousAssignment: SpeakerSegmentAssignment?
+        var timelineCursor = 0
 
         return transcriptionSegments.map { segment in
-            guard let assignment = bestAssignment(for: segment, timelineSegments: timelineSegments) else {
+            while timelineCursor < sortedTimelineSegments.count,
+                  sortedTimelineSegments[timelineCursor].end <= segment.start {
+                timelineCursor += 1
+            }
+
+            var scanIndex = timelineCursor
+            var speakerScores: [Int: Float] = [:]
+            while scanIndex < sortedTimelineSegments.count,
+                  sortedTimelineSegments[scanIndex].start < segment.end {
+                let timelineSegment = sortedTimelineSegments[scanIndex]
+                let score = overlap(
+                    start: segment.start,
+                    end: segment.end,
+                    otherStart: timelineSegment.start,
+                    otherEnd: timelineSegment.end
+                )
+                if score > 0 {
+                    speakerScores[timelineSegment.speakerID, default: 0] += score
+                }
+                scanIndex += 1
+            }
+
+            guard let assignment = bestAssignment(from: speakerScores) else {
                 return previousAssignment
             }
             previousAssignment = assignment
@@ -107,49 +136,63 @@ enum SpeakerAssignmentMapper {
         from sourceSegments: [TranscriptionSegment],
         assignments: [SpeakerSegmentAssignment?]
     ) -> [SpeakerSegmentAssignment?] {
-        targetSegments.map { segment in
+        let sortedSources = sourceSegments.indices.compactMap { sourceIndex -> (
+            segment: TranscriptionSegment,
+            assignment: SpeakerSegmentAssignment
+        )? in
+            guard assignments.indices.contains(sourceIndex),
+                  let assignment = assignments[sourceIndex] else {
+                return nil
+            }
+            return (sourceSegments[sourceIndex], assignment)
+        }
+        .sorted {
+            if $0.segment.start == $1.segment.start {
+                return $0.segment.end < $1.segment.end
+            }
+            return $0.segment.start < $1.segment.start
+        }
+        let indexedTargets = targetSegments.enumerated().sorted {
+            if $0.element.start == $1.element.start {
+                return $0.element.end < $1.element.end
+            }
+            return $0.element.start < $1.element.start
+        }
+        var preserved = Array<SpeakerSegmentAssignment?>(repeating: nil, count: targetSegments.count)
+        var sourceCursor = 0
+
+        for (targetIndex, segment) in indexedTargets {
+            while sourceCursor < sortedSources.count,
+                  sortedSources[sourceCursor].segment.end <= segment.start {
+                sourceCursor += 1
+            }
+
             var bestScore: Float = 0
             var bestAssignment: SpeakerSegmentAssignment?
+            var scanIndex = sourceCursor
 
-            for sourceIndex in sourceSegments.indices {
-                guard assignments.indices.contains(sourceIndex),
-                      let assignment = assignments[sourceIndex] else {
-                    continue
-                }
-
+            while scanIndex < sortedSources.count,
+                  sortedSources[scanIndex].segment.start < segment.end {
                 let score = overlap(
                     start: segment.start,
                     end: segment.end,
-                    otherStart: sourceSegments[sourceIndex].start,
-                    otherEnd: sourceSegments[sourceIndex].end
+                    otherStart: sortedSources[scanIndex].segment.start,
+                    otherEnd: sortedSources[scanIndex].segment.end
                 )
                 if score > bestScore {
                     bestScore = score
-                    bestAssignment = assignment
+                    bestAssignment = sortedSources[scanIndex].assignment
                 }
+                scanIndex += 1
             }
 
-            return bestScore > 0 ? bestAssignment : nil
+            preserved[targetIndex] = bestScore > 0 ? bestAssignment : nil
         }
+
+        return preserved
     }
 
-    private static func bestAssignment(
-        for segment: TranscriptionSegment,
-        timelineSegments: [SpeakerTimelineSegment]
-    ) -> SpeakerSegmentAssignment? {
-        var speakerScores: [Int: Float] = [:]
-
-        for timelineSegment in timelineSegments {
-            let score = overlap(
-                start: segment.start,
-                end: segment.end,
-                otherStart: timelineSegment.start,
-                otherEnd: timelineSegment.end
-            )
-            guard score > 0 else { continue }
-            speakerScores[timelineSegment.speakerID, default: 0] += score
-        }
-
+    private static func bestAssignment(from speakerScores: [Int: Float]) -> SpeakerSegmentAssignment? {
         guard let bestSpeaker = speakerScores.max(by: { lhs, rhs in
             if lhs.value == rhs.value {
                 return lhs.key > rhs.key

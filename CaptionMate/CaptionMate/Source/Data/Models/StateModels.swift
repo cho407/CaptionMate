@@ -449,7 +449,6 @@ class ModelManagementState: ObservableObject {
     @Published var loadingProgressValue: Float = 0.0
     @Published var specializationProgressRatio: Float = 0.2
     @Published var downloadProgress: [String: Float] = [:]
-    @Published var downloadTasks: [String: Task<Void, Never>] = [:]
 
     // 모델 크기 정보
     @Published var modelSizes: [String: Int64] = [:]
@@ -464,8 +463,6 @@ class ModelManagementState: ObservableObject {
     @Published var downloadBatchModels: [String] = []
     @Published var downloadErrors: [String: String] = [:]
     @Published var cancellingModels: Set<String> = [] // 취소 중인 모델들
-    @Published var lastProgressCallbackTime: [String: Date] = [:] // Progress 콜백 마지막 활동 시간
-    @Published var downloadProgressObjects: [String: Progress] = [:] // NSProgress 객체 저장
 
     // 다운로드 관리
     @Published var maxConcurrentDownloads: Int = 2
@@ -742,8 +739,6 @@ struct UIState {
     var columnVisibility: NavigationSplitViewVisibility = .all
     var showComputeUnits: Bool = true
     var showAdvancedOptions: Bool = false
-    var transcriptionTask: Task<Void, Never>? = nil
-    var transcribeTask: Task<Void, Never>? = nil
     var isTranscribingView: Bool = false
     var isModelmanagerViewPresented: Bool = false
     var isTargeted: Bool = false

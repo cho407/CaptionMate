@@ -1043,6 +1043,34 @@ struct ContentViewModelTests {
         }
     }
 
+    @Test("원격 모델 크기 조회는 제한된 병렬성으로 실행한다")
+    func testRemoteFolderSizesUseBoundedConcurrency() async throws {
+        let models = ["model-a", "model-b", "model-c", "model-d", "model-e"]
+        let probe = RemoteSizeConcurrencyProbe()
+        let collector = RemoteSizeResultCollector()
+
+        await ModelCatalogService.fetchRemoteFolderSizes(
+            repoName: "argmaxinc/whisperkit-coreml",
+            models: models,
+            maxConcurrentRequests: 2,
+            fetchSize: { _, model in
+                try await probe.fetchSize(for: model)
+            },
+            onResult: { model, result in
+                await collector.record(model: model, result: result)
+            }
+        )
+
+        #expect(await probe.maxObservedActiveRequests() == 2)
+        #expect(await collector.successfulSizes() == [
+            "model-a": 1_000,
+            "model-b": 1_000,
+            "model-c": 1_000,
+            "model-d": 1_000,
+            "model-e": 1_000,
+        ])
+    }
+
     @Test("로컬 모델 정렬 후에도 모델 크기 매핑은 유지된다")
     func testLocalModelSizeMappingSurvivesFormattedSort() throws {
         let folders = [
@@ -1287,9 +1315,12 @@ struct ContentViewModelTests {
             try? await Task.sleep(nanoseconds: 60_000_000_000)
         }
 
-        viewModel.modelManagementState.downloadTasks[model] = task
-        viewModel.modelManagementState.downloadProgressObjects[model] = Progress(totalUnitCount: 100)
-        viewModel.modelManagementState.lastProgressCallbackTime[model] = Date()
+        viewModel.setModelDownloadRuntimeForTesting(
+            model: model,
+            task: task,
+            progress: Progress(totalUnitCount: 100),
+            lastProgressCallbackTime: Date()
+        )
         viewModel.modelManagementState.currentDownloadingModels.insert(model)
         viewModel.modelManagementState.cancellingModels.insert(model)
         viewModel.modelManagementState.queuedDownloadModels = ["openai_whisper-small"]
@@ -1301,9 +1332,9 @@ struct ContentViewModelTests {
 
         viewModel.prepareForClose()
 
-        #expect(viewModel.modelManagementState.downloadTasks.isEmpty)
-        #expect(viewModel.modelManagementState.downloadProgressObjects.isEmpty)
-        #expect(viewModel.modelManagementState.lastProgressCallbackTime.isEmpty)
+        #expect(viewModel.activeModelDownloadTaskCountForTesting == 0)
+        #expect(viewModel.activeModelDownloadProgressObjectCountForTesting == 0)
+        #expect(viewModel.activeModelDownloadProgressCallbackCountForTesting == 0)
         #expect(viewModel.modelManagementState.currentDownloadingModels.isEmpty)
         #expect(viewModel.modelManagementState.cancellingModels.isEmpty)
         #expect(viewModel.modelManagementState.queuedDownloadModels.isEmpty)
@@ -1361,7 +1392,7 @@ struct ContentViewModelTests {
             try? await Task.sleep(nanoseconds: 60_000_000_000)
         }
 
-        viewModel.modelManagementState.downloadTasks[model] = task
+        viewModel.setModelDownloadRuntimeForTesting(model: model, task: task)
         viewModel.modelManagementState.currentDownloadingModels.insert(model)
         viewModel.modelManagementState.downloadBatchModels = [model]
 
@@ -1374,7 +1405,7 @@ struct ContentViewModelTests {
 
         #expect(viewModel.activeDownloadCancellationMonitorCountForTesting == 0)
         #expect(viewModel.modelManagementState.cancellingModels.isEmpty)
-        #expect(viewModel.modelManagementState.downloadTasks.isEmpty)
+        #expect(viewModel.activeModelDownloadTaskCountForTesting == 0)
     }
 }
 
@@ -1402,6 +1433,31 @@ struct SpeakerDiarizationTests {
             SpeakerSegmentAssignment(speakerID: 0),
             SpeakerSegmentAssignment(speakerID: 1),
             SpeakerSegmentAssignment(speakerID: 1),
+        ])
+    }
+
+    @Test("화자분리 매핑은 시간 순서가 섞인 타임라인도 안정적으로 처리한다")
+    func testSpeakerAssignmentMapperSortsTimelineBeforeLinearScan() throws {
+        let transcriptionSegments = [
+            TranscriptionSegment(start: 0, end: 1, text: "first"),
+            TranscriptionSegment(start: 1, end: 2, text: "second"),
+            TranscriptionSegment(start: 2, end: 3, text: "third"),
+        ]
+        let timelineSegments = [
+            SpeakerTimelineSegment(speakerID: 2, start: 2, end: 3),
+            SpeakerTimelineSegment(speakerID: 0, start: 0, end: 1),
+            SpeakerTimelineSegment(speakerID: 1, start: 1, end: 2),
+        ]
+
+        let assignments = SpeakerAssignmentMapper.assignments(
+            for: transcriptionSegments,
+            from: timelineSegments
+        )
+
+        #expect(assignments == [
+            SpeakerSegmentAssignment(speakerID: 0),
+            SpeakerSegmentAssignment(speakerID: 1),
+            SpeakerSegmentAssignment(speakerID: 2),
         ])
     }
 
@@ -2690,6 +2746,63 @@ struct ReleaseGateTests {
         #expect(source.range(of: longLivedCapturePattern, options: .regularExpression) == nil)
     }
 
+    @Test("모델 다운로드 Task는 ViewModel을 전체 작업 동안 강하게 보유하지 않는다")
+    func testModelDownloadTaskAvoidsLongLivedStrongSelfCapture() throws {
+        let source = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        let longLivedCapturePattern =
+            #"let task = Task\.detached\(priority: \.background\) \{ \[weak self\] in\s+guard let self = self else \{ return \}"#
+        #expect(source.range(of: longLivedCapturePattern, options: .regularExpression) == nil)
+    }
+
+    @Test("모델 다운로드 런타임 참조는 UI 상태 모델에 저장하지 않는다")
+    func testModelDownloadRuntimeReferencesStayOutOfStateModel() throws {
+        let stateSource = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Data/Models/StateModels.swift"
+        )
+        let viewModelSource = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(!stateSource.contains("downloadTasks: [String: Task<Void, Never>]"))
+        #expect(!stateSource.contains("downloadProgressObjects: [String: Progress]"))
+        #expect(!stateSource.contains("lastProgressCallbackTime: [String: Date]"))
+        #expect(viewModelSource.contains("private var modelDownloadTasks: [String: Task<Void, Never>]"))
+        #expect(viewModelSource.contains("private var modelDownloadProgressObjects: [String: Progress]"))
+    }
+
+    @Test("전사 Task는 UIState가 아니라 ViewModel이 소유한다")
+    func testTranscriptionTaskIsOwnedByViewModel() throws {
+        let stateSource = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Data/Models/StateModels.swift"
+        )
+        let viewModelSource = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(!stateSource.contains("Task<Void, Never>"))
+        #expect(viewModelSource.contains("private var transcribeTask: Task<Void, Never>?"))
+        #expect(viewModelSource.contains("func cancelTranscription()"))
+    }
+
+    @Test("화자분리가 꺼져 있으면 전사 오디오 샘플을 후속 분석으로 넘기지 않는다")
+    func testTranscriptionSkipsDiarizationCallWhenDisabled() throws {
+        let viewModelSource = try Self.readRepositoryFile(
+            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
+        )
+
+        #expect(viewModelSource.contains("let shouldRunSpeakerDiarization = enableSpeakerDiarization"))
+        #expect(viewModelSource.contains(
+            "if shouldRunSpeakerDiarization {\n            await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)\n        }"
+        ))
+        #expect(!viewModelSource.contains("""
+        try Task.checkCancellation()
+        await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)
+        """))
+    }
+
     private static func readRepositoryFile(_ relativePath: String) throws -> String {
         let url = try repositoryRoot().appendingPathComponent(relativePath)
         return try String(contentsOf: url, encoding: .utf8)
@@ -2736,4 +2849,35 @@ final class OversizedRemoteSizeURLProtocol: URLProtocol {
     }
 
     override func stopLoading() {}
+}
+
+actor RemoteSizeConcurrencyProbe {
+    private var activeRequests = 0
+    private var maxActiveRequests = 0
+
+    func fetchSize(for _: String) async throws -> Int64 {
+        activeRequests += 1
+        maxActiveRequests = max(maxActiveRequests, activeRequests)
+        try await Task.sleep(nanoseconds: 20_000_000)
+        activeRequests -= 1
+        return 1_000
+    }
+
+    func maxObservedActiveRequests() -> Int {
+        maxActiveRequests
+    }
+}
+
+actor RemoteSizeResultCollector {
+    private var sizes: [String: Int64] = [:]
+
+    func record(model: String, result: Result<Int64, Error>) {
+        if case let .success(size) = result {
+            sizes[model] = size
+        }
+    }
+
+    func successfulSizes() -> [String: Int64] {
+        sizes
+    }
 }

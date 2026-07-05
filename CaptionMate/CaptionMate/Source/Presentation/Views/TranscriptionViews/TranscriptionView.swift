@@ -148,10 +148,7 @@ struct TranscriptionView: View {
             .textSelection(.enabled)
 
             if let whisperKit = viewModel.whisperKit,
-               viewModel.audioState.isTranscribing,
-               let task = viewModel.uiState.transcribeTask,
-               !task.isCancelled,
-               whisperKit.progress.fractionCompleted < 1 {
+               viewModel.isTranscriptionProgressVisible {
                 HStack {
                     ProgressView(whisperKit.progress)
                         .progressViewStyle(.linear)
@@ -159,9 +156,7 @@ struct TranscriptionView: View {
                         .padding(.leading)
 
                     Button {
-                        viewModel.uiState.transcribeTask?.cancel()
-                        viewModel.uiState.transcribeTask = nil
-                        viewModel.resetState()
+                        viewModel.cancelTranscription()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(.red)

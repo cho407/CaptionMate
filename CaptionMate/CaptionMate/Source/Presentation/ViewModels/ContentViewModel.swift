@@ -130,6 +130,7 @@ class ContentViewModel: ObservableObject {
 
     private var isLoadingModel = false
     private var activeTranscribeTaskID: UUID?
+    private var transcribeTask: Task<Void, Never>?
     private var activeSpeakerDiarizationTaskID: UUID?
     private var speakerDiarizationModelTask: Task<Void, Never>?
     private var speakerDiarizationTask: Task<Void, Never>?
@@ -142,6 +143,9 @@ class ContentViewModel: ObservableObject {
     private var normalizationTask: Task<Void, Never>?
     private var normalizationTaskID: UUID?
     private var speakerDiarizationDownloadProgress: Progress?
+    private var modelDownloadTasks: [String: Task<Void, Never>] = [:]
+    private var modelDownloadProgressObjects: [String: Progress] = [:]
+    private var modelDownloadLastProgressCallbackTime: [String: Date] = [:]
     private var downloadCancellationMonitorTasks: [String: Task<Void, Never>] = [:]
     private var activeSourceAudioAccessURL: URL?
     private let projectStore: CaptionMateProjectStore
@@ -158,6 +162,18 @@ class ContentViewModel: ObservableObject {
         downloadCancellationMonitorTasks.count
     }
 
+    var activeModelDownloadTaskCountForTesting: Int {
+        modelDownloadTasks.count
+    }
+
+    var activeModelDownloadProgressObjectCountForTesting: Int {
+        modelDownloadProgressObjects.count
+    }
+
+    var activeModelDownloadProgressCallbackCountForTesting: Int {
+        modelDownloadLastProgressCallbackTime.count
+    }
+
     var hasActiveModelLoadTaskForTesting: Bool {
         modelLoadTask != nil
     }
@@ -168,6 +184,17 @@ class ContentViewModel: ObservableObject {
 
     func setModelLoadTaskForTesting(_ task: Task<Void, Never>) {
         modelLoadTask = task
+    }
+
+    func setModelDownloadRuntimeForTesting(
+        model: String,
+        task: Task<Void, Never>? = nil,
+        progress: Progress? = nil,
+        lastProgressCallbackTime: Date? = nil
+    ) {
+        modelDownloadTasks[model] = task
+        modelDownloadProgressObjects[model] = progress
+        modelDownloadLastProgressCallbackTime[model] = lastProgressCallbackTime
     }
 
     func setAudioProcessingTasksForTesting(
@@ -1185,9 +1212,24 @@ class ContentViewModel: ObservableObject {
     }
 
     private func cancelActiveTranscriptionTask() {
-        uiState.transcribeTask?.cancel()
-        uiState.transcribeTask = nil
+        transcribeTask?.cancel()
+        transcribeTask = nil
         activeTranscribeTaskID = nil
+    }
+
+    var isTranscriptionProgressVisible: Bool {
+        guard let whisperKit,
+              audioState.isTranscribing,
+              let transcribeTask,
+              !transcribeTask.isCancelled else {
+            return false
+        }
+        return whisperKit.progress.fractionCompleted < 1
+    }
+
+    func cancelTranscription() {
+        cancelActiveTranscriptionTask()
+        resetState()
     }
 
     private func cancelActiveSpeakerDiarizationTask() {
@@ -1210,24 +1252,22 @@ class ContentViewModel: ObservableObject {
         cancelActiveTranscriptionTask()
         cancelActiveSpeakerDiarizationTask()
         cancelAudioProcessingTasks()
-        uiState.transcriptionTask?.cancel()
-        uiState.transcriptionTask = nil
         languageChangeNotificationTask?.cancel()
         languageChangeNotificationTask = nil
 
-        for task in modelManagementState.downloadTasks.values {
+        for task in modelDownloadTasks.values {
             task.cancel()
         }
-        for progress in modelManagementState.downloadProgressObjects.values {
+        for progress in modelDownloadProgressObjects.values {
             progress.cancel()
         }
         for task in downloadCancellationMonitorTasks.values {
             task.cancel()
         }
         downloadCancellationMonitorTasks.removeAll()
-        modelManagementState.downloadTasks.removeAll()
-        modelManagementState.downloadProgressObjects.removeAll()
-        modelManagementState.lastProgressCallbackTime.removeAll()
+        modelDownloadTasks.removeAll()
+        modelDownloadProgressObjects.removeAll()
+        modelDownloadLastProgressCallbackTime.removeAll()
         modelManagementState.currentDownloadingModels.removeAll()
         modelManagementState.cancellingModels.removeAll()
         modelManagementState.queuedDownloadModels.removeAll()
@@ -1369,8 +1409,6 @@ class ContentViewModel: ObservableObject {
 
         // 백그라운드 작업 취소
         cancelActiveTranscriptionTask()
-        uiState.transcriptionTask?.cancel()
-        uiState.transcriptionTask = nil
         uiState.isTranscribingView = false
 
         // 전사 관련 상태 초기화
@@ -2089,10 +2127,12 @@ class ContentViewModel: ObservableObject {
         modelManagementState.downloadErrors.removeValue(forKey: model)
 
         // 기존 다운로드 Task가 있다면 취소
-        if let existingTask = modelManagementState.downloadTasks[model] {
+        if let existingTask = modelDownloadTasks[model] {
             existingTask.cancel()
-            modelManagementState.downloadTasks[model] = nil
+            modelDownloadTasks[model] = nil
         }
+        modelDownloadProgressObjects.removeValue(forKey: model)
+        modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
 
         let repoName = repoName
         let estimatedSize = estimatedDownloadSize(for: model)
@@ -2102,17 +2142,16 @@ class ContentViewModel: ObservableObject {
         let localModelPath = modelManagementState.localModelPath
 
         let task = Task.detached(priority: .background) { [weak self] in
-            guard let self = self else { return }
-
             do {
                 let resourceValues = try documents
                     .resourceValues(forKeys: [.volumeAvailableCapacityKey])
                 guard let availableSpace = resourceValues.volumeAvailableCapacity else {
-                    await MainActor.run {
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
                         self.modelManagementState.downloadErrors[model] = "Cannot check disk space."
                         self.modelManagementState.currentDownloadingModels.remove(model)
                         self.modelManagementState.downloadProgress[model] = nil
-                        self.modelManagementState.downloadTasks[model] = nil
+                        self.modelDownloadTasks[model] = nil
                         self.modelManagementState.untrackDownloadRequest(model)
                         self.showUserMessage(
                             .error,
@@ -2135,11 +2174,12 @@ class ContentViewModel: ObservableObject {
                         requiredGB,
                         availableGB
                     )
-                    await MainActor.run {
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
                         self.modelManagementState.downloadErrors[model] = errorMessage
                         self.modelManagementState.currentDownloadingModels.remove(model)
                         self.modelManagementState.downloadProgress[model] = nil
-                        self.modelManagementState.downloadTasks[model] = nil
+                        self.modelDownloadTasks[model] = nil
                         self.modelManagementState.untrackDownloadRequest(model)
                         self.showUserMessage(.error, title: "Download Failed", detail: errorMessage)
                         self.startNextQueuedDownloadIfPossible()
@@ -2155,15 +2195,14 @@ class ContentViewModel: ObservableObject {
                     variant: model,
                     from: repoName,
                     progressCallback: { [weak self] progress in
-                        guard let self = self else { return }
-
                         // Progress 콜백 활동 기록 (모든 콜백에서 기록)
-                        Task { @MainActor in
-                            self.modelManagementState.lastProgressCallbackTime[model] = Date()
+                        Task { @MainActor [weak self] in
+                            guard let self else { return }
+                            self.modelDownloadLastProgressCallbackTime[model] = Date()
 
                             // Progress 객체 저장 (처음 한 번만)
-                            if self.modelManagementState.downloadProgressObjects[model] == nil {
-                                self.modelManagementState.downloadProgressObjects[model] = progress
+                            if self.modelDownloadProgressObjects[model] == nil {
+                                self.modelDownloadProgressObjects[model] = progress
                                 print("Progress object stored: \(model)")
                             }
 
@@ -2174,10 +2213,8 @@ class ContentViewModel: ObservableObject {
                                     "Progress completion detected (fractionCompleted: \(progress.fractionCompleted)) - Cancelling state released: \(model)"
                                 )
                                 self.modelManagementState.cancellingModels.remove(model)
-                                self.modelManagementState.lastProgressCallbackTime
-                                    .removeValue(forKey: model)
-                                self.modelManagementState.downloadProgressObjects
-                                    .removeValue(forKey: model)
+                                self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+                                self.modelDownloadProgressObjects.removeValue(forKey: model)
 
                                 // 부분 다운로드 파일 정리 (비동기)
                                 Task.detached {
@@ -2198,8 +2235,8 @@ class ContentViewModel: ObservableObject {
                         }
 
                         // 취소 중인 상태인지 확인
-                        let isCancelling = Task { @MainActor in
-                            self.modelManagementState.cancellingModels.contains(model)
+                        let isCancelling = Task { @MainActor [weak self] in
+                            self?.modelManagementState.cancellingModels.contains(model) ?? false
                         }
 
                         Task {
@@ -2223,9 +2260,8 @@ class ContentViewModel: ObservableObject {
                                     }
 
                                     // 마지막 취소 완료 콜백까지 기다리기 위해 타임스탬프만 업데이트
-                                    await MainActor.run {
-                                        self.modelManagementState
-                                            .lastProgressCallbackTime[model] = Date()
+                                    await MainActor.run { [weak self] in
+                                        self?.modelDownloadLastProgressCallbackTime[model] = Date()
                                     }
                                 }
 
@@ -2237,7 +2273,8 @@ class ContentViewModel: ObservableObject {
                         // 진행률 업데이트 최적화
                         let currentTime = Date()
                         if currentTime.timeIntervalSince(lastUpdateTime) >= progressUpdateInterval {
-                            Task { @MainActor in
+                            Task { @MainActor [weak self] in
+                                guard let self else { return }
                                 // 취소 중인 상태라면 UI 업데이트 건너뛰기
                                 if self.modelManagementState.cancellingModels.contains(model) {
                                     print("Cancelling - skipping UI update: \(model)")
@@ -2293,12 +2330,13 @@ class ContentViewModel: ObservableObject {
                     ModelCatalogService.folderSize(url: modelFolder)
                 }.value
 
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
                     self.modelManagementState.currentDownloadingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = 1.0
-                    self.modelManagementState.downloadTasks[model] = nil
-                    self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
-                    self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+                    self.modelDownloadTasks[model] = nil
+                    self.modelDownloadProgressObjects.removeValue(forKey: model)
+                    self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
 
                     if !self.modelManagementState.localModels.contains(model) {
                         self.modelManagementState.localModels.append(model)
@@ -2319,15 +2357,18 @@ class ContentViewModel: ObservableObject {
             } catch is CancellationError {
                 print("Model download cancelled: \(model)")
                 let isCancelling = await MainActor
-                    .run { self.modelManagementState.cancellingModels.contains(model) }
+                    .run { [weak self] in
+                        self?.modelManagementState.cancellingModels.contains(model) ?? false
+                    }
                 if !isCancelling {
                     Self.cleanupPartialDownload(model, localModelPath: localModelPath)
-                    await MainActor.run {
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
                         self.modelManagementState.currentDownloadingModels.remove(model)
                         self.modelManagementState.downloadProgress[model] = nil
-                        self.modelManagementState.downloadTasks[model] = nil
-                        self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
-                        self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
+                        self.modelDownloadTasks[model] = nil
+                        self.modelDownloadProgressObjects.removeValue(forKey: model)
+                        self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
                         self.modelManagementState.untrackDownloadRequest(model)
                         self.startNextQueuedDownloadIfPossible()
                         self.updateDownloadActivityState()
@@ -2338,15 +2379,16 @@ class ContentViewModel: ObservableObject {
 
                 let downloadError = DownloadError.from(error)
 
-                await MainActor.run {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
                     self.modelManagementState
                         .downloadErrors[model] = "Download failed: \(error.localizedDescription)"
                     self.modelManagementState.currentDownloadingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = nil
-                    self.modelManagementState.downloadTasks[model] = nil
+                    self.modelDownloadTasks[model] = nil
                     self.modelManagementState.cancellingModels.remove(model) // 에러 시 취소 상태도 해제
-                    self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
-                    self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+                    self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+                    self.modelDownloadProgressObjects.removeValue(forKey: model)
                     self.modelManagementState.untrackDownloadRequest(model)
 
                     // 다운로드 실패 알림 표시 (취소로 인한 에러가 아닌 경우만)
@@ -2366,7 +2408,7 @@ class ContentViewModel: ObservableObject {
             }
         }
 
-        modelManagementState.downloadTasks[model] = task
+        modelDownloadTasks[model] = task
     }
 
     /// 부분 다운로드 파일 정리 헬퍼 메서드
@@ -2413,7 +2455,7 @@ class ContentViewModel: ObservableObject {
             return
         }
 
-        guard let task = modelManagementState.downloadTasks[model],
+        guard let task = modelDownloadTasks[model],
               modelManagementState.currentDownloadingModels.contains(model) else {
             return
         }
@@ -2427,7 +2469,7 @@ class ContentViewModel: ObservableObject {
         updateDownloadActivityState()
 
         // 2. NSProgress 직접 취소 (다운로드 즉시 중단)
-        if let progress = modelManagementState.downloadProgressObjects[model] {
+        if let progress = modelDownloadProgressObjects[model] {
             progress.cancel()
             print("NSProgress directly cancelled: \(model)")
         }
@@ -2467,7 +2509,7 @@ class ContentViewModel: ObservableObject {
 
             // 마지막 Progress 콜백 활동 확인
             let lastActivity = await MainActor.run {
-                self.modelManagementState.lastProgressCallbackTime[model]
+                self.modelDownloadLastProgressCallbackTime[model]
             }
 
             if let lastActivity = lastActivity {
@@ -2501,13 +2543,13 @@ class ContentViewModel: ObservableObject {
         await MainActor.run {
             // 취소 중 상태 해제
             self.modelManagementState.cancellingModels.remove(model)
-            self.modelManagementState.lastProgressCallbackTime.removeValue(forKey: model)
-            self.modelManagementState.downloadProgressObjects.removeValue(forKey: model)
+            self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+            self.modelDownloadProgressObjects.removeValue(forKey: model)
             self.modelManagementState.currentDownloadingModels.remove(model)
 
             // 다운로드 관련 상태 정리
             self.modelManagementState.downloadProgress[model] = nil
-            self.modelManagementState.downloadTasks[model] = nil
+            self.modelDownloadTasks[model] = nil
             self.modelManagementState.untrackDownloadRequest(model)
             self.downloadCancellationMonitorTasks.removeValue(forKey: model)
 
@@ -2774,14 +2816,14 @@ class ContentViewModel: ObservableObject {
         whisperKit?.audioProcessor = AudioProcessor()
         let taskID = UUID()
         activeTranscribeTaskID = taskID
-        uiState.transcribeTask = Task { [weak self] in
+        transcribeTask = Task { [weak self] in
             guard let self else { return }
             self.audioState.isTranscribing = true
             self.showUserMessage(.info, title: "Transcribing", detail: self.audioState.audioFileName)
             defer {
                 self.audioState.isTranscribing = false
                 if self.activeTranscribeTaskID == taskID {
-                    self.uiState.transcribeTask = nil
+                    self.transcribeTask = nil
                     self.activeTranscribeTaskID = nil
                 }
             }
@@ -2813,6 +2855,8 @@ class ContentViewModel: ObservableObject {
         Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
+        let shouldRunSpeakerDiarization = enableSpeakerDiarization &&
+            (transcription?.segments.isEmpty == false)
 
         await MainActor.run {
             transcriptionState.currentText = ""
@@ -2842,7 +2886,9 @@ class ContentViewModel: ObservableObject {
         }
 
         try Task.checkCancellation()
-        await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)
+        if shouldRunSpeakerDiarization {
+            await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)
+        }
     }
 
     private func runSpeakerDiarizationIfEnabled(audioSamples: [Float]) async {
@@ -4602,34 +4648,40 @@ class ContentViewModel: ObservableObject {
 
         modelManagementState.isRemoteModelSizeLoading = true
         remoteModelSizeTask = Task { [weak self] in
-            guard let self else { return }
-            var cachedSizes = ModelCatalogService.cachedRemoteSizes(repoName: repoName)
-
-            for model in modelsNeedingRemoteSize {
-                guard !Task.isCancelled else { break }
-                do {
-                    let size = try await ModelCatalogService.remoteFolderSize(
-                        repoName: repoName,
-                        model: model
-                    )
-                    guard size > 0 else { continue }
-                    cachedSizes[model] = size
-                    self.modelManagementState.modelSizes[model] = size
-                    self.modelManagementState.modelSizeSources[model] = .remote
-                } catch {
-                    if self.modelManagementState.modelSizes[model] == nil {
-                        self.modelManagementState.modelSizes[model] = ModelCatalogService
-                            .estimatedDownloadSize(for: model)
-                        self.modelManagementState.modelSizeSources[model] = .estimate
+            await ModelCatalogService.fetchRemoteFolderSizes(
+                repoName: repoName,
+                models: modelsNeedingRemoteSize,
+                maxConcurrentRequests: 3
+            ) { [weak self] model, result in
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    switch result {
+                    case let .success(size) where size > 0:
+                        self.modelManagementState.modelSizes[model] = size
+                        self.modelManagementState.modelSizeSources[model] = .remote
+                    default:
+                        if self.modelManagementState.modelSizes[model] == nil {
+                            self.modelManagementState.modelSizes[model] = ModelCatalogService
+                                .estimatedDownloadSize(for: model)
+                            self.modelManagementState.modelSizeSources[model] = .estimate
+                        }
                     }
                 }
             }
 
-            if !Task.isCancelled {
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                var cachedSizes = ModelCatalogService.cachedRemoteSizes(repoName: repoName)
+                for model in modelsNeedingRemoteSize
+                    where self.modelManagementState.modelSizeSources[model] == .remote {
+                    cachedSizes[model] = self.modelManagementState.modelSizes[model]
+                }
                 ModelCatalogService.saveCachedRemoteSizes(cachedSizes, repoName: repoName)
+                self.modelManagementState.isRemoteModelSizeLoading = false
+                self.remoteModelSizeTask = nil
             }
-            self.modelManagementState.isRemoteModelSizeLoading = false
-            self.remoteModelSizeTask = nil
         }
     }
 
