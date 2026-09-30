@@ -1486,6 +1486,91 @@ struct SpeakerDiarizationTests {
         ])
     }
 
+    @Test("화자 배정 보존은 분할 여부와 무관하게 화자별 겹침 시간을 합산한다", arguments: [false, true])
+    func testPreservedAssignmentsUsesCumulativeSpeakerOverlap(splitSource: Bool) {
+        let speakerA = SpeakerSegmentAssignment(speakerID: 5)
+        let speakerB = SpeakerSegmentAssignment(speakerID: 2)
+        let sourceSegments = splitSource ? [
+            TranscriptionSegment(start: 0, end: 2, text: "A first"),
+            TranscriptionSegment(start: 2, end: 4, text: "A second"),
+            TranscriptionSegment(start: 4, end: 7, text: "B"),
+        ] : [
+            TranscriptionSegment(start: 0, end: 4, text: "A"),
+            TranscriptionSegment(start: 4, end: 7, text: "B"),
+        ]
+        let assignments: [SpeakerSegmentAssignment?] = splitSource
+            ? [speakerA, speakerA, speakerB]
+            : [speakerA, speakerB]
+
+        let preserved = SpeakerAssignmentMapper.preservedAssignments(
+            for: [TranscriptionSegment(start: 0, end: 7, text: "merged")],
+            from: sourceSegments,
+            assignments: assignments
+        )
+
+        #expect(preserved == [speakerA])
+    }
+
+    @Test("화자 배정 보존은 겹침이 없거나 경계만 닿으면 미배정으로 남긴다")
+    func testPreservedAssignmentsLeavesZeroOverlapUnassigned() {
+        let preserved = SpeakerAssignmentMapper.preservedAssignments(
+            for: [
+                TranscriptionSegment(start: -1, end: 0, text: "before"),
+                TranscriptionSegment(start: 2, end: 4, text: "gap"),
+                TranscriptionSegment(start: 7, end: 8, text: "after"),
+                TranscriptionSegment(start: 1, end: 1, text: "zero duration"),
+            ],
+            from: [
+                TranscriptionSegment(start: 0, end: 2, text: "A"),
+                TranscriptionSegment(start: 4, end: 7, text: "B"),
+            ],
+            assignments: [
+                SpeakerSegmentAssignment(speakerID: 5),
+                SpeakerSegmentAssignment(speakerID: 2),
+            ]
+        )
+
+        #expect(preserved == [nil, nil, nil, nil])
+    }
+
+    @Test("화자 배정 보존은 누적 겹침 시간이 같으면 낮은 화자 ID를 선택한다")
+    func testPreservedAssignmentsBreaksCumulativeOverlapTieByLowerSpeakerID() {
+        let higherID = SpeakerSegmentAssignment(speakerID: 5)
+        let lowerID = SpeakerSegmentAssignment(speakerID: 2)
+        let preserved = SpeakerAssignmentMapper.preservedAssignments(
+            for: [TranscriptionSegment(start: 0, end: 4, text: "tie")],
+            from: [
+                TranscriptionSegment(start: 0, end: 2, text: "higher ID"),
+                TranscriptionSegment(start: 2, end: 3, text: "lower ID first"),
+                TranscriptionSegment(start: 3, end: 4, text: "lower ID second"),
+            ],
+            assignments: [higherID, lowerID, lowerID]
+        )
+
+        #expect(preserved == [lowerID])
+    }
+
+    @Test("화자 배정 보존은 시간 순서가 섞인 대상의 원래 순서를 유지한다")
+    func testPreservedAssignmentsKeepsOutOfOrderTargetsInOriginalOrder() {
+        let speakerA = SpeakerSegmentAssignment(speakerID: 5)
+        let speakerB = SpeakerSegmentAssignment(speakerID: 2)
+        let preserved = SpeakerAssignmentMapper.preservedAssignments(
+            for: [
+                TranscriptionSegment(start: 4, end: 7, text: "later"),
+                TranscriptionSegment(start: 0, end: 7, text: "merged"),
+                TranscriptionSegment(start: 0, end: 2, text: "earlier"),
+            ],
+            from: [
+                TranscriptionSegment(start: 0, end: 2, text: "A first"),
+                TranscriptionSegment(start: 2, end: 4, text: "A second"),
+                TranscriptionSegment(start: 4, end: 7, text: "B"),
+            ],
+            assignments: [speakerA, speakerA, speakerB]
+        )
+
+        #expect(preserved == [speakerB, speakerA, speakerA])
+    }
+
     @Test("화자 라벨 export prefix 테스트")
     func testSpeakerLabelFormatterPrefixesWithoutDuplication() throws {
         let assignment = SpeakerSegmentAssignment(speakerID: 0)

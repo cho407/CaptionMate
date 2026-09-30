@@ -173,8 +173,7 @@ enum SpeakerAssignmentMapper {
                 sourceCursor += 1
             }
 
-            var bestScore: Float = 0
-            var bestAssignment: SpeakerSegmentAssignment?
+            var speakerScores: [Int: Float] = [:]
             var scanIndex = sourceCursor
 
             while scanIndex < sortedSources.count,
@@ -185,14 +184,14 @@ enum SpeakerAssignmentMapper {
                     otherStart: sortedSources[scanIndex].segment.start,
                     otherEnd: sortedSources[scanIndex].segment.end
                 )
-                if score > bestScore {
-                    bestScore = score
-                    bestAssignment = sortedSources[scanIndex].assignment
+                if score > 0 {
+                    let speakerID = sortedSources[scanIndex].assignment.speakerID
+                    speakerScores[speakerID, default: 0] += score
                 }
                 scanIndex += 1
             }
 
-            preserved[targetIndex] = bestScore > 0 ? bestAssignment : nil
+            preserved[targetIndex] = bestAssignment(from: speakerScores)
         }
 
         return preserved
