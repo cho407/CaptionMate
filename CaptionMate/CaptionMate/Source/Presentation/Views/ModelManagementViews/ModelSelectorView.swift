@@ -66,12 +66,13 @@ struct ModelSelectorView: View {
                             let isLocalModel = viewModel.modelManagementState.localModels
                                 .contains(model)
                             let modelName = viewModel.modelManagementState.displayName(for: model)
-                            let modelSymbolName: String = model == viewModel
-                                .selectedModel ? "circle.fill" : "checkmark.circle"
+                            let isSelectedModel = model == viewModel.selectedModel &&
+                                modelState.hasVisibleModelSelection(for: model)
+                            let modelSymbolName: String = isSelectedModel
+                                ? "circle.fill" : "checkmark.circle"
 
                             Button(action: {
-                                viewModel.selectedModel = model
-                                viewModel.loadModel(model)
+                                viewModel.selectModel(model)
 
                             }) {
                                 HStack {
@@ -82,8 +83,7 @@ struct ModelSelectorView: View {
                                     Image(systemName: isLocalModel ? modelSymbolName :
                                         "arrow.down.circle.dotted")
                                         .symbolRenderingMode(.palette)
-                                        .foregroundStyle(model == viewModel
-                                            .selectedModel ? loadingColor : Color
+                                        .foregroundStyle(isSelectedModel ? loadingColor : Color
                                             .modelSelectorText(for: colorScheme))
                                 }
                             }
@@ -92,19 +92,24 @@ struct ModelSelectorView: View {
                         }
                     } label: {
                         HStack {
-                            let selectedModelName = viewModel.modelManagementState
-                                .displayName(for: viewModel.selectedModel)
-                            Text(selectedModelName)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
+                            if modelState.hasVisibleModelSelection(for: viewModel.selectedModel) {
+                                Text(modelState.displayName(for: viewModel.selectedModel))
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            } else {
+                                Text("Select model")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
                         .cornerRadius(6)
+                        .accessibilityIdentifier("modelSelector.selectedModel")
                     }
                     .disabled(viewModel.modelManagementState.modelState == .loading || viewModel
                         .modelManagementState.modelState == .downloading || viewModel
-                        .modelManagementState.modelState == .prewarming)
+                        .modelManagementState.modelState == .prewarming || viewModel
+                        .modelManagementState.modelState == .unloading)
 
                 } else {
                     HStack {

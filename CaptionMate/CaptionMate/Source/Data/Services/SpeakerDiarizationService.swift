@@ -29,13 +29,14 @@ enum SpeakerAssignmentGranularity: Equatable, Sendable {
 }
 
 enum SpeakerDiarizationServiceError: LocalizedError {
-    case modelUnavailable([String])
+    case modelUnavailable(SpeakerDiarizationModelFailure)
+
+    static let repairMessage = "Speaker model files need repair. Open Manage Models to repair them."
 
     var errorDescription: String? {
         switch self {
-        case let .modelUnavailable(missingPaths):
-            let summary = missingPaths.prefix(3).joined(separator: ", ")
-            return summary.isEmpty ? "Speaker model is not ready." : "Missing speaker model files: \(summary)"
+        case .modelUnavailable:
+            return Self.repairMessage
         }
     }
 }
@@ -48,9 +49,15 @@ struct SpeakerDiarizationService {
         expectedSpeakerCount: Int? = nil,
         progressHandler: (@Sendable (Progress) -> Void)? = nil
     ) async throws -> [SpeakerTimelineSegment] {
+        try Task.checkCancellation()
+        let fileSnapshot = SpeakerDiarizationModelStore.fileSnapshot(for: modelRootURL)
         let report = SpeakerDiarizationModelStore.validationReport(for: modelRootURL)
         guard report.isValid else {
-            throw SpeakerDiarizationServiceError.modelUnavailable(report.missingRelativePaths)
+            throw SpeakerDiarizationServiceError.modelUnavailable(SpeakerDiarizationModelFailure(
+                rootURL: modelRootURL,
+                invalidRelativePaths: report.missingRelativePaths,
+                fileSnapshot: fileSnapshot
+            ))
         }
 
         let config = PyannoteConfig(
@@ -64,14 +71,18 @@ struct SpeakerDiarizationService {
             concurrentEmbedderWorkers: 1
         )
 
-        let speakerKit = try await SpeakerKit(config)
+        var loadedSpeakerKit: SpeakerKit?
         do {
+            let speakerKit = try await SpeakerKit(config)
+            loadedSpeakerKit = speakerKit
             let result = try await speakerKit.diarize(
                 audioArray: audioSamples,
                 options: PyannoteDiarizationOptions(numberOfSpeakers: expectedSpeakerCount),
                 progressCallback: progressHandler
             )
             await speakerKit.unloadModels()
+            loadedSpeakerKit = nil
+            try Task.checkCancellation()
             return result.segments.compactMap { segment in
                 guard let speakerID = segment.speaker.speakerId,
                       segment.endTime > segment.startTime else {
@@ -84,9 +95,23 @@ struct SpeakerDiarizationService {
                 )
             }
         } catch {
-            await speakerKit.unloadModels()
-            throw error
+            await loadedSpeakerKit?.unloadModels()
+            throw Self.diagnosedError(error, modelRootURL: modelRootURL)
         }
+    }
+
+    static func diagnosedError(
+        _ error: Error,
+        modelRootURL: URL,
+        expectedFileSHA256: [String: String] = SpeakerDiarizationModelStore.requiredFileSHA256
+    ) -> Error {
+        guard !(error is CancellationError), !Task.isCancelled else { return CancellationError() }
+        if let failure = SpeakerDiarizationModelStore.integrityFailure(
+            for: modelRootURL, expectedFileSHA256: expectedFileSHA256
+        ) {
+            return SpeakerDiarizationServiceError.modelUnavailable(failure)
+        }
+        return Task.isCancelled ? CancellationError() : error
     }
 }
 
@@ -103,10 +128,23 @@ enum SpeakerAssignmentMapper {
             }
             return $0.start < $1.start
         }
-        var previousAssignment: SpeakerSegmentAssignment?
+        let indexedSegments = transcriptionSegments.enumerated().sorted { lhs, rhs in
+            if lhs.element.start == rhs.element.start {
+                if lhs.element.end == rhs.element.end {
+                    return lhs.offset < rhs.offset
+                }
+                return lhs.element.end < rhs.element.end
+            }
+            return lhs.element.start < rhs.element.start
+        }
+        var assignments = Array<SpeakerSegmentAssignment?>(
+            repeating: nil,
+            count: transcriptionSegments.count
+        )
         var timelineCursor = 0
 
-        return transcriptionSegments.map { segment in
+        for indexedSegment in indexedSegments {
+            let segment = indexedSegment.element
             while timelineCursor < sortedTimelineSegments.count,
                   sortedTimelineSegments[timelineCursor].end <= segment.start {
                 timelineCursor += 1
@@ -130,10 +168,33 @@ enum SpeakerAssignmentMapper {
             }
 
             guard let assignment = bestAssignment(from: speakerScores) else {
-                return previousAssignment
+                continue
             }
-            previousAssignment = assignment
-            return assignment
+            assignments[indexedSegment.offset] = assignment
+        }
+
+        return assignments
+    }
+
+    // Cluster numbers are local to a run. Preserve a name only for an unchanged
+    // group of subtitle turns, even when the new run permutes those numbers.
+    static func reconciledNames(
+        from previous: [SpeakerSegmentAssignment?],
+        names: [Int: String],
+        to current: [SpeakerSegmentAssignment?]
+    ) -> [Int: String] {
+        guard previous.count == current.count, !names.isEmpty else { return [:] }
+        var previousGroups: [Int: Set<Int>] = [:]
+        var currentGroups: [Int: Set<Int>] = [:]
+        for index in current.indices {
+            if let id = previous[index]?.speakerID { previousGroups[id, default: []].insert(index) }
+            if let id = current[index]?.speakerID { currentGroups[id, default: []].insert(index) }
+        }
+        let namedGroups = Dictionary(uniqueKeysWithValues: previousGroups.compactMap { id, turns in
+            names[id].map { (turns, $0) }
+        })
+        return currentGroups.reduce(into: [:]) { result, entry in
+            if let name = namedGroups[entry.value] { result[entry.key] = name }
         }
     }
 

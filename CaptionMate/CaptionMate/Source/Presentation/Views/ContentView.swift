@@ -121,7 +121,7 @@ private struct ProjectLibraryView: View {
     @State private var isAudioRelinkImporterPresented = false
 
     private var canSaveCurrentProject: Bool {
-        !viewModel.transcriptionState.confirmedSegments.isEmpty
+        viewModel.canSaveCurrentProject
     }
 
     var body: some View {

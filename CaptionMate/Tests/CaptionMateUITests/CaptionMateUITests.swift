@@ -267,11 +267,12 @@ final class InteractionTests: XCTestCase {
         // Settings 닫기 (ESC 키 사용)
         app.typeKey(.escape, modifierFlags: [])
 
-        // Settings가 닫혔는지 확인
-        let settingsClosed = !app.sliders.firstMatch.exists && !app.toggles.firstMatch.exists
-        if !settingsClosed {
-            throw XCTSkip("Settings View가 완전히 닫히지 않았습니다.")
-        }
+        // 메인 화면의 토글과 설정 시트의 컨트롤을 구분해 닫힘을 확인
+        let settingsSheet = app.element("settings.sheet")
+        XCTAssertFalse(
+            settingsSheet.waitForExistence(timeout: 1.0),
+            "Settings View가 닫혀야 합니다"
+        )
     }
 
     @MainActor
@@ -319,6 +320,69 @@ final class InteractionTests: XCTestCase {
             "저장된 프로젝트가 없을 때 빈 상태가 표시되어야 합니다"
         )
     }
+
+    @MainActor
+    func testBottomControlsShareHorizontalAlignment() throws {
+        let resetButton = app.element("Reset")
+        let importButton = app.element("Import File")
+        let settingsButton = app.element("Settings")
+        let startButton = app.element("Start Transcription")
+
+        XCTAssertTrue(resetButton.waitForExistence(timeout: 5.0), "초기화 버튼이 표시되어야 합니다")
+        XCTAssertTrue(importButton.waitForExistence(timeout: 3.0), "파일 가져오기 버튼이 표시되어야 합니다")
+        XCTAssertTrue(settingsButton.waitForExistence(timeout: 3.0), "설정 버튼이 표시되어야 합니다")
+        XCTAssertTrue(startButton.waitForExistence(timeout: 3.0), "전사 시작 버튼이 표시되어야 합니다")
+
+        XCTAssertEqual(
+            Double(resetButton.frame.minX),
+            Double(importButton.frame.minX),
+            accuracy: 3.0,
+            "초기화와 파일 가져오기 버튼의 왼쪽 기준선이 맞아야 합니다"
+        )
+        XCTAssertEqual(
+            Double(settingsButton.frame.maxX),
+            Double(startButton.frame.maxX),
+            accuracy: 3.0,
+            "설정과 전사 시작 버튼의 오른쪽 기준선이 맞아야 합니다"
+        )
+    }
+
+    @MainActor
+    func testLanguageChangeRefreshesMenuBarImmediately() throws {
+        let startsInKorean = app.menuBarItems["설정"].waitForExistence(timeout: 3.0)
+        let targetLanguageTitle = startsInKorean ? "English (US)" : "한국어"
+        let expectedSettingsTitle = startsInKorean ? "Settings" : "설정"
+        let expectedShortcutsTitle = startsInKorean ? "Shortcuts" : "단축키"
+
+        let settingsMenu = app.menuBarItem(matchingTitles: ["Settings", "설정"])
+        XCTAssertTrue(settingsMenu.waitForExistence(timeout: 5.0), "Settings 메뉴가 있어야 합니다")
+        settingsMenu.click()
+
+        let languageMenu = app.menuItem(matchingTitles: ["Language", "언어"])
+        guard languageMenu.waitForExistence(timeout: 3.0) else {
+            throw XCTSkip("macOS 메뉴바 하위 메뉴 접근이 현재 테스트 환경에서 불안정합니다.")
+        }
+        languageMenu.click()
+
+        let targetLanguage = app.menuItems[targetLanguageTitle]
+        XCTAssertTrue(
+            targetLanguage.waitForExistence(timeout: 3.0),
+            "언어 메뉴에 선택 가능한 언어가 있어야 합니다"
+        )
+        targetLanguage.click()
+
+        XCTAssertTrue(
+            app.menuBarItems[expectedSettingsTitle].waitForExistence(timeout: 5.0),
+            "언어 변경 직후 상단 Settings 메뉴가 갱신되어야 합니다"
+        )
+        XCTAssertTrue(
+            app.menuBarItems[expectedShortcutsTitle].waitForExistence(timeout: 5.0),
+            "언어 변경 직후 상단 Shortcuts 메뉴가 갱신되어야 합니다"
+        )
+        // File/Edit/View/Window/Help are AppKit-owned. They are updated by the
+        // app's top-level matcher, but XCUITest does not expose their labels
+        // consistently across macOS test hosts.
+    }
 }
 
 // MARK: - 화자분리 UX 테스트
@@ -328,7 +392,9 @@ final class SpeakerDiarizationUXTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        let needsSpeakerFixture = name.contains("testSpeakerEditorRenameAndExportReview")
+        let needsSpeakerFixture =
+            name.contains("testSpeakerEditorRenameAndExportReview") ||
+            name.contains("testTranscriptionCompletedEditorRoundTrip")
         app = XCUIApplication.captionMate(
             launchArguments: needsSpeakerFixture ? ["-CaptionMateUITestSpeakerFixture"] : []
         )
@@ -344,40 +410,73 @@ final class SpeakerDiarizationUXTests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsSpeakerDiarizationControls() throws {
-        let settingsButton = app.buttons["Settings"]
-        XCTAssertTrue(settingsButton.waitForExistence(timeout: 5.0), "Settings 버튼이 존재해야 합니다")
-        settingsButton.click()
-
-        let settingsSheet = app.element("settings.sheet")
-        let speakerToggle = app.element("settings.speakerDiarizationToggle")
-        let speakerCountPicker = app.element("settings.speakerCountPicker")
-        let exportLabelsToggle = app.element("settings.exportSpeakerLabelsToggle")
-
-        let settingsOpened = settingsSheet.waitForExistence(timeout: 5.0) ||
-            speakerToggle.waitForExistence(timeout: 5.0)
-        XCTAssertTrue(settingsOpened, "Settings 시트가 열려야 합니다")
+    func testTranscriptionSpeakerDiarizationControls() throws {
+        let speakerToggle = app.element("transcription.speakerDiarizationToggle")
+        let speakerCountPicker = app.element("transcription.speakerCountPicker")
+        let exportLabelsToggle = app.element("transcription.exportSpeakerLabelsToggle")
 
         XCTAssertTrue(speakerToggle.waitForExistence(timeout: 3.0))
         XCTAssertTrue(speakerCountPicker.waitForExistence(timeout: 3.0))
         XCTAssertTrue(exportLabelsToggle.waitForExistence(timeout: 3.0))
 
+        let sourceLanguagePicker = app.element("transcription.sourceLanguagePicker")
+        XCTAssertTrue(sourceLanguagePicker.waitForExistence(timeout: 3.0))
+        let sourceLanguagePlaceholder = sourceLanguagePicker.value as? String
+        XCTAssertFalse(
+            sourceLanguagePlaceholder?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
+            "모델 언어가 준비되지 않은 상태에서도 현지화된 placeholder가 표시되어야 합니다"
+        )
+        XCTAssertNotEqual(sourceLanguagePlaceholder, "English")
+
+        XCTAssertFalse(speakerToggle.isEnabled)
         XCTAssertFalse(speakerCountPicker.isEnabled)
         XCTAssertFalse(exportLabelsToggle.isEnabled)
+    }
 
-        speakerToggle.click()
-        XCTAssertTrue(speakerCountPicker.isEnabled)
-        XCTAssertTrue(exportLabelsToggle.isEnabled)
+    @MainActor
+    func testTranscriptionCompletedEditorRoundTrip() throws {
+        let transcriptionView = app.element("transcription.view")
+        XCTAssertTrue(transcriptionView.waitForExistence(timeout: 5.0), "전사 화면이 표시되어야 합니다")
 
-        speakerToggle.click()
-        XCTAssertFalse(speakerCountPicker.isEnabled)
-        XCTAssertFalse(exportLabelsToggle.isEnabled)
+        let completedView = app.element("transcription.completedView")
+        XCTAssertTrue(completedView.waitForExistence(timeout: 5.0), "전사 완료 화면이 먼저 표시되어야 합니다")
+
+        let unassignedBlock = app.element("transcription.completedBlock.0")
+        let speakerBlock = app.element("transcription.completedBlock.1")
+        let repeatedSpeakerBlock = app.element("transcription.completedBlock.2")
+        XCTAssertTrue(unassignedBlock.waitForExistence(timeout: 3.0), "미지정 화자 발화가 표시되어야 합니다")
+        XCTAssertTrue(speakerBlock.waitForExistence(timeout: 3.0), "화자 발화가 표시되어야 합니다")
+        XCTAssertFalse(repeatedSpeakerBlock.exists, "연속된 동일 화자 자막은 한 블록으로 합쳐져야 합니다")
+
+        let speakerText = app.element("transcription.completedText.1")
+        XCTAssertTrue(speakerText.waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.element("transcription.completedSpeaker.1").waitForExistence(timeout: 3.0))
+
+        let editButton = app.element("transcription.editButton")
+        XCTAssertTrue(editButton.waitForExistence(timeout: 3.0), "편집하기 버튼이 표시되어야 합니다")
+
+        let speakerEditor = app.element("speakerEditor.container")
+        XCTAssertFalse(speakerEditor.exists, "완료 화면에서는 상세 편집기가 숨겨져야 합니다")
+
+        editButton.click()
+
+        XCTAssertTrue(speakerEditor.waitForExistence(timeout: 5.0), "화자 편집기가 표시되어야 합니다")
+        let applyButton = app.element("transcription.applyEditsButton")
+        XCTAssertTrue(applyButton.waitForExistence(timeout: 3.0), "적용하기 버튼이 표시되어야 합니다")
+
+        applyButton.click()
+        XCTAssertTrue(completedView.waitForExistence(timeout: 3.0), "적용 후 완료 화면으로 돌아와야 합니다")
+        XCTAssertFalse(speakerEditor.exists, "적용 후 상세 편집기가 숨겨져야 합니다")
     }
 
     @MainActor
     func testSpeakerEditorRenameAndExportReview() throws {
         let transcriptionView = app.element("transcription.view")
         XCTAssertTrue(transcriptionView.waitForExistence(timeout: 5.0), "전사 화면이 표시되어야 합니다")
+
+        let editButton = app.element("transcription.editButton")
+        XCTAssertTrue(editButton.waitForExistence(timeout: 3.0), "편집하기 버튼이 표시되어야 합니다")
+        editButton.click()
 
         let speakerEditor = app.element("speakerEditor.container")
         XCTAssertTrue(speakerEditor.waitForExistence(timeout: 5.0), "화자 편집기가 표시되어야 합니다")
@@ -434,6 +533,7 @@ final class SpeakerDiarizationUXTests: XCTestCase {
         XCTAssertTrue(app.menuItems["हिन्दी"].waitForExistence(timeout: 3.0))
         XCTAssertTrue(app.menuItems["简体中文"].waitForExistence(timeout: 3.0))
     }
+
 }
 
 // MARK: - 성능 테스트 (별도 실행)

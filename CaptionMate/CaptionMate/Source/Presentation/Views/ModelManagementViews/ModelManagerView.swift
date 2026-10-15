@@ -86,6 +86,8 @@ struct ModelManagerView: View {
             return Text("Downloading \(modelState.formattedSpeakerDiarizationProgress)")
         case .loading, .prewarming:
             return Text("Preparing")
+        case .unloading:
+            return Text("Cancelling...")
         default:
             return Text("Not downloaded")
         }
@@ -99,7 +101,7 @@ struct ModelManagerView: View {
         switch modelState.speakerDiarizationModelState {
         case .downloaded:
             return "checkmark.circle.fill"
-        case .downloading, .loading, .prewarming:
+        case .downloading, .loading, .prewarming, .unloading:
             return "arrow.down.circle.fill"
         default:
             return "person.2.wave.2.fill"
@@ -293,7 +295,11 @@ struct ModelManagerView: View {
                             .foregroundStyle(.secondary)
                             .accessibilityLabel(Text("Speaker model size"))
 
-                        if modelState.isSpeakerDiarizationModelPreparing {
+                        if modelState.speakerDiarizationModelState == .unloading {
+                            ProgressView()
+                                .frame(width: 90)
+                                .accessibilityIdentifier("modelManager.speakerModelProgress")
+                        } else if modelState.isSpeakerDiarizationModelPreparing {
                             if let progress = modelState.speakerDiarizationModelProgress {
                                 ProgressView(value: Double(progress))
                                     .frame(width: 90)
@@ -312,20 +318,22 @@ struct ModelManagerView: View {
                             .buttonStyle(.borderless)
                             .help("Cancel speaker model download")
                             .accessibilityLabel(Text("Cancel speaker model download"))
-                        } else if !modelState.isSpeakerDiarizationModelReady {
+                        } else if modelState.shouldShowSpeakerDiarizationModelAction {
                             Button {
-                                viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded(
-                                    showSuccessMessage: true
-                                )
+                                if modelState.speakerDiarizationModelNeedsRepair ||
+                                    modelState.speakerDiarizationModelNeedsUpdate {
+                                    viewModel.repairDefaultSpeakerDiarizationModel()
+                                } else {
+                                    viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded(
+                                        showSuccessMessage: true
+                                    )
+                                }
                             } label: {
                                 Image(systemName: speakerModelActionSymbol)
                             }
                             .buttonStyle(.borderless)
                             .help(speakerModelActionLabel)
                             .accessibilityLabel(Text(speakerModelActionLabel))
-                            .accessibilityHint(
-                                Text("Repairs the local offline speaker model used by speaker diarization.")
-                            )
                             .accessibilityIdentifier("modelManager.speakerModelActionButton")
                         } else {
                             Image(systemName: "checkmark.circle.fill")
@@ -574,6 +582,25 @@ struct ModelRowView: View {
     @State private var isDeleteConfirmationPresented = false
     @State private var observedDownloadProgress: Float = 0
 
+    private func modelSizeText(for model: String) -> Text {
+        let modelState = viewModel.modelManagementState
+        guard let size = modelState.formattedModelSize(for: model) else {
+            return Text("Unknown")
+        }
+
+        let formattedSize = Text(verbatim: size)
+        switch modelState.modelSizeSources[model] {
+        case .local:
+            return formattedSize + Text(" ") + Text("On disk")
+        case .remote:
+            return formattedSize + Text(" ") + Text("Download size")
+        case .estimate:
+            return formattedSize + Text(" ") + Text("Estimated size")
+        case nil:
+            return formattedSize
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // 모델 이름 행
@@ -608,7 +635,7 @@ struct ModelRowView: View {
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     } else {
-                        Text(viewModel.modelManagementState.formattedModelSizeWithSource(for: model))
+                        modelSizeText(for: model)
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }

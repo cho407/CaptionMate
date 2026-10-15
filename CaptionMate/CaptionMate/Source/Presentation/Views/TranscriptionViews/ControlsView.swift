@@ -27,13 +27,16 @@ struct ControlsView: View {
     @ObservedObject var viewModel: ContentViewModel
     @Environment(\.colorScheme) private var colorScheme
 
+    private let contentMaxWidth: CGFloat = 960
+
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             BasicSettingsView(viewModel: viewModel)
 
-            VStack {
-                HStack {
+            VStack(spacing: 12) {
+                HStack(alignment: .center) {
                     Button {
+                        guard viewModel.confirmDiscardingUnsavedChanges() else { return }
                         viewModel.resetState()
                     } label: {
                         Label("Reset", systemImage: "arrow.clockwise")
@@ -51,8 +54,9 @@ struct ControlsView: View {
                     .buttonStyle(BorderlessButtonStyle())
                     .accessibilityIdentifier("Settings")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack {
+                HStack(alignment: .center) {
                     Button {
                         withAnimation {
                             viewModel.selectFile()
@@ -60,7 +64,8 @@ struct ControlsView: View {
                     } label: {
                         Text("Import Files")
                             .font(.headline)
-                            .padding(8)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 8)
                     }
                     .fileImporter(
                         isPresented: $viewModel.uiState.isFilePickerPresented,
@@ -71,7 +76,6 @@ struct ControlsView: View {
                     .lineLimit(1)
                     .disabled(viewModel.audioState.isTranscribing ||
                         viewModel.uiState.isTranscribingView)
-                    .padding()
                     .accessibilityIdentifier("Import File")
 
                     Spacer()
@@ -94,10 +98,14 @@ struct ControlsView: View {
                         .modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
                     .accessibilityIdentifier("Start Transcription")
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.top, 12)
         }
+        .frame(maxWidth: contentMaxWidth)
         .frame(maxWidth: .infinity)
-        .padding(.horizontal)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 16)
         .sheet(isPresented: $viewModel.uiState.showAdvancedOptions) {
             SettingsView(viewModel: viewModel)
                 .presentationDetents([.medium, .large])

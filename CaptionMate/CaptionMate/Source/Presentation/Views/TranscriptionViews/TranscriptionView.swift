@@ -28,124 +28,134 @@ struct TranscriptionView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        VStack {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading) {
-                        if !viewModel.transcriptionState.confirmedSegments.isEmpty {
-                            SubtitleSearchReplaceBar(viewModel: viewModel)
-                                .padding(.bottom, 8)
-                        }
+        VStack(spacing: 0) {
+            TranscriptionModeHeader(viewModel: viewModel)
 
-                        if !viewModel.uiState.subtitleQualityIssues.isEmpty {
-                            SubtitleQualitySummaryView(viewModel: viewModel)
-                                .padding(.bottom, 8)
-                        }
-
-                        if viewModel.enableSpeakerDiarization,
-                           (viewModel.transcriptionState.speakerDiarization.isRunning ||
-                               viewModel.transcriptionState.speakerDiarization.errorMessage != nil) {
-                            SpeakerDiarizationStatusView(viewModel: viewModel)
-                                .padding(.bottom, 8)
-                        }
-
-                        if viewModel.enableSpeakerDiarization,
-                           !viewModel.transcriptionState.confirmedSegments.isEmpty {
-                            SpeakerNameEditorView(viewModel: viewModel)
-                                .padding(.bottom, 8)
-                        }
-
-                        ForEach(viewModel.transcriptionState.confirmedSegments.indices, id: \.self) { index in
-                            let segment = viewModel.transcriptionState.confirmedSegments[index]
-                            let issues = viewModel.qualityIssues(forSegmentAt: index)
-                            let timestampText = viewModel
-                                .enableTimestamps ?
-                                TimeInterval(segment.start)
-                                .formatTimeRange(to: TimeInterval(segment.end)) :
-                                ""
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 8) {
-                                    if !timestampText.isEmpty {
-                                        Text(timestampText)
-                                            .font(.caption.monospacedDigit())
-                                            .foregroundStyle(.secondary)
-                                    }
-
-                                    if viewModel.enableSpeakerDiarization ||
-                                        viewModel.speakerAssignment(forSegmentAt: index) != nil {
-                                        SpeakerAssignmentMenu(viewModel: viewModel, index: index)
-                                    }
-
-                                    ForEach(issues.prefix(3)) { issue in
-                                        SubtitleIssueBadge(issue: issue)
-                                    }
-
-                                    Spacer()
-                                    SubtitleSegmentToolButtons(viewModel: viewModel, index: index)
-                                }
-
-                                if viewModel.enableTimestamps {
-                                    SubtitleTimingFieldsView(viewModel: viewModel, index: index)
-                                }
-
-                                TextEditor(
-                                    text: Binding(
-                                        get: {
-                                            guard viewModel.transcriptionState.confirmedSegments
-                                                .indices.contains(index) else {
-                                                return ""
-                                            }
-                                            return viewModel.transcriptionState.confirmedSegments[index].text
-                                        },
-                                        set: { newText in
-                                            viewModel.updateTranscriptionSegmentText(
-                                                at: index,
-                                                text: newText
-                                            )
-                                        }
-                                    )
-                                )
-                                .font(.headline)
-                                .fontWeight(.bold)
-                                .scrollContentBackground(.hidden)
-                                .frame(minHeight: 52)
-                                .padding(6)
-                                .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(
-                                            issuesBorderColor(for: issues),
-                                            lineWidth: issues.isEmpty ? 0 : 1
-                                        )
-                                )
+            if viewModel.uiState.isSubtitleEditing {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading) {
+                            if !viewModel.transcriptionState.confirmedSegments.isEmpty {
+                                SubtitleSearchReplaceBar(viewModel: viewModel)
+                                    .padding(.bottom, 8)
                             }
-                            .id(index)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 4)
-                        }
-                        if viewModel.enableDecoderPreview {
-                            Text("\(viewModel.transcriptionState.currentText)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.leading)
+
+                            if !viewModel.uiState.subtitleQualityIssues.isEmpty {
+                                SubtitleQualitySummaryView(viewModel: viewModel)
+                                    .padding(.bottom, 8)
+                            }
+
+                            if viewModel.enableSpeakerDiarization,
+                               (viewModel.transcriptionState.speakerDiarization.isRunning ||
+                                   viewModel.transcriptionState.speakerDiarization.errorMessage != nil) {
+                                SpeakerDiarizationStatusView(viewModel: viewModel)
+                                    .padding(.bottom, 8)
+                            }
+
+                            if viewModel.enableSpeakerDiarization,
+                               !viewModel.transcriptionState.confirmedSegments.isEmpty {
+                                SpeakerNameEditorView(viewModel: viewModel)
+                                    .padding(.bottom, 8)
+                            }
+
+                            ForEach(viewModel.transcriptionState.confirmedSegments.indices, id: \.self) { index in
+                                let segment = viewModel.transcriptionState.confirmedSegments[index]
+                                let issues = viewModel.qualityIssues(forSegmentAt: index)
+                                let timestampText = viewModel
+                                    .enableTimestamps ?
+                                    TimeInterval(segment.start)
+                                    .formatTimeRange(to: TimeInterval(segment.end)) :
+                                    ""
+                                VStack(alignment: .leading, spacing: 6) {
+                                    HStack(spacing: 8) {
+                                        if !timestampText.isEmpty {
+                                            Text(timestampText)
+                                                .font(.caption.monospacedDigit())
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        if viewModel.enableSpeakerDiarization ||
+                                            viewModel.speakerAssignment(forSegmentAt: index) != nil {
+                                            SpeakerAssignmentMenu(viewModel: viewModel, index: index)
+                                        }
+
+                                        ForEach(issues.prefix(3)) { issue in
+                                            SubtitleIssueBadge(issue: issue)
+                                        }
+
+                                        Spacer()
+                                        SubtitleSegmentToolButtons(viewModel: viewModel, index: index)
+                                    }
+
+                                    if viewModel.enableTimestamps {
+                                        SubtitleTimingFieldsView(viewModel: viewModel, index: index)
+                                    }
+
+                                    TextEditor(
+                                        text: Binding(
+                                            get: {
+                                                guard viewModel.transcriptionState.confirmedSegments
+                                                    .indices.contains(index) else {
+                                                    return ""
+                                                }
+                                                return viewModel.transcriptionState
+                                                    .confirmedSegments[index].text
+                                            },
+                                            set: { newText in
+                                                viewModel.updateTranscriptionSegmentText(
+                                                    at: index,
+                                                    text: newText
+                                                )
+                                            }
+                                        )
+                                    )
+                                    .font(.headline)
+                                    .fontWeight(.bold)
+                                    .scrollContentBackground(.hidden)
+                                    .frame(minHeight: 52)
+                                    .padding(6)
+                                    .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
+                                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(
+                                                issuesBorderColor(for: issues),
+                                                lineWidth: issues.isEmpty ? 0 : 1
+                                            )
+                                    )
+                                }
+                                .id(index)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                            }
+                            if viewModel.enableDecoderPreview {
+                                Text("\(viewModel.transcriptionState.currentText)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.leading)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
+                        .padding()
+                    }
+                    .accessibilityIdentifier("transcription.editorView")
+                    .onChange(
+                        of: viewModel.uiState.focusedSubtitleSegmentIndex,
+                        initial: true
+                    ) { _, index in
+                        guard let index else { return }
+                        withAnimation {
+                            proxy.scrollTo(index, anchor: .center)
                         }
                     }
-                    .padding()
                 }
-                .accessibilityIdentifier("transcription.view")
-                .onChange(of: viewModel.uiState.focusedSubtitleSegmentIndex) { _, index in
-                    guard let index else { return }
-                    withAnimation {
-                        proxy.scrollTo(index, anchor: .center)
-                    }
-                }
+                .background(Color.transcriptionBackground(for: colorScheme))
+                .frame(maxWidth: .infinity)
+                .defaultScrollAnchor(.bottom)
+                .textSelection(.enabled)
+            } else {
+                TranscriptionCompletedView(viewModel: viewModel)
             }
-            .background(Color.transcriptionBackground(for: colorScheme))
-            .frame(maxWidth: .infinity)
-            .defaultScrollAnchor(.bottom)
-            .textSelection(.enabled)
 
             if let whisperKit = viewModel.whisperKit,
                viewModel.isTranscriptionProgressVisible {
@@ -167,6 +177,8 @@ struct TranscriptionView: View {
             }
             TranscriptionControlView(viewModel: viewModel)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("transcription.view")
         .sheet(isPresented: $viewModel.uiState.showSubtitleReview) {
             SubtitleReviewSheet(viewModel: viewModel)
                 .frame(minWidth: 480, minHeight: 420)
@@ -452,7 +464,7 @@ private struct SubtitleSearchReplaceBar: View {
     }
 }
 
-private struct SpeakerDiarizationStatusView: View {
+struct SpeakerDiarizationStatusView: View {
     @ObservedObject var viewModel: ContentViewModel
 
     var body: some View {
@@ -462,8 +474,16 @@ private struct SpeakerDiarizationStatusView: View {
                     .frame(width: 90)
                 Label("Analyzing Speakers", systemImage: "person.2.wave.2")
                     .font(.caption.weight(.medium))
+                Button {
+                    viewModel.cancelSpeakerDiarization()
+                } label: {
+                    Image(systemName: "xmark.circle")
+                }
+                .buttonStyle(.borderless)
+                .help("Cancel")
+                .accessibilityLabel(Text("Cancel"))
             } else if let errorMessage = viewModel.transcriptionState.speakerDiarization.errorMessage {
-                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
+                Label(LocalizedStringKey(errorMessage), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -504,7 +524,8 @@ private struct SpeakerNameEditorView: View {
                     }
                 }
                 .frame(width: 96)
-                .disabled(viewModel.transcriptionState.speakerDiarization.isRunning)
+                .disabled(viewModel.transcriptionState.speakerDiarization.isRunning ||
+                    !viewModel.isSpeakerDiarizationAvailable)
                 .accessibilityLabel(Text("Speaker Count"))
                 .accessibilityIdentifier("speakerEditor.speakerCountPicker")
                 Button {
@@ -515,7 +536,8 @@ private struct SpeakerNameEditorView: View {
                 .buttonStyle(.borderless)
                 .controlSize(.small)
                 .disabled(viewModel.transcriptionState.speakerDiarization.isRunning ||
-                    viewModel.audioState.importedAudioURL == nil)
+                    viewModel.audioState.importedAudioURL == nil ||
+                    !viewModel.isSpeakerDiarizationAvailable)
                 .help("Run speaker analysis again")
                 .accessibilityIdentifier("speakerEditor.reanalyzeButton")
             }

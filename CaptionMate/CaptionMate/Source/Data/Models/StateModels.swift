@@ -468,7 +468,8 @@ class ModelManagementState: ObservableObject {
     @Published var maxConcurrentDownloads: Int = 2
 
     var availableDownloadSlotCount: Int {
-        max(maxConcurrentDownloads - currentDownloadingModels.count, 0)
+        let occupiedSlots = currentDownloadingModels.union(cancellingModels).count
+        return max(maxConcurrentDownloads - occupiedSlots, 0)
     }
 
     var hasAvailableDownloadSlot: Bool {
@@ -484,29 +485,19 @@ class ModelManagementState: ObservableObject {
     @Published var speakerDiarizationModelNeedsRepair: Bool = false
     @Published var speakerDiarizationModelNeedsUpdate: Bool = false
 
+    var shouldShowSpeakerDiarizationModelAction: Bool {
+        speakerDiarizationModelNeedsUpdate || !isSpeakerDiarizationModelReady
+    }
+
     // UI 상태
     @Published var modelFilter: String = ""
 
     @Published var folder: URL?
 
     // 모델 정보 포맷 헬퍼 함수들
-    func formattedModelSize(for model: String) -> String {
-        guard let size = modelSizes[model] else { return "알 수 없음" }
+    func formattedModelSize(for model: String) -> String? {
+        guard let size = modelSizes[model] else { return nil }
         return ByteCountFormatter.string(fromByteCount: size, countStyle: .file)
-    }
-
-    func formattedModelSizeWithSource(for model: String) -> String {
-        let formattedSize = formattedModelSize(for: model)
-        switch modelSizeSources[model] {
-        case .local:
-            return "\(formattedSize) on disk"
-        case .remote:
-            return "\(formattedSize) download"
-        case .estimate:
-            return "\(formattedSize) estimated"
-        case nil:
-            return formattedSize
-        }
     }
 
     func formattedDownloadProgress(for model: String) -> String {
@@ -659,6 +650,15 @@ class ModelManagementState: ObservableObject {
         return queuedDownloadModels.contains(model)
     }
 
+    /// A model name is shown as the active selection only while it is usable or
+    /// has an active download lifecycle that the user can follow.
+    func hasVisibleModelSelection(for model: String) -> Bool {
+        localModels.contains(model) ||
+            currentDownloadingModels.contains(model) ||
+            queuedDownloadModels.contains(model) ||
+            cancellingModels.contains(model)
+    }
+
     func canStartDownload(model: String) -> Bool {
         return !isDownloading(model: model) &&
             !isCancelling(model: model) &&
@@ -669,13 +669,13 @@ class ModelManagementState: ObservableObject {
     var isSpeakerDiarizationModelPreparing: Bool {
         speakerDiarizationModelState == .downloading ||
             speakerDiarizationModelState == .loading ||
-            speakerDiarizationModelState == .prewarming
+            speakerDiarizationModelState == .prewarming ||
+            speakerDiarizationModelState == .unloading
     }
 
     var isSpeakerDiarizationModelReady: Bool {
         speakerDiarizationModelState == .downloaded &&
-            !speakerDiarizationModelNeedsRepair &&
-            !speakerDiarizationModelNeedsUpdate
+            !speakerDiarizationModelNeedsRepair
     }
 
     var formattedSpeakerDiarizationModelSize: String {
@@ -706,6 +706,19 @@ class ModelManagementState: ObservableObject {
         }
 
         speakerDiarizationModelProgress = normalizedProgress
+    }
+
+    func applySpeakerDiarizationDownloadFailure(
+        message: String,
+        modelIsValidAfterFailure: Bool,
+        modelExists: Bool,
+        updateIsRequired: Bool
+    ) {
+        speakerDiarizationModelState = modelIsValidAfterFailure ? .downloaded : .unloaded
+        speakerDiarizationModelProgress = modelIsValidAfterFailure ? 1 : nil
+        speakerDiarizationModelError = message
+        speakerDiarizationModelNeedsRepair = !modelIsValidAfterFailure && modelExists
+        speakerDiarizationModelNeedsUpdate = modelIsValidAfterFailure && updateIsRequired
     }
 
     func displayName(for model: String) -> String {
@@ -753,6 +766,7 @@ struct UIState {
     var subtitleIssueFilter: SubtitleIssueFilter = .all
     var subtitleSearchText: String = ""
     var subtitleReplaceText: String = ""
+    var isSubtitleEditing: Bool = false
 }
 
 struct ProjectLibraryState {

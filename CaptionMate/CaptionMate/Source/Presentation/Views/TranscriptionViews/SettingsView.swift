@@ -99,36 +99,6 @@ struct SettingsView: View {
                             Toggle("", isOn: $viewModel.enableWordTimestamp).labelsHidden()
                         }
                         Divider()
-                        SettingRow(title: "Speaker Diarization", infoKey: "info.speaker_diarization") {
-                            Toggle("", isOn: Binding(
-                                get: { viewModel.enableSpeakerDiarization },
-                                set: { viewModel.setSpeakerDiarizationEnabled($0) }
-                            ))
-                            .labelsHidden()
-                            .accessibilityLabel(Text("Speaker Diarization"))
-                            .accessibilityIdentifier("settings.speakerDiarizationToggle")
-                        }
-                        Divider()
-                        SettingRow(title: "Speaker Count", infoKey: "info.speaker_count") {
-                            Picker("", selection: $viewModel.speakerDiarizationSpeakerCount) {
-                                ForEach(0 ... 8, id: \.self) { count in
-                                    Text(viewModel.speakerCountOptionTitleKey(for: count)).tag(count)
-                                }
-                            }
-                            .frame(width: 104)
-                            .disabled(!viewModel.enableSpeakerDiarization)
-                            .accessibilityLabel(Text("Speaker Count"))
-                            .accessibilityIdentifier("settings.speakerCountPicker")
-                        }
-                        Divider()
-                        SettingRow(title: "Include Speaker Names", infoKey: "info.include_speaker_names") {
-                            Toggle("", isOn: $viewModel.includeSpeakerLabelsInExport)
-                                .labelsHidden()
-                                .disabled(!viewModel.enableSpeakerDiarization)
-                                .accessibilityLabel(Text("Include Speaker Names"))
-                                .accessibilityIdentifier("settings.exportSpeakerLabelsToggle")
-                        }
-                        Divider()
                         SettingRow(title: "Special Characters",
                                    infoKey: "info.special_characters") {
                             Toggle("", isOn: $viewModel.enableSpecialCharacters).labelsHidden()
@@ -187,11 +157,6 @@ struct SettingsView: View {
                         SettingRow(title: "Prompt Prefill", infoKey: "info.prompt_prefill") {
                             Toggle("", isOn: $viewModel.enablePromptPrefill).labelsHidden()
                         }
-                        Divider()
-                        SettingRow(title: "Cache Prefill", infoKey: "info.cache_prefill") {
-                            Toggle("", isOn: $viewModel.enableCachePrefill).labelsHidden()
-                        }
-
                         Divider()
 
                         VStack(alignment: .leading, spacing: 6) {

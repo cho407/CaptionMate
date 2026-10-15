@@ -88,10 +88,13 @@ enum ModelCatalogService {
         }
         .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
 
-        let folders = folderURLs.map { url in
-            LocalModelFolderInfo(
+        let folders: [LocalModelFolderInfo] = folderURLs.compactMap { url in
+            let size = folderSize(url: url, fileManager: fileManager)
+            guard size > 0 else { return nil }
+
+            return LocalModelFolderInfo(
                 name: url.lastPathComponent,
-                size: folderSize(url: url, fileManager: fileManager)
+                size: size
             )
         }
 

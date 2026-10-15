@@ -53,6 +53,7 @@ struct TranscriptionControlView: View {
             Divider()
             HStack {
                 Button {
+                    guard viewModel.confirmDiscardingUnsavedChanges() else { return }
                     withAnimation {
                         viewModel.resetState()
                     }
@@ -65,6 +66,7 @@ struct TranscriptionControlView: View {
                 }
                 .lineLimit(1)
                 .disabled(viewModel.audioState.isTranscribing)
+                .accessibilityIdentifier("transcription.backButton")
                 .padding()
 
                 Spacer()
@@ -89,7 +91,8 @@ struct TranscriptionControlView: View {
                     }
                 }
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
-                .disabled(viewModel.transcriptionResult == nil || viewModel.isExporting)
+                .disabled(viewModel.transcriptionResult == nil || viewModel.isExporting ||
+                    viewModel.transcriptionState.speakerDiarization.isRunning)
                 .accessibilityIdentifier("transcription.exportButton")
             }
         }

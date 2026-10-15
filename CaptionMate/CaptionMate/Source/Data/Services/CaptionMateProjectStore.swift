@@ -117,6 +117,13 @@ struct CaptionMateProjectStore {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(project)
+        let byteCount = Int64(data.count)
+        guard byteCount <= Self.maxReadableProjectBytes else {
+            throw CaptionMateProjectStoreError.fileTooLarge(
+                byteCount: byteCount,
+                limit: Self.maxReadableProjectBytes
+            )
+        }
         try data.write(to: url, options: .atomic)
         return url
     }
@@ -210,12 +217,17 @@ struct CaptionMateProjectStore {
             includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         )
-        let projects = try urls
+        let projects = urls
             .filter { $0.lastPathComponent.hasSuffix(".\(Self.pathExtension)") }
-            .map { url in
-                try validateReadableSize(of: url)
-                let data = try Data(contentsOf: url)
-                return try JSONDecoder().decode(CaptionMateProject.self, from: data)
+            .compactMap { url in
+                do {
+                    try validateReadableSize(of: url)
+                    let data = try Data(contentsOf: url)
+                    return try JSONDecoder().decode(CaptionMateProject.self, from: data)
+                } catch {
+                    print("Skipped unreadable project \(url.lastPathComponent): \(error.localizedDescription)")
+                    return nil
+                }
             }
 
         return projects

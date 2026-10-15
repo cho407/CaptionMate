@@ -80,6 +80,13 @@ enum CaptionMateSidecarService {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         let data = try encoder.encode(sidecar)
+        let byteCount = Int64(data.count)
+        guard byteCount <= maxReadableSidecarBytes else {
+            throw CaptionMateSidecarError.fileTooLarge(
+                byteCount: byteCount,
+                limit: maxReadableSidecarBytes
+            )
+        }
         try data.write(to: sidecarURL, options: .atomic)
         return sidecarURL
     }

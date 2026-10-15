@@ -126,14 +126,18 @@ enum AppLanguageResolver {
 
 @MainActor
 class ContentViewModel: ObservableObject {
-    private static let supportedSpeakerIDRange = 0 ..< 8
+    // The manual count picker is limited to eight; automatic detection can find more.
+    private static let supportedSpeakerIDRange = 0 ..< 256
 
     private var isLoadingModel = false
     private var activeTranscribeTaskID: UUID?
     private var transcribeTask: Task<Void, Never>?
     private var activeSpeakerDiarizationTaskID: UUID?
+    private var activeSpeakerDiarizationModelTaskID: UUID?
     private var speakerDiarizationModelTask: Task<Void, Never>?
     private var speakerDiarizationTask: Task<Void, Never>?
+    private var previousSpeakerDiarizationStatus: SpeakerDiarizationState?
+    private var activeModelLoadTaskID: UUID?
     private var modelLoadTask: Task<Void, Never>?
     private var modelCatalogTask: Task<Void, Never>?
     private var remoteModelSizeTask: Task<Void, Never>?
@@ -143,14 +147,29 @@ class ContentViewModel: ObservableObject {
     private var normalizationTask: Task<Void, Never>?
     private var normalizationTaskID: UUID?
     private var speakerDiarizationDownloadProgress: Progress?
+    private var speakerModelIntegrityFailure: SpeakerDiarizationModelFailure?
     private var modelDownloadTasks: [String: Task<Void, Never>] = [:]
+    private var modelDownloadOperationIDs: [String: UUID] = [:]
+    private var modelDownloadCancellationErrors: [String: String] = [:]
     private var modelDownloadProgressObjects: [String: Progress] = [:]
     private var modelDownloadLastProgressCallbackTime: [String: Date] = [:]
     private var modelDownloadLastProgressUIUpdateTime: [String: Date] = [:]
-    private var downloadCancellationMonitorTasks: [String: Task<Void, Never>] = [:]
+    private var pendingModelLoadAfterDownload: String?
+    private var pendingModelLoadIsRepair = false
     private var activeSourceAudioAccessURL: URL?
+    private var activeAudioImportID: UUID?
+    private var audioImportSnapshot: ProjectSnapshot?
+    private var audioImportTask: Task<PreparedAudioImport, Error>?
     private let projectStore: CaptionMateProjectStore
+    private let speakerModelRootURL: URL?
+    typealias SpeakerAnalyzer = @Sendable (
+        [Float], Int?, (@Sendable (Progress) -> Void)?
+    ) async throws -> [SpeakerTimelineSegment]
+    typealias AudioImportPreparer = @Sendable (URL, Bool) async throws -> PreparedAudioImport
+    private let speakerAnalyzer: SpeakerAnalyzer?
+    private let audioImportPreparer: AudioImportPreparer
     private var lastSavedProjectSnapshot: ProjectSnapshot?
+    private var isConfirmingUnsavedChanges = false
 
     private struct ProjectSnapshot: Equatable {
         let sidecar: CaptionMateSidecar
@@ -159,10 +178,6 @@ class ContentViewModel: ObservableObject {
     }
 
 #if DEBUG
-    var activeDownloadCancellationMonitorCountForTesting: Int {
-        downloadCancellationMonitorTasks.count
-    }
-
     var activeModelDownloadTaskCountForTesting: Int {
         modelDownloadTasks.count
     }
@@ -187,6 +202,73 @@ class ContentViewModel: ObservableObject {
         modelLoadTask = task
     }
 
+    @discardableResult
+    func setSpeakerDiarizationModelTaskForTesting(_ task: Task<Void, Never>) -> UUID {
+        speakerDiarizationModelTask = task
+        let operationID = UUID()
+        activeSpeakerDiarizationModelTaskID = operationID
+        return operationID
+    }
+
+    func installSpeakerModelForTesting(
+        from stagedRoot: URL,
+        to destinationRoot: URL,
+        operationID: UUID,
+        checksums: [String: String]
+    ) throws {
+        try commitSpeakerDiarizationModelDownload(
+            stagedRootURL: stagedRoot,
+            destinationRootURL: destinationRoot,
+            operationID: operationID,
+            expectedFileSHA256: checksums
+        )
+    }
+
+    func ownsSpeakerModelDownloadForTesting(operationID: UUID) -> Bool {
+        activeSpeakerDiarizationModelTaskID == operationID && speakerDiarizationModelTask != nil
+    }
+
+    func finishSpeakerModelDownloadForTesting(operationID: UUID, errorMessage: String?) {
+        finishSpeakerDiarizationModelDownload(
+            operationID: operationID,
+            didInstallModel: false,
+            errorMessage: errorMessage,
+            showSuccessMessage: false
+        )
+    }
+
+    func beginModelLoadOperationForTesting() -> UUID {
+        let operationID = UUID()
+        activeModelLoadTaskID = operationID
+        return operationID
+    }
+
+    func publishModelLoadCompletionForTesting(model: String, operationID: UUID) {
+        publishModelLoadCompletion(
+            model: model,
+            modelState: .loaded,
+            operationID: operationID
+        )
+    }
+
+    var pendingModelRepairForTesting: String? {
+        pendingModelLoadIsRepair ? pendingModelLoadAfterDownload : nil
+    }
+
+    func simulateWhisperPrewarmFailureForTesting(model: String, taskID: UUID) async {
+        await handleWhisperPrewarmFailure(
+            model: model,
+            error: NSError(
+                domain: "ContentViewModelTests.WhisperPrewarm",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Simulated prewarm runtime failure"]
+            ),
+            redownload: false,
+            taskID: taskID,
+            failedKit: nil
+        )
+    }
+
     func setModelDownloadRuntimeForTesting(
         model: String,
         task: Task<Void, Never>? = nil,
@@ -194,9 +276,18 @@ class ContentViewModel: ObservableObject {
         lastProgressCallbackTime: Date? = nil
     ) {
         modelDownloadTasks[model] = task
+        modelDownloadOperationIDs[model] = task == nil ? nil : UUID()
         modelDownloadProgressObjects[model] = progress
         modelDownloadLastProgressCallbackTime[model] = lastProgressCallbackTime
         modelDownloadLastProgressUIUpdateTime[model] = lastProgressCallbackTime
+    }
+
+    func modelDownloadOperationIDForTesting(model: String) -> UUID? {
+        modelDownloadOperationIDs[model]
+    }
+
+    func canCommitModelDownloadForTesting(model: String, operationID: UUID) -> Bool {
+        canCommitModelDownload(model, operationID: operationID)
     }
 
     func setAudioProcessingTasksForTesting(
@@ -207,6 +298,21 @@ class ContentViewModel: ObservableObject {
         waveformProcessingTaskID = waveformTask == nil ? nil : UUID()
         self.normalizationTask = normalizationTask
         normalizationTaskID = normalizationTask == nil ? nil : UUID()
+    }
+
+    var transcriptionTaskForTesting: Task<Void, Never>? { transcribeTask }
+
+    func setTranscriptionTaskForTesting(_ task: Task<Void, Never>) {
+        cancelActiveTranscriptionTask()
+        transcribeTask = task
+        activeTranscribeTaskID = UUID()
+    }
+
+    func decodingCallbackForTesting() -> TranscriptionCallback {
+        makeDecodingCallback(
+            task: selectedTask == "transcribe" ? .transcribe : .translate,
+            options: DecodingOptions()
+        )
     }
 #endif
 
@@ -258,7 +364,6 @@ class ContentViewModel: ObservableObject {
     @AppStorage("enableTimestamps") var enableTimestamps: Bool = true
     @AppStorage("enablePromptPrefill") var enablePromptPrefill: Bool =
         true
-    @AppStorage("enableCachePrefill") var enableCachePrefill: Bool = true
     @AppStorage("enableSpecialCharacters") var enableSpecialCharacters: Bool =
         false
     @AppStorage("enableWordTimestamp") var enableWordTimestamp: Bool =
@@ -319,13 +424,60 @@ class ContentViewModel: ObservableObject {
     }
 
     var hasUnsavedProjectChanges: Bool {
-        guard projectLibraryState.hasActiveProject else { return false }
         guard let currentProjectSnapshot = makeCurrentProjectSnapshot() else { return false }
         return currentProjectSnapshot != lastSavedProjectSnapshot
     }
 
+    var canSaveCurrentProject: Bool {
+        !audioState.isTranscribing &&
+            (projectLibraryState.hasActiveProject || transcriptionResult != nil ||
+                !transcriptionState.confirmedSegments.isEmpty)
+    }
+
+    enum UnsavedProjectDecision {
+        case save, discard, cancel
+    }
+
+    func resolveUnsavedProjectChanges(_ decision: UnsavedProjectDecision) -> Bool {
+        switch decision {
+        case .save: return saveCurrentProject() != nil
+        case .discard: return true
+        case .cancel: return false
+        }
+    }
+
+    func confirmDiscardingUnsavedChanges() -> Bool {
+        guard !isConfirmingUnsavedChanges else { return false }
+        guard hasUnsavedProjectChanges else { return true }
+        isConfirmingUnsavedChanges = true
+        defer { isConfirmingUnsavedChanges = false }
+        let language = appLanguage == "en-US" ? "en" : appLanguage
+        let bundle = Bundle.main.path(forResource: language, ofType: "lproj")
+            .flatMap(Bundle.init(path:)) ?? .main
+        func text(_ key: String) -> String {
+            bundle.localizedString(forKey: key, value: key, table: "Localizable")
+        }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = text("Save Changes?")
+        alert.informativeText = text("Save your transcript before continuing.")
+        alert.addButton(withTitle: text("Save Project"))
+        alert.addButton(withTitle: text("Discard Changes"))
+        alert.addButton(withTitle: text("Cancel")).keyEquivalent = "\u{1b}"
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return resolveUnsavedProjectChanges(.save)
+        case .alertSecondButtonReturn: return resolveUnsavedProjectChanges(.discard)
+        default: return resolveUnsavedProjectChanges(.cancel)
+        }
+    }
+
     var supportedAppLanguages: [AppLanguageOption] {
         Self.supportedAppLanguages
+    }
+
+    /// Model-dependent speaker analysis is available only after the local model passes validation.
+    var isSpeakerDiarizationAvailable: Bool {
+        modelManagementState.isSpeakerDiarizationModelReady
     }
 
     // MARK: - Initialization
@@ -406,13 +558,28 @@ class ContentViewModel: ObservableObject {
             launchArguments.contains(UITestArgument.disableModelDownloads)
     }
 
+    private static var shouldSimulateMissingSpeakerModelForUITesting: Bool {
+        launchArguments.contains(UITestArgument.disableModelDownloads) &&
+            !launchArguments.contains(UITestArgument.speakerFixture)
+    }
+
     var shouldSkipModelSelectorAutoActionsForUITesting: Bool {
         Self.isUITesting
     }
 #endif
 
-    init(projectStore: CaptionMateProjectStore = .liveStore()) {
+    init(
+        projectStore: CaptionMateProjectStore = .liveStore(),
+        speakerAnalyzer: SpeakerAnalyzer? = nil,
+        audioImportPreparer: AudioImportPreparer? = nil,
+        speakerModelRootURL: URL? = SpeakerDiarizationModelStore.defaultRootURL()
+    ) {
         self.projectStore = projectStore
+        self.speakerModelRootURL = speakerModelRootURL
+        self.speakerAnalyzer = speakerAnalyzer
+        self.audioImportPreparer = audioImportPreparer ?? { url, scoped in
+            try await Self.prepareAudioImport(from: url, needsSecurityScopedAccess: scoped)
+        }
 #if DEBUG
         if Self.launchArguments.contains(UITestArgument.resetDefaults) {
             Self.resetPersistentDefaultsForUITesting()
@@ -465,10 +632,15 @@ class ContentViewModel: ObservableObject {
         speakerDiarizationSpeakerCount = 2
         enableTimestamps = true
         modelManagementState.modelState = .loaded
+        modelManagementState.speakerDiarizationModelState = .downloaded
+        modelManagementState.speakerDiarizationModelProgress = 1
+        modelManagementState.speakerDiarizationModelNeedsRepair = false
+        modelManagementState.speakerDiarizationModelNeedsUpdate = false
 
         let segments = [
             TranscriptionSegment(start: 0, end: 1.8, text: "Welcome to CaptionMate."),
             TranscriptionSegment(start: 2.0, end: 3.8, text: "This segment already has a speaker."),
+            TranscriptionSegment(start: 4.0, end: 5.4, text: "The same speaker continues."),
         ]
         transcriptionResult = TranscriptionResult(
             text: segments.map(\.text).joined(separator: " "),
@@ -480,6 +652,7 @@ class ContentViewModel: ObservableObject {
         transcriptionState.speakerAssignments = [
             nil,
             SpeakerSegmentAssignment(speakerID: 0),
+            SpeakerSegmentAssignment(speakerID: 0),
         ]
         transcriptionState.speakerNames = [:]
         transcriptionState.speakerDiarization = SpeakerDiarizationState(
@@ -488,7 +661,7 @@ class ContentViewModel: ObservableObject {
         audioState.audioFileName = "UITest Speaker Fixture"
         audioState.importedAudioURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("CaptionMateUITestSpeakerFixture.wav")
-        audioState.totalDuration = 3.8
+        audioState.totalDuration = 5.4
         uiState.isTranscribingView = true
         uiState.showFirstRunGuide = false
         uiState.isModelmanagerViewPresented = false
@@ -659,6 +832,8 @@ class ContentViewModel: ObservableObject {
             restoreTranscriptionSidecar(project.sidecar)
             audioState.audioFileName = project.sidecar.audioFileName
             audioState.sourceAudioBookmarkData = project.sourceAudioBookmarkData
+            // A source reference can remain valid even while its drive is offline.
+            audioState.sourceAudioURL = project.sourceAudioPath.map { URL(fileURLWithPath: $0) }
 
             if let sourceAudioURL = resolveProjectAudioURL(project) {
                 audioState.importedAudioURL = sourceAudioURL
@@ -869,7 +1044,7 @@ class ContentViewModel: ObservableObject {
     }
 
     private func makeCurrentProjectSidecar() -> CaptionMateSidecar? {
-        guard !transcriptionState.confirmedSegments.isEmpty else { return nil }
+        guard canSaveCurrentProject else { return nil }
 
         let language = transcriptionResult?.language ?? selectedLanguage
         let timings = transcriptionResult?.timings ?? TranscriptionTimings()
@@ -942,7 +1117,7 @@ class ContentViewModel: ObservableObject {
         )
     }
 
-    private struct PreparedAudioImport {
+    struct PreparedAudioImport: Sendable {
         let localURL: URL
         let sourceURL: URL
         let sourceBookmarkData: Data?
@@ -961,7 +1136,8 @@ class ContentViewModel: ObservableObject {
         from sourceURL: URL,
         needsSecurityScopedAccess: Bool
     ) async throws -> PreparedAudioImport {
-        try await Task.detached(priority: .userInitiated) {
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
             let didStartAccessing = needsSecurityScopedAccess ?
                 sourceURL.startAccessingSecurityScopedResource() : false
             defer {
@@ -971,6 +1147,11 @@ class ContentViewModel: ObservableObject {
             }
 
             let localURL = try copyAudioFileToTemporaryDirectory(from: sourceURL)
+            var prepared = false
+            defer {
+                if !prepared { try? FileManager.default.removeItem(at: localURL) }
+            }
+            try Task.checkCancellation()
             let sidecarResult = loadSidecarIfPresent(nextTo: sourceURL)
             let sourceBookmarkData = try? sourceURL.bookmarkData(
                 options: [.withSecurityScope],
@@ -978,6 +1159,8 @@ class ContentViewModel: ObservableObject {
                 relativeTo: nil
             )
 
+            try Task.checkCancellation()
+            prepared = true
             return PreparedAudioImport(
                 localURL: localURL,
                 sourceURL: sourceURL,
@@ -987,7 +1170,12 @@ class ContentViewModel: ObservableObject {
                 sidecarURL: sidecarResult.url,
                 sidecarRestoreError: sidecarResult.errorMessage
             )
-        }.value
+        }
+        return try await withTaskCancellationHandler {
+            try await worker.value
+        } onCancel: {
+            worker.cancel()
+        }
     }
 
     nonisolated private static func loadSidecarIfPresent(
@@ -1159,6 +1347,7 @@ class ContentViewModel: ObservableObject {
 
     /// 상태 초기화: 모든 상태 모델의 값을 초기값으로 재설정
     func resetState(preservingImportedAudio: Bool = false) {
+        cancelAudioImport()
         cancelActiveTranscriptionTask()
         cancelActiveSpeakerDiarizationTask()
         stopImportedAudio()
@@ -1206,6 +1395,7 @@ class ContentViewModel: ObservableObject {
         uiState.subtitleIssueFilter = .all
         uiState.subtitleSearchText = ""
         uiState.subtitleReplaceText = ""
+        uiState.isSubtitleEditing = false
         projectLibraryState.activeProjectID = nil
         projectLibraryState.activeProjectDisplayName = nil
         projectLibraryState.lastSavedAt = nil
@@ -1238,6 +1428,10 @@ class ContentViewModel: ObservableObject {
         speakerDiarizationTask?.cancel()
         speakerDiarizationTask = nil
         activeSpeakerDiarizationTaskID = nil
+        if let previousSpeakerDiarizationStatus {
+            transcriptionState.speakerDiarization = previousSpeakerDiarizationStatus
+        }
+        previousSpeakerDiarizationStatus = nil
         transcriptionState.speakerDiarization.isRunning = false
     }
 
@@ -1251,32 +1445,30 @@ class ContentViewModel: ObservableObject {
     }
 
     func prepareForClose() {
+        cancelAudioImport()
         cancelActiveTranscriptionTask()
         cancelActiveSpeakerDiarizationTask()
         cancelAudioProcessingTasks()
         languageChangeNotificationTask?.cancel()
         languageChangeNotificationTask = nil
 
-        for task in modelDownloadTasks.values {
-            task.cancel()
+        let activeDownloadModels = Set(modelDownloadTasks.keys)
+        for model in activeDownloadModels {
+            modelDownloadCancellationErrors.removeValue(forKey: model)
+            modelManagementState.currentDownloadingModels.remove(model)
+            modelManagementState.cancellingModels.insert(model)
+            modelDownloadProgressObjects[model]?.cancel()
+            modelDownloadTasks[model]?.cancel()
         }
-        for progress in modelDownloadProgressObjects.values {
-            progress.cancel()
-        }
-        for task in downloadCancellationMonitorTasks.values {
-            task.cancel()
-        }
-        downloadCancellationMonitorTasks.removeAll()
-        modelDownloadTasks.removeAll()
-        modelDownloadProgressObjects.removeAll()
-        modelDownloadLastProgressCallbackTime.removeAll()
-        modelDownloadLastProgressUIUpdateTime.removeAll()
         modelManagementState.currentDownloadingModels.removeAll()
-        modelManagementState.cancellingModels.removeAll()
         modelManagementState.queuedDownloadModels.removeAll()
-        modelManagementState.downloadBatchModels.removeAll()
-        modelManagementState.downloadProgress.removeAll()
-        modelManagementState.isDownloading = false
+        modelManagementState.downloadBatchModels.removeAll {
+            !activeDownloadModels.contains($0)
+        }
+        modelManagementState.downloadProgress = modelManagementState.downloadProgress.filter {
+            activeDownloadModels.contains($0.key)
+        }
+        updateDownloadActivityState()
         modelCatalogTask?.cancel()
         modelCatalogTask = nil
         remoteModelSizeTask?.cancel()
@@ -1285,13 +1477,15 @@ class ContentViewModel: ObservableObject {
             modelManagementState.catalogLoadState = .idle
         }
         modelManagementState.isRemoteModelSizeLoading = false
-        speakerDiarizationModelTask?.cancel()
-        speakerDiarizationModelTask = nil
+        if let speakerDiarizationModelTask {
+            speakerDiarizationDownloadProgress?.cancel()
+            speakerDiarizationModelTask.cancel()
+            modelManagementState.speakerDiarizationModelState = .unloading
+            modelManagementState.speakerDiarizationModelProgress = nil
+        }
         modelLoadTask?.cancel()
-        modelLoadTask = nil
-        isLoadingModel = false
-        speakerDiarizationDownloadProgress?.cancel()
-        speakerDiarizationDownloadProgress = nil
+        pendingModelLoadAfterDownload = nil
+        pendingModelLoadIsRepair = false
 
         stopImportedAudio()
         stopSourceAudioAccessIfNeeded()
@@ -1461,10 +1655,42 @@ class ContentViewModel: ObservableObject {
         }
     }
 
+    func selectModel(_ model: String) {
+        guard !isLoadingModel, modelLoadTask == nil else { return }
+
+        if modelManagementState.localModels.contains(model) {
+            selectedModel = model
+            pendingModelLoadAfterDownload = nil
+            pendingModelLoadIsRepair = false
+            loadModel(model)
+        } else {
+            pendingModelLoadAfterDownload = model
+            pendingModelLoadIsRepair = false
+            if modelManagementState.isDownloading(model: model) ||
+                modelManagementState.isQueued(model: model) {
+                return
+            }
+            downloadModel(model)
+        }
+    }
+
     func loadModel(_ model: String, redownload: Bool = false) {
+        if !modelManagementState.localModels.contains(model) {
+            selectedModel = model
+            pendingModelLoadAfterDownload = model
+            pendingModelLoadIsRepair = redownload
+            if !modelManagementState.isDownloading(model: model),
+               !modelManagementState.isQueued(model: model) {
+                downloadModel(model)
+            }
+            return
+        }
+
         guard !isLoadingModel else { return }
         isLoadingModel = true
         modelLoadTask?.cancel()
+        let taskID = UUID()
+        activeModelLoadTaskID = taskID
 
         // 상태 초기화
         modelManagementState.modelState = .unloading
@@ -1482,8 +1708,11 @@ class ContentViewModel: ObservableObject {
         modelLoadTask = Task { [weak self] in
             guard let self else { return }
             defer {
-                self.modelLoadTask = nil
-                self.isLoadingModel = false
+                if self.activeModelLoadTaskID == taskID {
+                    self.modelLoadTask = nil
+                    self.activeModelLoadTaskID = nil
+                    self.isLoadingModel = false
+                }
             }
             // 로딩 단계별 진행률 비율 설정 (초기화/프리워밍/로딩)
             let initProgressRatio: Float = 0.9 // 초기화 단계
@@ -1495,9 +1724,11 @@ class ContentViewModel: ObservableObject {
                 await self.updateProgressBar(
                     startProgress: 0.0,
                     targetProgress: initProgressRatio,
-                    maxTime: 2.0
+                    maxTime: 2.0,
+                    modelLoadOperationID: taskID
                 )
             }
+            defer { initProgressTask.cancel() }
 
             // 디스크 공간 확인 및 캐시 정리
             let diskSpace = self.checkDiskSpace()
@@ -1511,8 +1742,14 @@ class ContentViewModel: ObservableObject {
             // 기존 WhisperKit 인스턴스 해제
             if let kit = self.whisperKit {
                 await kit.unloadModels()
+                guard self.activeModelLoadTaskID == taskID else { return }
                 print("Previous WhisperKit model released")
                 self.whisperKit = nil
+            }
+            guard !Task.isCancelled,
+                  self.activeModelLoadTaskID == taskID else {
+                self.resetCancelledModelLoadState(operationID: taskID)
+                return
             }
 
             // 초기화 진행률 업데이트 작업 완료
@@ -1538,10 +1775,26 @@ class ContentViewModel: ObservableObject {
                                               prewarm: false,
                                               load: false,
                                               download: false)
-                self.whisperKit = try await WhisperKit(config)
+                let initializedKit = try await WhisperKit(config)
+                guard !Task.isCancelled,
+                      self.activeModelLoadTaskID == taskID else {
+                    await initializedKit.unloadModels()
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
+                }
+                self.whisperKit = initializedKit
+            } catch is CancellationError {
+                self.resetCancelledModelLoadState(operationID: taskID)
+                return
             } catch {
+                if Task.isCancelled {
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
+                }
+                guard self.activeModelLoadTaskID == taskID else { return }
                 print("⚠️ WhisperKit initialization failed: \(error.localizedDescription)")
                 await MainActor.run {
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     self.modelManagementState.modelState = .unloaded
                     self.modelManagementState.hasModelLoadError = true
                     self.modelManagementState
@@ -1555,6 +1808,7 @@ class ContentViewModel: ObservableObject {
 
             guard let whisperKit = self.whisperKit else {
                 await MainActor.run {
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     self.modelManagementState.modelState = .unloaded
                     self.modelManagementState.hasModelLoadError = true
                     self.modelManagementState.modelLoadError = "WhisperKit instance creation failed"
@@ -1565,157 +1819,139 @@ class ContentViewModel: ObservableObject {
             }
 
             // 3. 모델 파일 설정 단계
-            var folder: URL?
+            let folder: URL
             do {
-                if self.modelManagementState.localModels.contains(model) && !redownload {
-                    // 로컬 모델 경로 가져오기 - 다운로드 없이 바로 로드
-                    folder = try ModelCatalogService.modelFolderURL(
-                        for: model,
-                        in: self.modelManagementState.localModelPath
-                    )
-
-                    // 로컬 모델은 다운로드 상태를 완료로 설정
-                    if self.modelManagementState.downloadProgress[model] == nil {
-                        self.modelManagementState.downloadProgress[model] = 1.0
-                    }
-                } else {
-                    // 다운로드 시작 전 상태 업데이트
-                    await MainActor.run {
-                        self.modelManagementState.beginDownloadBatchIfIdle()
-                        self.modelManagementState.trackDownloadRequest(model)
-                        self.modelManagementState.modelState = .downloading
-                        self.modelManagementState.currentDownloadingModels.insert(model)
-                        self.modelManagementState.isDownloading = true
-                    }
-
-                    let downloadTask = Task {
-                        await self.updateProgressBar(
-                            startProgress: 0.0,
-                            targetProgress: 0.99,
-                            maxTime: 20.0
-                        )
-                    }
-
-                    // 모델 다운로드
-                    folder = try await WhisperKit.download(
-                        variant: model,
-                        from: self.repoName,
-                        progressCallback: { progress in
-                            Task { [weak self] in
-                                await MainActor.run { [weak self] in
-                                    guard let self else { return }
-                                    // 다운로드 전용 진행률 업데이트
-                                    self.modelManagementState
-                                        .downloadProgress[model] = Float(progress.fractionCompleted)
-                                }
-                            }
-                        }
-                    )
-
-                    // 다운로드 완료 후 상태 업데이트
-                    downloadTask.cancel()
-                    await MainActor.run {
-                        self.modelManagementState.modelState = .downloaded
-                        self.modelManagementState.downloadProgress[model] = 1.0
-                        self.modelManagementState.currentDownloadingModels.remove(model)
-
-                        self.updateDownloadActivityState()
-
-                        if !self.modelManagementState.localModels.contains(model) {
-                            self.modelManagementState.localModels.append(model)
-                        }
-                    }
+                folder = try ModelCatalogService.modelFolderURL(
+                    for: model,
+                    in: self.modelManagementState.localModelPath
+                )
+                if self.modelManagementState.downloadProgress[model] == nil {
+                    self.modelManagementState.downloadProgress[model] = 1.0
                 }
             } catch {
-                print("⚠️ Model download failed: \(error.localizedDescription)")
+                guard self.activeModelLoadTaskID == taskID else { return }
+                print("⚠️ Model files unavailable: \(error.localizedDescription)")
                 await MainActor.run {
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     self.modelManagementState.modelState = .unloaded
                     self.modelManagementState.hasModelLoadError = true
                     self.modelManagementState
-                        .modelLoadError = "Model download failed: \(error.localizedDescription)"
+                        .modelLoadError = "Model files unavailable: \(error.localizedDescription)"
                     self.modelManagementState.loadingProgressValue = 0.0
-                    self.modelManagementState.downloadProgress[model] = nil
-                    self.modelManagementState.currentDownloadingModels.remove(model)
-                    self.modelManagementState.untrackDownloadRequest(model)
-
-                    self.updateDownloadActivityState()
-
                     self.isLoadingModel = false
                 }
                 return
             }
 
-            if let modelFolder = folder {
+            let modelFolder = folder
                 // 4. 모델 프리워밍 단계
                 whisperKit.modelFolder = modelFolder
 
                 // 프리워밍 시작
                 await MainActor.run {
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     self.modelManagementState.modelState = .prewarming
+                }
+                guard !Task.isCancelled,
+                      self.activeModelLoadTaskID == taskID else {
+                    await whisperKit.unloadModels()
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
                 }
 
                 // 프리워밍 진행률 업데이트 작업 시작
                 let prewarmProgressTask = Task {
                     await self.updateProgressBar(startProgress: 0.0,
                                                  targetProgress: prewarmProgressRatio,
-                                                 maxTime: 15) // 프리워밍은 보통 시간이 좀 더 걸림
+                                                 maxTime: 15,
+                                                 modelLoadOperationID: taskID) // 프리워밍은 보통 시간이 좀 더 걸림
                 }
+                defer { prewarmProgressTask.cancel() }
 
                 // 모델 프리워밍
                 do {
                     try await whisperKit.prewarmModels()
                     prewarmProgressTask.cancel()
+                    guard !Task.isCancelled,
+                          self.activeModelLoadTaskID == taskID else {
+                        await whisperKit.unloadModels()
+                        self.resetCancelledModelLoadState(operationID: taskID)
+                        return
+                    }
 
                     // 프리워밍 완료 후 진행률 업데이트
                     await MainActor.run {
+                        guard self.activeModelLoadTaskID == taskID else { return }
                         self.modelManagementState.loadingProgressValue = prewarmProgressRatio
                     }
-                } catch {
-                    print("⚠️ Model prewarm failed: \(error.localizedDescription)")
+                } catch is CancellationError {
                     prewarmProgressTask.cancel()
-
-                    // 재다운로드 시도
-                    if !redownload {
-                        await MainActor.run {
-                            self.modelManagementState.loadingProgressValue = 0.0
-                            self.modelManagementState.hasModelLoadError = true
-                            self.modelManagementState
-                                .modelLoadError = "Model optimization failed, retrying..."
-                            self.isLoadingModel = false
-                        }
-                        self.loadModel(model, redownload: true)
-                        return
-                    } else {
-                        await MainActor.run {
-                            self.modelManagementState.modelState = .unloaded
-                            self.modelManagementState.hasModelLoadError = true
-                            self.modelManagementState
-                                .modelLoadError =
-                                "Model optimization failed: \(error.localizedDescription)"
-                            self.modelManagementState.loadingProgressValue = 0.0
-                            self.isLoadingModel = false
-                        }
+                    await whisperKit.unloadModels()
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
+                } catch {
+                    if Task.isCancelled {
+                        prewarmProgressTask.cancel()
+                        await whisperKit.unloadModels()
+                        self.resetCancelledModelLoadState(operationID: taskID)
                         return
                     }
+                    guard self.activeModelLoadTaskID == taskID else { return }
+                    prewarmProgressTask.cancel()
+                    await self.handleWhisperPrewarmFailure(
+                        model: model,
+                        error: error,
+                        redownload: redownload,
+                        taskID: taskID,
+                        failedKit: whisperKit
+                    )
+                    return
                 }
 
                 // 5. 모델 로딩 단계
                 await MainActor.run {
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     self.modelManagementState.modelState = .loading
+                }
+                guard !Task.isCancelled,
+                      self.activeModelLoadTaskID == taskID else {
+                    await whisperKit.unloadModels()
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
                 }
 
                 // 로딩 진행률 업데이트 작업 시작
                 let loadProgressTask = Task {
                     await self.updateProgressBar(startProgress: prewarmProgressRatio,
                                                  targetProgress: loadProgressRatio,
-                                                 maxTime: 10)
+                                                 maxTime: 10,
+                                                 modelLoadOperationID: taskID)
                 }
+                defer { loadProgressTask.cancel() }
 
                 // 모델 로드 시도
                 do {
                     try await whisperKit.loadModels()
                     loadProgressTask.cancel()
+                    guard !Task.isCancelled,
+                          self.activeModelLoadTaskID == taskID else {
+                        await whisperKit.unloadModels()
+                        self.resetCancelledModelLoadState(operationID: taskID)
+                        return
+                    }
+                } catch is CancellationError {
+                    loadProgressTask.cancel()
+                    await whisperKit.unloadModels()
+                    self.resetCancelledModelLoadState(operationID: taskID)
+                    return
                 } catch {
+                    if Task.isCancelled {
+                        loadProgressTask.cancel()
+                        await whisperKit.unloadModels()
+                        self.resetCancelledModelLoadState(operationID: taskID)
+                        return
+                    }
+                    guard self.activeModelLoadTaskID == taskID else { return }
                     print("⚠️ Model load failed: \(error.localizedDescription)")
                     loadProgressTask.cancel()
 
@@ -1733,8 +1969,25 @@ class ContentViewModel: ObservableObject {
                         do {
                             try await Task.sleep(nanoseconds: 500_000_000) // 500ms 대기
                             try await whisperKit.loadModels()
+                            guard !Task.isCancelled,
+                                  self.activeModelLoadTaskID == taskID else {
+                                await whisperKit.unloadModels()
+                                self.resetCancelledModelLoadState(operationID: taskID)
+                                return
+                            }
+                        } catch is CancellationError {
+                            await whisperKit.unloadModels()
+                            self.resetCancelledModelLoadState(operationID: taskID)
+                            return
                         } catch {
+                            if Task.isCancelled {
+                                await whisperKit.unloadModels()
+                                self.resetCancelledModelLoadState(operationID: taskID)
+                                return
+                            }
+                            guard self.activeModelLoadTaskID == taskID else { return }
                             await MainActor.run {
+                                guard self.activeModelLoadTaskID == taskID else { return }
                                 self.modelManagementState.modelState = .unloaded
                                 self.modelManagementState.hasModelLoadError = true
                                 self.modelManagementState
@@ -1747,6 +2000,7 @@ class ContentViewModel: ObservableObject {
                         }
                     } else {
                         await MainActor.run {
+                            guard self.activeModelLoadTaskID == taskID else { return }
                             self.modelManagementState.modelState = .unloaded
                             self.modelManagementState.hasModelLoadError = true
                             self.modelManagementState
@@ -1760,32 +2014,84 @@ class ContentViewModel: ObservableObject {
 
                 // 모델 로딩 성공
                 await MainActor.run {
-                    // 모델 정보 업데이트 및 완료 상태 설정
-                    self.modelManagementState.availableLanguages = Constants.languages.map { $0.key }
-                        .sorted()
-                    self.modelManagementState.loadingProgressValue = loadProgressRatio
-                    self.modelManagementState.modelState = whisperKit.modelState
-                    self.currentLoadedModel = model
-
-                    // 에러 상태 초기화 (성공적으로 로드됨)
-                    self.modelManagementState.hasModelLoadError = false
-                    self.modelManagementState.modelLoadError = nil
-                    self.showUserMessage(
-                        .success,
-                        title: "Model Ready",
-                        detail: self.modelManagementState.displayName(for: model)
+                    guard self.activeModelLoadTaskID == taskID,
+                          !Task.isCancelled else { return }
+                    self.publishModelLoadCompletion(
+                        model: model,
+                        modelState: whisperKit.modelState,
+                        operationID: taskID
                     )
-                    self.modelLoadTask = nil
                 }
-            }
         }
+    }
+
+    private func publishModelLoadCompletion(
+        model: String,
+        modelState: ModelState,
+        operationID: UUID
+    ) {
+        guard activeModelLoadTaskID == operationID else { return }
+        modelManagementState.availableLanguages = Constants.languages.map(\.key).sorted()
+        modelManagementState.loadingProgressValue = 1
+        modelManagementState.modelState = modelState
+        currentLoadedModel = model
+        modelManagementState.hasModelLoadError = false
+        modelManagementState.modelLoadError = nil
+        showUserMessage(
+            .success,
+            title: "Model Ready",
+            detail: modelManagementState.displayName(for: model)
+        )
+    }
+
+    private func resetCancelledModelLoadState(operationID: UUID) {
+        guard activeModelLoadTaskID == operationID else { return }
+        whisperKit = nil
+        currentLoadedModel = ""
+        modelManagementState.modelState = .unloaded
+        modelManagementState.loadingProgressValue = 0
+    }
+
+    private func handleWhisperPrewarmFailure(
+        model _: String,
+        error: Error,
+        redownload _: Bool,
+        taskID: UUID,
+        failedKit: WhisperKit?
+    ) async {
+        guard activeModelLoadTaskID == taskID,
+              !Task.isCancelled else {
+            if activeModelLoadTaskID == taskID {
+                resetCancelledModelLoadState(operationID: taskID)
+            }
+            return
+        }
+        print("⚠️ Model prewarm failed: \(error.localizedDescription)")
+
+        await failedKit?.unloadModels()
+        guard activeModelLoadTaskID == taskID,
+              !Task.isCancelled else {
+            if activeModelLoadTaskID == taskID {
+                resetCancelledModelLoadState(operationID: taskID)
+            }
+            return
+        }
+
+        whisperKit = nil
+        modelManagementState.modelState = .unloaded
+        modelManagementState.hasModelLoadError = true
+        modelManagementState.modelLoadError =
+            "Model optimization failed: \(error.localizedDescription)"
+        modelManagementState.loadingProgressValue = 0.0
+        isLoadingModel = false
     }
 
     /// 진행률 업데이트 - 시작 진행률부터 목표 진행률까지 자연스럽게 증가
     func updateProgressBar(
         startProgress: Float = 0.0,
         targetProgress: Float,
-        maxTime: TimeInterval
+        maxTime: TimeInterval,
+        modelLoadOperationID: UUID? = nil
     ) async {
         let progressRange = targetProgress - startProgress
         let decayConstant = -log(1 - 0.95) / Float(maxTime) // 95% 완료에 도달하는 시간 기준
@@ -1794,6 +2100,10 @@ class ContentViewModel: ObservableObject {
 
         // 업데이트 간격을 더 길게 설정하여 CPU 사용량 감소
         while !Task.isCancelled {
+            if let modelLoadOperationID,
+               activeModelLoadTaskID != modelLoadOperationID {
+                break
+            }
             let elapsedTime = Date().timeIntervalSince(startTime)
             // 자연스러운 곡선을 위해 지수 함수 사용
             let decayFactor = exp(-decayConstant * Float(elapsedTime))
@@ -1802,6 +2112,8 @@ class ContentViewModel: ObservableObject {
 
             // MainActor에서 한 번만 상태 업데이트
             await MainActor.run {
+                guard modelLoadOperationID == nil ||
+                        activeModelLoadTaskID == modelLoadOperationID else { return }
                 modelManagementState.loadingProgressValue = min(currentProgress, targetProgress)
             }
 
@@ -1856,7 +2168,26 @@ class ContentViewModel: ObservableObject {
     }
 
     func refreshSpeakerDiarizationModelState() {
-        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
+        if speakerDiarizationModelTask != nil,
+           modelManagementState.isSpeakerDiarizationModelPreparing {
+            return
+        }
+
+#if DEBUG
+        if Self.shouldSimulateMissingSpeakerModelForUITesting {
+            modelManagementState.speakerDiarizationModelState = .unloaded
+            modelManagementState.speakerDiarizationModelPath = ""
+            modelManagementState.speakerDiarizationModelProgress = nil
+            modelManagementState.speakerDiarizationModelError = nil
+            modelManagementState.speakerDiarizationModelNeedsRepair = false
+            modelManagementState.speakerDiarizationModelNeedsUpdate = false
+            modelManagementState.speakerDiarizationModelSize = SpeakerDiarizationModelStore
+                .estimatedDownloadSize
+            return
+        }
+#endif
+
+        guard let modelRoot = speakerModelRootURL else {
             modelManagementState.speakerDiarizationModelState = .unloaded
             modelManagementState.speakerDiarizationModelPath = ""
             modelManagementState.speakerDiarizationModelError = "Document directory not found."
@@ -1867,9 +2198,25 @@ class ContentViewModel: ObservableObject {
 
         modelManagementState.speakerDiarizationModelPath = modelRoot.path
 
+        if let failure = speakerModelIntegrityFailure {
+            speakerModelIntegrityFailure = failure.rootURL == modelRoot ? failure.remainingFailure : nil
+        }
+
+        do {
+            try SpeakerDiarizationModelStore.recoverBackupIfNeeded(for: modelRoot)
+        } catch {
+            modelManagementState.speakerDiarizationModelState = .unloaded
+            modelManagementState.speakerDiarizationModelProgress = nil
+            modelManagementState.speakerDiarizationModelError = error.localizedDescription
+            modelManagementState.speakerDiarizationModelNeedsRepair = true
+            modelManagementState.speakerDiarizationModelNeedsUpdate = false
+            return
+        }
+
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: modelRoot.path, isDirectory: &isDirectory),
               isDirectory.boolValue else {
+            speakerModelIntegrityFailure = nil
             modelManagementState.speakerDiarizationModelState = .unloaded
             modelManagementState.speakerDiarizationModelProgress = nil
             modelManagementState.speakerDiarizationModelError = nil
@@ -1887,7 +2234,7 @@ class ContentViewModel: ObservableObject {
             SpeakerDiarizationModelStore.estimatedDownloadSize
         )
 
-        if report.isValid {
+        if report.isValid, speakerModelIntegrityFailure == nil {
             let needsUpdate = speakerDiarizationModelManifestVersion <
                 SpeakerDiarizationModelStore.manifestVersion
             modelManagementState.speakerDiarizationModelState = .downloaded
@@ -1899,7 +2246,7 @@ class ContentViewModel: ObservableObject {
             modelManagementState.speakerDiarizationModelState = .unloaded
             modelManagementState.speakerDiarizationModelProgress = nil
             modelManagementState.speakerDiarizationModelError =
-                "Missing files: \(report.missingRelativePaths.prefix(3).joined(separator: ", "))"
+                SpeakerDiarizationServiceError.repairMessage
             modelManagementState.speakerDiarizationModelNeedsRepair = true
             modelManagementState.speakerDiarizationModelNeedsUpdate = false
         }
@@ -1916,41 +2263,47 @@ class ContentViewModel: ObservableObject {
         }
 #endif
 
-        guard !modelManagementState.isSpeakerDiarizationModelPreparing else { return }
+        guard speakerDiarizationModelTask == nil,
+              !modelManagementState.isSpeakerDiarizationModelPreparing else { return }
 
         refreshSpeakerDiarizationModelState()
-        if !forceRepair, modelManagementState.isSpeakerDiarizationModelReady {
+        if !forceRepair,
+           modelManagementState.isSpeakerDiarizationModelReady || speakerModelIntegrityFailure != nil {
             return
         }
 
-        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
+        guard let modelRoot = speakerModelRootURL,
+              let stagingDownloadBase = SpeakerDiarizationModelStore.stagingDownloadBaseURL() else {
             modelManagementState.speakerDiarizationModelError = "Document directory not found."
             return
         }
 
-        let shouldResetLocalCache = forceRepair ||
-            modelManagementState.speakerDiarizationModelNeedsRepair ||
-            modelManagementState.speakerDiarizationModelNeedsUpdate
-
-        speakerDiarizationModelTask?.cancel()
         speakerDiarizationDownloadProgress = nil
         modelManagementState.beginSpeakerDiarizationModelDownload(path: modelRoot.path)
+        let operationID = UUID()
+        activeSpeakerDiarizationModelTaskID = operationID
 
         speakerDiarizationModelTask = Task.detached(priority: .background) { [weak self] in
-            do {
-                if shouldResetLocalCache {
-                    try? FileManager.default.removeItem(at: modelRoot)
-                }
+            let fileManager = FileManager.default
+            var installedModel = false
+            var downloadError: Error?
 
+            do {
+                if fileManager.fileExists(atPath: stagingDownloadBase.path) {
+                    try fileManager.removeItem(at: stagingDownloadBase)
+                }
+                try Task.checkCancellation()
                 let diskSpace = Self.diskSpaceStatus()
                 if !diskSpace.isEnough {
                     Self.clearCoreMLRuntimeCacheContents()
                 }
 
                 let config = PyannoteConfig(
+                    downloadBase: stagingDownloadBase.path,
                     modelRepo: SpeakerDiarizationModelStore.repoName,
                     download: true,
                     useBackgroundDownloadSession: false,
+                    downloadRevision: SpeakerDiarizationModelStore.downloadRevision,
                     load: false,
                     verbose: false,
                     concurrentSegmenterWorkers: 1,
@@ -1959,61 +2312,128 @@ class ContentViewModel: ObservableObject {
                 let diarizer = SpeakerKitDiarizer.pyannote(config: config)
                 let progressCallback: (Progress) -> Void = { [weak self] progress in
                     Task<Void, Never> { @MainActor [weak self] in
-                        self?.updateSpeakerDiarizationDownloadProgress(progress)
+                        self?.updateSpeakerDiarizationDownloadProgress(
+                            progress,
+                            operationID: operationID
+                        )
                     }
                 }
-                _ = try await diarizer.loader.resolveModels(
+                let resolvedModelPath = try await diarizer.loader.resolveModels(
                     downloader: diarizer.downloader,
                     progressCallback: progressCallback
                 )
                 try Task.checkCancellation()
 
-                let report = SpeakerDiarizationModelStore.validationReport(for: modelRoot)
+                let stagedRoot = URL(fileURLWithPath: resolvedModelPath, isDirectory: true)
+                    .standardizedFileURL
+                let stagingPathPrefix = stagingDownloadBase.standardizedFileURL.path + "/"
+                guard stagedRoot.path.hasPrefix(stagingPathPrefix) else {
+                    throw CocoaError(.fileReadInvalidFileName)
+                }
+
+                let report = SpeakerDiarizationModelStore.validationReport(for: stagedRoot)
                 guard report.isValid else {
                     throw CocoaError(.fileReadCorruptFile)
                 }
 
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.modelManagementState.speakerDiarizationModelProgress = 1.0
-                    self.refreshSpeakerDiarizationModelState()
-                    self.speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore
-                        .manifestVersion
-                    self.refreshSpeakerDiarizationModelState()
-                    self.speakerDiarizationDownloadProgress = nil
-                    self.speakerDiarizationModelTask = nil
-
-                    if showSuccessMessage {
-                        self.showUserMessage(
-                            .success,
-                            title: "Speaker Model Ready",
-                            detail: self.modelManagementState.formattedSpeakerDiarizationModelSize
-                        )
-                    }
+                try await MainActor.run { [weak self] in
+                    guard let self else { throw CancellationError() }
+                    try self.commitSpeakerDiarizationModelDownload(
+                        stagedRootURL: stagedRoot,
+                        destinationRootURL: modelRoot,
+                        operationID: operationID
+                    )
                 }
-            } catch is CancellationError {
-                try? FileManager.default.removeItem(at: modelRoot)
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.modelManagementState.speakerDiarizationModelState = .unloaded
-                    self.modelManagementState.speakerDiarizationModelProgress = nil
-                    self.modelManagementState.speakerDiarizationModelError = "Download cancelled."
-                    self.speakerDiarizationDownloadProgress = nil
-                    self.speakerDiarizationModelTask = nil
+                installedModel = true
+            } catch {
+                downloadError = error
+            }
+
+            // The fixed staging directory belongs to this operation until cleanup returns.
+            // Nothing may touch it after the MainActor releases the retry slot below.
+            var downloadWasCancelled = !installedModel &&
+                (downloadError is CancellationError || Task.isCancelled)
+            do {
+                if fileManager.fileExists(atPath: stagingDownloadBase.path) {
+                    try fileManager.removeItem(at: stagingDownloadBase)
                 }
             } catch {
-                let modelExists = FileManager.default.fileExists(atPath: modelRoot.path)
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    self.modelManagementState.speakerDiarizationModelState = .unloaded
-                    self.modelManagementState.speakerDiarizationModelProgress = nil
-                    self.modelManagementState.speakerDiarizationModelError = error.localizedDescription
-                    self.modelManagementState.speakerDiarizationModelNeedsRepair = modelExists
-                    self.speakerDiarizationDownloadProgress = nil
-                    self.speakerDiarizationModelTask = nil
-                }
+                downloadError = error
+                downloadWasCancelled = false
+            }
+            let didInstallModel = installedModel
+            let errorMessage = downloadError.map {
+                downloadWasCancelled ? "Download cancelled." : $0.localizedDescription
+            }
+            await MainActor.run { [weak self] in
+                self?.finishSpeakerDiarizationModelDownload(
+                    operationID: operationID,
+                    didInstallModel: didInstallModel,
+                    errorMessage: errorMessage,
+                    showSuccessMessage: showSuccessMessage
+                )
             }
         }
+    }
+
+    private func finishSpeakerDiarizationModelDownload(
+        operationID: UUID,
+        didInstallModel: Bool,
+        errorMessage: String?,
+        showSuccessMessage: Bool
+    ) {
+        guard activeSpeakerDiarizationModelTaskID == operationID else { return }
+        if didInstallModel {
+            speakerDiarizationModelManifestVersion = SpeakerDiarizationModelStore.manifestVersion
+        }
+        speakerDiarizationDownloadProgress = nil
+        speakerDiarizationModelTask = nil
+        activeSpeakerDiarizationModelTaskID = nil
+        refreshSpeakerDiarizationModelState()
+        if let errorMessage {
+            modelManagementState.applySpeakerDiarizationDownloadFailure(
+                message: errorMessage,
+                modelIsValidAfterFailure: modelManagementState.isSpeakerDiarizationModelReady,
+                modelExists: speakerModelRootURL.map { FileManager.default.fileExists(atPath: $0.path) } ?? false,
+                updateIsRequired: speakerDiarizationModelManifestVersion < SpeakerDiarizationModelStore.manifestVersion
+            )
+        } else if showSuccessMessage {
+            showUserMessage(
+                .success,
+                title: "Speaker Model Ready",
+                detail: modelManagementState.formattedSpeakerDiarizationModelSize
+            )
+        }
+    }
+
+    private func commitSpeakerDiarizationModelDownload(
+        stagedRootURL: URL,
+        destinationRootURL: URL,
+        operationID: UUID,
+        expectedFileSHA256: [String: String] = SpeakerDiarizationModelStore.requiredFileSHA256
+    ) throws {
+        guard canCommitSpeakerDiarizationModelDownload(operationID: operationID) else {
+            throw CancellationError()
+        }
+
+        try SpeakerDiarizationModelStore.installValidatedModel(
+            from: stagedRootURL,
+            to: destinationRootURL,
+            expectedFileSHA256: expectedFileSHA256
+        )
+        speakerModelIntegrityFailure = nil
+        modelManagementState.speakerDiarizationModelState = .loading
+        modelManagementState.speakerDiarizationModelProgress = nil
+    }
+
+    private func canCommitSpeakerDiarizationModelDownload(operationID: UUID) -> Bool {
+        guard activeSpeakerDiarizationModelTaskID == operationID,
+              let task = speakerDiarizationModelTask,
+              !task.isCancelled,
+              modelManagementState.speakerDiarizationModelState != .unloading else {
+            return false
+        }
+        return speakerDiarizationDownloadProgress?.isCancelled != true
     }
 
     func repairDefaultSpeakerDiarizationModel() {
@@ -2023,26 +2443,24 @@ class ContentViewModel: ObservableObject {
         )
     }
 
-    private func updateSpeakerDiarizationDownloadProgress(_ progress: Progress) {
+    private func updateSpeakerDiarizationDownloadProgress(
+        _ progress: Progress,
+        operationID: UUID
+    ) {
+        guard activeSpeakerDiarizationModelTaskID == operationID,
+              modelManagementState.speakerDiarizationModelState == .downloading else { return }
         speakerDiarizationDownloadProgress = progress
         modelManagementState.applySpeakerDiarizationDownloadProgress(progress)
     }
 
     func cancelDefaultSpeakerDiarizationModelDownload() {
-        guard modelManagementState.isSpeakerDiarizationModelPreparing else { return }
+        guard let task = speakerDiarizationModelTask else { return }
         speakerDiarizationDownloadProgress?.cancel()
         speakerDiarizationDownloadProgress = nil
-        speakerDiarizationModelTask?.cancel()
-        speakerDiarizationModelTask = nil
-        modelManagementState.speakerDiarizationModelState = .unloaded
+        task.cancel()
+        modelManagementState.speakerDiarizationModelState = .unloading
         modelManagementState.speakerDiarizationModelProgress = nil
-        modelManagementState.speakerDiarizationModelError = "Download cancelled."
-
-        if let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() {
-            Task(priority: .utility) {
-                try? FileManager.default.removeItem(at: modelRoot)
-            }
-        }
+        modelManagementState.speakerDiarizationModelError = "Cancelling download..."
     }
 
     // MARK: - 모델 다운로드 관리
@@ -2112,6 +2530,9 @@ class ContentViewModel: ObservableObject {
     }
 
     private func startModelDownload(_ model: String) {
+        guard modelDownloadTasks[model] == nil,
+              modelDownloadOperationIDs[model] == nil else { return }
+
         guard let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
             .first else {
             print("Document directory not found")
@@ -2127,17 +2548,14 @@ class ContentViewModel: ObservableObject {
         modelManagementState.isDownloading = true
         modelManagementState.downloadProgress[model] = 0.0
         modelManagementState.downloadErrors.removeValue(forKey: model)
-
-        // 기존 다운로드 Task가 있다면 취소
-        if let existingTask = modelDownloadTasks[model] {
-            existingTask.cancel()
-            modelDownloadTasks[model] = nil
-        }
         modelDownloadProgressObjects.removeValue(forKey: model)
         modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
         modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
+        modelDownloadCancellationErrors.removeValue(forKey: model)
 
         let repoName = repoName
+        let operationID = UUID()
+        modelDownloadOperationIDs[model] = operationID
         let estimatedSize = estimatedDownloadSize(for: model)
         let requiredSpace = estimatedRequiredDownloadSpace(for: model)
         let reservedSpaceForOtherDownloads =
@@ -2150,19 +2568,11 @@ class ContentViewModel: ObservableObject {
                     .resourceValues(forKeys: [.volumeAvailableCapacityKey])
                 guard let availableSpace = resourceValues.volumeAvailableCapacity else {
                     await MainActor.run { [weak self] in
-                        guard let self else { return }
-                        self.modelManagementState.downloadErrors[model] = "Cannot check disk space."
-                        self.modelManagementState.currentDownloadingModels.remove(model)
-                        self.modelManagementState.downloadProgress[model] = nil
-                        self.modelDownloadTasks[model] = nil
-                        self.modelManagementState.untrackDownloadRequest(model)
-                        self.showUserMessage(
-                            .error,
-                            title: "Download Failed",
-                            detail: "Cannot check disk space."
+                        self?.finishModelDownloadFailure(
+                            model,
+                            operationID: operationID,
+                            message: "Cannot check disk space."
                         )
-                        self.startNextQueuedDownloadIfPossible()
-                        self.updateDownloadActivityState()
                     }
                     return
                 }
@@ -2178,15 +2588,11 @@ class ContentViewModel: ObservableObject {
                         availableGB
                     )
                     await MainActor.run { [weak self] in
-                        guard let self else { return }
-                        self.modelManagementState.downloadErrors[model] = errorMessage
-                        self.modelManagementState.currentDownloadingModels.remove(model)
-                        self.modelManagementState.downloadProgress[model] = nil
-                        self.modelDownloadTasks[model] = nil
-                        self.modelManagementState.untrackDownloadRequest(model)
-                        self.showUserMessage(.error, title: "Download Failed", detail: errorMessage)
-                        self.startNextQueuedDownloadIfPossible()
-                        self.updateDownloadActivityState()
+                        self?.finishModelDownloadFailure(
+                            model,
+                            operationID: operationID,
+                            message: errorMessage
+                        )
                     }
                     return
                 }
@@ -2199,32 +2605,14 @@ class ContentViewModel: ObservableObject {
                     progressCallback: { [weak self] progress in
                         // Progress 콜백 활동 기록 (모든 콜백에서 기록)
                         Task { @MainActor [weak self] in
-                            guard let self else { return }
+                            guard let self,
+                                  self.modelDownloadOperationIDs[model] == operationID else { return }
                             self.modelDownloadLastProgressCallbackTime[model] = Date()
 
                             // Progress 객체 저장 (처음 한 번만)
                             if self.modelDownloadProgressObjects[model] == nil {
                                 self.modelDownloadProgressObjects[model] = progress
                                 print("Progress object stored: \(model)")
-                            }
-
-                            // Progress 완료 감지 (1.0 도달 시 cancelling 상태 해제)
-                            if self.modelManagementState.cancellingModels.contains(model) &&
-                                progress.fractionCompleted >= 1.0 {
-                                print(
-                                    "Progress completion detected (fractionCompleted: \(progress.fractionCompleted)) - Cancelling state released: \(model)"
-                                )
-                                self.modelManagementState.cancellingModels.remove(model)
-                                self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
-                                self.modelDownloadProgressObjects.removeValue(forKey: model)
-
-                                // 부분 다운로드 파일 정리 (비동기)
-                                Task.detached {
-                                    Self.cleanupPartialDownload(
-                                        model,
-                                        localModelPath: localModelPath
-                                    )
-                                }
                             }
 
                             // 진행률 업데이트 최적화
@@ -2266,60 +2654,12 @@ class ContentViewModel: ObservableObject {
                                     self.estimatedRemainingDownloadSpaceForOtherActiveDownloads(
                                         excluding: model
                                     ) {
-                                    progress.cancel()
-                                    self.modelManagementState
-                                        .downloadErrors[model] =
-                                        "Disk space became insufficient during download"
-                                    self.modelManagementState.currentDownloadingModels
-                                        .remove(model)
-                                    self.modelManagementState.untrackDownloadRequest(model)
-                                    self.updateDownloadActivityState()
+                                    self.requestModelDownloadCancellation(
+                                        model,
+                                        errorMessage: "Disk space became insufficient during download"
+                                    )
                                     return
                                 }
-                            }
-                        }
-
-                        // 작업이 취소되었는지 확인
-                        if Task.isCancelled {
-                            print(
-                                "Task cancellation detected - terminating from progress callback: \(model)"
-                            )
-                            return
-                        }
-
-                        // 취소 중인 상태인지 확인
-                        let isCancelling = Task { @MainActor [weak self] in
-                            self?.modelManagementState.cancellingModels.contains(model) ?? false
-                        }
-
-                        Task {
-                            if await isCancelling.value || progress.isCancelled {
-                                print(
-                                    "Cancellation detected - immediate download stop: \(model) (progress: \(String(format: "%.1f", progress.fractionCompleted * 100))%)"
-                                )
-
-                                // Progress가 취소되었으면 즉시 파일 삭제
-                                if progress.isCancelled {
-                                    print(
-                                        "NSProgress cancellation detected - starting immediate file deletion: \(model)"
-                                    )
-
-                                    // 즉시 부분 다운로드 파일 정리
-                                    Task.detached {
-                                        Self.cleanupPartialDownload(
-                                            model,
-                                            localModelPath: localModelPath
-                                        )
-                                    }
-
-                                    // 마지막 취소 완료 콜백까지 기다리기 위해 타임스탬프만 업데이트
-                                    await MainActor.run { [weak self] in
-                                        self?.modelDownloadLastProgressCallbackTime[model] = Date()
-                                    }
-                                }
-
-                                // Progress 콜백에서 즉시 return하여 더 이상 진행하지 않음
-                                return
                             }
                         }
                     }
@@ -2333,12 +2673,19 @@ class ContentViewModel: ObservableObject {
                 let actualSize = await Task.detached {
                     ModelCatalogService.folderSize(url: modelFolder)
                 }.value
+                try Task.checkCancellation()
 
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
+                let didCommit = await MainActor.run { [weak self] in
+                    guard let self,
+                          self.canCommitModelDownload(model, operationID: operationID) else {
+                        return false
+                    }
                     self.modelManagementState.currentDownloadingModels.remove(model)
+                    self.modelManagementState.cancellingModels.remove(model)
                     self.modelManagementState.downloadProgress[model] = 1.0
                     self.modelDownloadTasks[model] = nil
+                    self.modelDownloadOperationIDs.removeValue(forKey: model)
+                    self.modelDownloadCancellationErrors.removeValue(forKey: model)
                     self.modelDownloadProgressObjects.removeValue(forKey: model)
                     self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
                     self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
@@ -2355,72 +2702,129 @@ class ContentViewModel: ObservableObject {
                         title: "Model Downloaded",
                         detail: self.modelManagementState.displayName(for: model)
                     )
+                    let shouldLoadModel = self.pendingModelLoadAfterDownload == model
+                    let isRepairLoad = shouldLoadModel && self.pendingModelLoadIsRepair
+                    if self.pendingModelLoadAfterDownload == model {
+                        self.selectedModel = model
+                        self.pendingModelLoadAfterDownload = nil
+                        self.pendingModelLoadIsRepair = false
+                    }
                     self.startNextQueuedDownloadIfPossible()
                     self.updateDownloadActivityState()
+                    if shouldLoadModel {
+                        self.loadModel(model, redownload: isRepairLoad)
+                    }
+                    return true
                 }
+                guard didCommit else { throw CancellationError() }
 
             } catch is CancellationError {
                 print("Model download cancelled: \(model)")
-                let isCancelling = await MainActor
-                    .run { [weak self] in
-                        self?.modelManagementState.cancellingModels.contains(model) ?? false
-                    }
-                if !isCancelling {
+                let ownsOperation = await MainActor.run { [weak self] in
+                    self?.modelDownloadOperationIDs[model] == operationID
+                }
+                if ownsOperation {
                     Self.cleanupPartialDownload(model, localModelPath: localModelPath)
-                    await MainActor.run { [weak self] in
-                        guard let self else { return }
-                        self.modelManagementState.currentDownloadingModels.remove(model)
-                        self.modelManagementState.downloadProgress[model] = nil
-                        self.modelDownloadTasks[model] = nil
-                        self.modelDownloadProgressObjects.removeValue(forKey: model)
-                        self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
-                        self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
-                        self.modelManagementState.untrackDownloadRequest(model)
-                        self.startNextQueuedDownloadIfPossible()
-                        self.updateDownloadActivityState()
-                    }
+                }
+                await MainActor.run { [weak self] in
+                    self?.finishModelDownloadCancellation(model, operationID: operationID)
                 }
             } catch {
                 print("Model download failed: \(error.localizedDescription)")
-
-                let downloadError = DownloadError.from(error)
-
+                let ownsOperation = await MainActor.run { [weak self] in
+                    self?.modelDownloadOperationIDs[model] == operationID
+                }
+                if ownsOperation {
+                    Self.cleanupPartialDownload(model, localModelPath: localModelPath)
+                }
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    self.modelManagementState
-                        .downloadErrors[model] = "Download failed: \(error.localizedDescription)"
-                    self.modelManagementState.currentDownloadingModels.remove(model)
-                    self.modelManagementState.downloadProgress[model] = nil
-                    self.modelDownloadTasks[model] = nil
-                    self.modelManagementState.cancellingModels.remove(model) // 에러 시 취소 상태도 해제
-                    self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
-                    self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
-                    self.modelDownloadProgressObjects.removeValue(forKey: model)
-                    self.modelManagementState.untrackDownloadRequest(model)
-
-                    // 다운로드 실패 알림 표시 (취소로 인한 에러가 아닌 경우만)
-                    if let downloadError = downloadError {
-                        self.uiState.downloadError = downloadError
-                        self.uiState.showDownloadErrorAlert = true
+                    if self.modelManagementState.cancellingModels.contains(model) {
+                        self.finishModelDownloadCancellation(model, operationID: operationID)
+                    } else {
+                        self.finishModelDownloadFailure(
+                            model,
+                            operationID: operationID,
+                            message: "Download failed: \(error.localizedDescription)",
+                            downloadError: DownloadError.from(error)
+                        )
                     }
-                    self.showUserMessage(
-                        .error,
-                        title: "Download Failed",
-                        detail: error.localizedDescription
-                    )
-                    self.startNextQueuedDownloadIfPossible()
-                    self.updateDownloadActivityState()
                 }
-                Self.cleanupPartialDownload(model, localModelPath: localModelPath)
             }
         }
 
         modelDownloadTasks[model] = task
     }
 
-    /// 부분 다운로드 파일 정리 헬퍼 메서드
-    private func cleanupPartialDownload(_ model: String) async {
-        Self.cleanupPartialDownload(model, localModelPath: modelManagementState.localModelPath)
+    private func canCommitModelDownload(_ model: String, operationID: UUID) -> Bool {
+        guard modelDownloadOperationIDs[model] == operationID,
+              let task = modelDownloadTasks[model],
+              !task.isCancelled,
+              !modelManagementState.cancellingModels.contains(model) else {
+            return false
+        }
+        return modelDownloadProgressObjects[model]?.isCancelled != true
+    }
+
+    private func clearModelDownloadRuntime(_ model: String, operationID: UUID) -> Bool {
+        guard modelDownloadOperationIDs[model] == operationID else { return false }
+
+        modelDownloadTasks.removeValue(forKey: model)
+        modelDownloadOperationIDs.removeValue(forKey: model)
+        modelDownloadProgressObjects.removeValue(forKey: model)
+        modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
+        modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
+        modelManagementState.currentDownloadingModels.remove(model)
+        modelManagementState.cancellingModels.remove(model)
+        modelManagementState.downloadProgress[model] = nil
+        modelManagementState.untrackDownloadRequest(model)
+        return true
+    }
+
+    private func finishModelDownloadCancellation(_ model: String, operationID: UUID) {
+        let errorMessage = modelDownloadCancellationErrors[model]
+        guard clearModelDownloadRuntime(model, operationID: operationID) else { return }
+        modelDownloadCancellationErrors.removeValue(forKey: model)
+
+        if let errorMessage {
+            modelManagementState.downloadErrors[model] = errorMessage
+            showUserMessage(.error, title: "Download Failed", detail: errorMessage)
+        } else {
+            modelManagementState.downloadErrors.removeValue(forKey: model)
+            showUserMessage(
+                .info,
+                title: "Download Cancelled",
+                detail: modelManagementState.displayName(for: model)
+            )
+        }
+        if pendingModelLoadAfterDownload == model {
+            pendingModelLoadAfterDownload = nil
+            pendingModelLoadIsRepair = false
+        }
+        startNextQueuedDownloadIfPossible()
+        updateDownloadActivityState()
+    }
+
+    private func finishModelDownloadFailure(
+        _ model: String,
+        operationID: UUID,
+        message: String,
+        downloadError: DownloadError? = nil
+    ) {
+        guard clearModelDownloadRuntime(model, operationID: operationID) else { return }
+        modelDownloadCancellationErrors.removeValue(forKey: model)
+        modelManagementState.downloadErrors[model] = message
+        if let downloadError {
+            uiState.downloadError = downloadError
+            uiState.showDownloadErrorAlert = true
+        }
+        if pendingModelLoadAfterDownload == model {
+            pendingModelLoadAfterDownload = nil
+            pendingModelLoadIsRepair = false
+        }
+        showUserMessage(.error, title: "Download Failed", detail: message)
+        startNextQueuedDownloadIfPossible()
+        updateDownloadActivityState()
     }
 
     private nonisolated static func cleanupPartialDownload(
@@ -2453,6 +2857,10 @@ class ContentViewModel: ObservableObject {
             modelManagementState.downloadProgress[model] = nil
             modelManagementState.downloadErrors.removeValue(forKey: model)
             modelManagementState.untrackDownloadRequest(model)
+            if pendingModelLoadAfterDownload == model {
+                pendingModelLoadAfterDownload = nil
+                pendingModelLoadIsRepair = false
+            }
             updateDownloadActivityState()
             showUserMessage(
                 .info,
@@ -2462,113 +2870,28 @@ class ContentViewModel: ObservableObject {
             return
         }
 
+        requestModelDownloadCancellation(model)
+    }
+
+    private func requestModelDownloadCancellation(
+        _ model: String,
+        errorMessage: String? = nil
+    ) {
         guard let task = modelDownloadTasks[model],
-              modelManagementState.currentDownloadingModels.contains(model) else {
-            return
+              modelDownloadOperationIDs[model] != nil,
+              !modelManagementState.cancellingModels.contains(model) else { return }
+
+        if let errorMessage {
+            modelDownloadCancellationErrors[model] = errorMessage
+            modelManagementState.downloadErrors[model] = errorMessage
         }
-
-        print("Download cancellation requested: \(model)")
-
-        // 1. 즉시 취소 중 상태로 변경
         modelManagementState.cancellingModels.insert(model)
         modelManagementState.currentDownloadingModels.remove(model)
         modelManagementState.untrackDownloadRequest(model)
         updateDownloadActivityState()
 
-        // 2. NSProgress 직접 취소 (다운로드 즉시 중단)
-        if let progress = modelDownloadProgressObjects[model] {
-            progress.cancel()
-            print("NSProgress directly cancelled: \(model)")
-        }
-
-        // 3. Task 취소
+        modelDownloadProgressObjects[model]?.cancel()
         task.cancel()
-
-        // 3. Progress 콜백이 완전히 멈출 때까지 모니터링 시작
-        downloadCancellationMonitorTasks[model]?.cancel()
-        downloadCancellationMonitorTasks[model] = Task { [weak self] in
-            await self?.monitorProgressCompletion(model: model)
-        }
-
-        print(
-            "Download cancellation processing completed - Progress completion monitoring started: \(model)"
-        )
-    }
-
-    /// 마지막 취소 완료 콜백 감지 모니터링
-    private func monitorProgressCompletion(model: String) async {
-        let maxWaitTime: TimeInterval = 30.0 // 최대 30초 대기
-        let checkInterval: TimeInterval = 0.5 // 0.5초마다 확인
-        let inactivityThreshold: TimeInterval = 3.0 // 3초간 비활성 시 마지막 콜백으로 간주
-
-        let startTime = Date()
-        print("Cancellation completion callback monitoring started: \(model)")
-
-        while await MainActor
-            .run(body: { self.modelManagementState.cancellingModels.contains(model) }) {
-            // 최대 대기 시간 초과 확인
-            if Date().timeIntervalSince(startTime) > maxWaitTime {
-                print(
-                    "Cancellation completion monitoring timeout (30s) - forced termination: \(model)"
-                )
-                break
-            }
-
-            // 마지막 Progress 콜백 활동 확인
-            let lastActivity = await MainActor.run {
-                self.modelDownloadLastProgressCallbackTime[model]
-            }
-
-            if let lastActivity = lastActivity {
-                let timeSinceLastActivity = Date().timeIntervalSince(lastActivity)
-
-                // 3초간 비활성이면 마지막 취소 완료 콜백으로 간주
-                if timeSinceLastActivity > inactivityThreshold {
-                    print(
-                        "Last cancellation completion callback detected (\(String(format: "%.1f", timeSinceLastActivity))s inactive) - Cancelling UI released: \(model)"
-                    )
-                    break
-                }
-            }
-
-            // 대기
-            do {
-                try await Task.sleep(nanoseconds: UInt64(checkInterval * 1_000_000_000))
-            } catch {
-                return
-            }
-        }
-
-        guard !Task.isCancelled else { return }
-
-        // 최종 정리 (마지막 콜백 완료 후)
-        await finalizeProgressCompletion(model: model)
-    }
-
-    /// Progress 완료 후 최종 상태 정리
-    private func finalizeProgressCompletion(model: String) async {
-        await MainActor.run {
-            // 취소 중 상태 해제
-            self.modelManagementState.cancellingModels.remove(model)
-            self.modelDownloadLastProgressCallbackTime.removeValue(forKey: model)
-            self.modelDownloadLastProgressUIUpdateTime.removeValue(forKey: model)
-            self.modelDownloadProgressObjects.removeValue(forKey: model)
-            self.modelManagementState.currentDownloadingModels.remove(model)
-
-            // 다운로드 관련 상태 정리
-            self.modelManagementState.downloadProgress[model] = nil
-            self.modelDownloadTasks[model] = nil
-            self.modelManagementState.untrackDownloadRequest(model)
-            self.downloadCancellationMonitorTasks.removeValue(forKey: model)
-
-            // 모든 다운로드가 완료되었는지 확인
-            print("Progress completion confirmed - Cancelling UI released: \(model)")
-            self.startNextQueuedDownloadIfPossible()
-            self.updateDownloadActivityState()
-        }
-
-        // 부분 다운로드 파일 정리
-        await cleanupPartialDownload(model)
     }
 
     // MARK: - 파일 선택 및 처리
@@ -2582,20 +2905,27 @@ class ContentViewModel: ObservableObject {
     func handleFilePicker(result: Result<[URL], Error>) {
         switch result {
         case let .success(urls):
-            guard !urls.isEmpty else { return }
+            guard !urls.isEmpty, confirmDiscardingUnsavedChanges() else { return }
             if urls.count > 1 {
                 setBatchQueue(urls, needsSecurityScopedAccess: true)
+            } else {
+                clearBatchQueue()
             }
 
             guard let selectedFileURL = urls.first else { return }
-            Task {
+            let operationID = beginAudioImportOperation()
+            Task { [weak self] in
+                guard let self else { return }
                 if urls.count > 1 {
-                    await loadBatchItem(at: 0)
+                    await self.processSelectedFile(
+                        selectedFileURL, needsSecurityScopedAccess: true,
+                        batchIndex: 0, operationID: operationID
+                    )
                 } else {
-                    clearBatchQueue()
-                    await processSelectedFile(
+                    await self.processSelectedFile(
                         selectedFileURL,
-                        needsSecurityScopedAccess: true
+                        needsSecurityScopedAccess: true,
+                        operationID: operationID
                     )
                 }
             }
@@ -2606,6 +2936,7 @@ class ContentViewModel: ObservableObject {
     }
 
     func setBatchQueue(_ urls: [URL], needsSecurityScopedAccess: Bool) {
+        cancelAudioImport()
         batchQueue = urls.map { url in
             BatchImportItem(
                 url: url,
@@ -2622,17 +2953,19 @@ class ContentViewModel: ObservableObject {
     }
 
     func clearBatchQueue() {
+        cancelAudioImport()
         batchQueue = []
         currentBatchIndex = nil
     }
 
-    func loadBatchItem(at index: Int) async {
+    func loadBatchItem(at index: Int, confirmingChanges: Bool = true) async {
         guard batchQueue.indices.contains(index) else { return }
-        currentBatchIndex = index
+        guard !confirmingChanges || confirmDiscardingUnsavedChanges() else { return }
         let item = batchQueue[index]
         await processSelectedFile(
             item.url,
-            needsSecurityScopedAccess: item.needsSecurityScopedAccess
+            needsSecurityScopedAccess: item.needsSecurityScopedAccess,
+            batchIndex: index
         )
     }
 
@@ -2662,6 +2995,7 @@ class ContentViewModel: ObservableObject {
 
     func removeBatchItem(at index: Int) {
         guard batchQueue.indices.contains(index) else { return }
+        cancelAudioImport()
         batchQueue.remove(at: index)
 
         if batchQueue.isEmpty {
@@ -2671,19 +3005,74 @@ class ContentViewModel: ObservableObject {
         }
     }
 
-    /// 선택된 파일 처리 (비동기 작업)
-    @MainActor
-    private func processSelectedFile(
-        _ selectedFileURL: URL,
-        needsSecurityScopedAccess: Bool
-    ) async {
-        do {
-            let importedAudio = try await Self.prepareAudioImport(
-                from: selectedFileURL,
-                needsSecurityScopedAccess: needsSecurityScopedAccess
-            )
+    private func cancelAudioImport() {
+        audioImportTask?.cancel()
+        audioImportTask = nil
+        activeAudioImportID = nil
+        audioImportSnapshot = nil
+    }
 
+    func beginAudioImportOperation() -> UUID {
+        cancelAudioImport()
+        let operationID = UUID()
+        activeAudioImportID = operationID
+        audioImportSnapshot = makeCurrentProjectSnapshot()
+        return operationID
+    }
+
+    /// Prepare off-main and publish a complete import only while it still owns the document.
+    @MainActor
+    func processSelectedFile(
+        _ selectedFileURL: URL,
+        needsSecurityScopedAccess: Bool,
+        batchIndex: Int? = nil,
+        operationID requestedOperationID: UUID? = nil
+    ) async {
+        let operationID = requestedOperationID ?? beginAudioImportOperation()
+        guard activeAudioImportID == operationID else { return }
+        let originalSnapshot = audioImportSnapshot
+        let prepare = audioImportPreparer
+        let task = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try await prepare(selectedFileURL, needsSecurityScopedAccess)
+        }
+        audioImportTask = task
+        defer {
+            if activeAudioImportID == operationID {
+                activeAudioImportID = nil
+                audioImportTask = nil
+                audioImportSnapshot = nil
+            }
+        }
+        do {
+            let importedAudio = try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+            var committed = false
+            defer {
+                if !committed { try? FileManager.default.removeItem(at: importedAudio.localURL) }
+            }
+            guard activeAudioImportID == operationID, !task.isCancelled, !Task.isCancelled else { return }
+            let audioAsset = AVURLAsset(url: importedAudio.localURL)
+            let duration = try? await audioAsset.load(.duration)
+            guard activeAudioImportID == operationID, !task.isCancelled, !Task.isCancelled else { return }
+            guard makeCurrentProjectSnapshot() == originalSnapshot else {
+                showUserMessage(.warning, title: "Import Failed",
+                                detail: "The transcript changed during import. Your current work was kept.")
+                return
+            }
+            if let batchIndex {
+                guard batchQueue.indices.contains(batchIndex),
+                      batchQueue[batchIndex].url == selectedFileURL else { return }
+            }
+
+            activeAudioImportID = nil
+            audioImportTask = nil
             resetState()
+            committed = true
+            if let batchIndex { currentBatchIndex = batchIndex }
 
             // 임시 파일 URL 저장 (나중에 정리용)
             audioState.temporaryAudioURL = importedAudio.localURL
@@ -2694,12 +3083,10 @@ class ContentViewModel: ObservableObject {
 
             // 파일을 임포트한 후 바로 총 재생 시간을 확인하고 업데이트
             do {
-                let audioAsset = AVURLAsset(url: importedAudio.localURL)
-                let duration = try await audioAsset.load(.duration)
-                let durationInSeconds = CMTimeGetSeconds(duration)
+                let durationInSeconds = duration.map(CMTimeGetSeconds) ?? 0
 
                 // 재생 시간 업데이트 (재생 시작 전에 미리 설정)
-                audioState.totalDuration = durationInSeconds
+                audioState.totalDuration = durationInSeconds.isFinite ? max(0, durationInSeconds) : 0
                 audioPlayer?.currentTime = 0.0
                 print("Audio file duration: \(durationInSeconds) seconds")
 
@@ -2749,6 +3136,8 @@ class ContentViewModel: ObservableObject {
             updateNormalizationFactor(for: importedAudio.localURL)
             startWaveformProcessing(for: importedAudio.localURL)
         } catch {
+            guard activeAudioImportID == operationID,
+                  !task.isCancelled, !Task.isCancelled, !(error is CancellationError) else { return }
             print("File selection error: \(error.localizedDescription)")
             showUserMessage(.error, title: "Import Failed", detail: error.localizedDescription)
         }
@@ -2819,18 +3208,21 @@ class ContentViewModel: ObservableObject {
 
     /// 파일 전사 시작
     func transcribeFile(path: String) {
+        guard confirmDiscardingUnsavedChanges() else { return }
         resetState(preservingImportedAudio: true)
         stopImportedAudio()
         whisperKit?.audioProcessor = AudioProcessor()
         let taskID = UUID()
         activeTranscribeTaskID = taskID
         transcribeTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self,
+                  !Task.isCancelled,
+                  self.activeTranscribeTaskID == taskID else { return }
             self.audioState.isTranscribing = true
             self.showUserMessage(.info, title: "Transcribing", detail: self.audioState.audioFileName)
             defer {
-                self.audioState.isTranscribing = false
                 if self.activeTranscribeTaskID == taskID {
+                    self.audioState.isTranscribing = false
                     self.transcribeTask = nil
                     self.activeTranscribeTaskID = nil
                 }
@@ -2839,8 +3231,10 @@ class ContentViewModel: ObservableObject {
             do {
                 try await self.transcribeCurrentFile(path: path)
             } catch is CancellationError {
+                guard self.activeTranscribeTaskID == taskID else { return }
                 self.showUserMessage(.info, title: "Transcription Cancelled")
             } catch {
+                guard self.activeTranscribeTaskID == taskID else { return }
                 print("Transcription error: \(error.localizedDescription)")
                 self.showUserMessage(
                     .error,
@@ -2855,15 +3249,18 @@ class ContentViewModel: ObservableObject {
     func transcribeCurrentFile(path: String) async throws {
         Logging.debug("Loading audio file: \(path)")
         let loadingStart = Date()
-        let audioFileSamples = try await Task.detached(priority: .userInitiated) {
+        let audioFileSamples = try await CancellableAudioWork.run {
             try autoreleasepool {
                 try AudioProcessor.loadAudioAsFloatArray(fromPath: path)
             }
-        }.value
+        }
+        try Task.checkCancellation()
         Logging.debug("Loaded audio file in \(Date().timeIntervalSince(loadingStart)) seconds")
 
         let transcription = try await transcribeAudioSamples(audioFileSamples)
+        try Task.checkCancellation()
         let shouldRunSpeakerDiarization = enableSpeakerDiarization &&
+            isSpeakerDiarizationAvailable &&
             (transcription?.segments.isEmpty == false)
 
         await MainActor.run {
@@ -2884,6 +3281,7 @@ class ContentViewModel: ObservableObject {
             transcriptionState.speakerAssignments = Array(repeating: nil, count: segments.count)
             transcriptionState.speakerNames = [:]
             transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            uiState.isSubtitleEditing = false
             refreshSubtitleQualityIssues()
             showUserMessage(
                 .success,
@@ -2901,82 +3299,157 @@ class ContentViewModel: ObservableObject {
 
     private func runSpeakerDiarizationIfEnabled(audioSamples: [Float]) async {
         guard enableSpeakerDiarization,
+              isSpeakerDiarizationAvailable,
               !transcriptionState.confirmedSegments.isEmpty else {
             return
         }
 
-        guard let modelRoot = SpeakerDiarizationModelStore.defaultRootURL() else {
-            transcriptionState.speakerDiarization = SpeakerDiarizationState(
-                errorMessage: "Document directory not found."
-            )
-            showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: "Document directory not found.")
-            return
+        guard let task = beginSpeakerDiarization(audioSamplesProvider: {
+            audioSamples
+        }) else { return }
+        await task.value
+    }
+
+    @discardableResult
+    func beginSpeakerDiarization(
+        audioSamplesProvider: @escaping @Sendable () async throws -> [Float]
+    ) -> Task<Void, Never>? {
+        guard enableSpeakerDiarization,
+              isSpeakerDiarizationAvailable,
+              !transcriptionState.confirmedSegments.isEmpty else { return nil }
+
+        cancelActiveSpeakerDiarizationTask()
+        guard let modelRoot = speakerModelRootURL else { return nil }
+        if speakerAnalyzer == nil { refreshSpeakerDiarizationModelState() }
+        guard isSpeakerDiarizationAvailable else {
+            showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: "Speaker model is not ready.")
+            return nil
         }
 
-        refreshSpeakerDiarizationModelState()
-        guard modelManagementState.isSpeakerDiarizationModelReady else {
-            let detail = modelManagementState.isSpeakerDiarizationModelPreparing
-                ? "Speaker model is still preparing."
-                : (modelManagementState.speakerDiarizationModelError ?? "Speaker model is not ready.")
-            transcriptionState.speakerDiarization = SpeakerDiarizationState(errorMessage: detail)
+        let service = SpeakerDiarizationService(modelRootURL: modelRoot)
+        let analyze: SpeakerAnalyzer = speakerAnalyzer ?? { samples, count, progress in
+            try await service.diarize(audioSamples: samples, expectedSpeakerCount: count, progressHandler: progress)
+        }
+        let expectedSpeakerCount = speakerDiarizationExpectedSpeakerCount()
+        let originalSnapshot = makeCurrentProjectSnapshot()
+        let segments = transcriptionState.confirmedSegments
+        let previousStatus = transcriptionState.speakerDiarization
+        previousSpeakerDiarizationStatus = previousStatus
+        let operationID = UUID()
+        activeSpeakerDiarizationTaskID = operationID
+        transcriptionState.speakerDiarization.isRunning = true
+        transcriptionState.speakerDiarization.progress = 0
+        transcriptionState.speakerDiarization.errorMessage = nil
+        showUserMessage(.info, title: "Analyzing Speakers", detail: audioState.audioFileName)
+
+        let task = Task { [weak self] in
+            defer {
+                if self?.activeSpeakerDiarizationTaskID == operationID {
+                    self?.transcriptionState.speakerDiarization.isRunning = false
+                    self?.speakerDiarizationTask = nil
+                    self?.activeSpeakerDiarizationTaskID = nil
+                    self?.previousSpeakerDiarizationStatus = nil
+                }
+            }
+
+            do {
+                let audioSamples = try await audioSamplesProvider()
+                try Task.checkCancellation()
+                let timeline = try await analyze(audioSamples, expectedSpeakerCount) { [weak self] progress in
+                    let value = progress.fractionCompleted.isFinite ? progress.fractionCompleted : 0
+                    Task { @MainActor [weak self] in
+                        guard let self, self.activeSpeakerDiarizationTaskID == operationID else { return }
+                        self.transcriptionState.speakerDiarization.progress = min(max(value, 0), 1)
+                    }
+                }
+                try Task.checkCancellation()
+                self?.publishSpeakerDiarizationResult(
+                    timeline, segments: segments, originalSnapshot: originalSnapshot,
+                    operationID: operationID, previousStatus: previousStatus
+                )
+            } catch is CancellationError {
+                guard self?.activeSpeakerDiarizationTaskID == operationID else { return }
+                self?.transcriptionState.speakerDiarization = previousStatus
+            } catch {
+                guard let self, self.activeSpeakerDiarizationTaskID == operationID else { return }
+                self.transcriptionState.speakerDiarization = previousStatus
+                guard !Task.isCancelled else { return }
+                var detail: String? = error.localizedDescription
+                if case let .modelUnavailable(failure) = error as? SpeakerDiarizationServiceError {
+                    if failure.rootURL == modelRoot, let remainingFailure = failure.remainingFailure {
+                        self.speakerModelIntegrityFailure = remainingFailure
+                        self.refreshSpeakerDiarizationModelState()
+                    } else {
+                        detail = nil
+                    }
+                }
+                self.transcriptionState.speakerDiarization.errorMessage = detail
+                self.showUserMessage(
+                    .warning,
+                    title: "Speaker Analysis Failed",
+                    detail: detail
+                )
+            }
+        }
+        speakerDiarizationTask = task
+        return task
+    }
+
+    private func publishSpeakerDiarizationResult(
+        _ timelineSegments: [SpeakerTimelineSegment],
+        segments: [TranscriptionSegment],
+        originalSnapshot: ProjectSnapshot?,
+        operationID: UUID,
+        previousStatus: SpeakerDiarizationState
+    ) {
+        guard activeSpeakerDiarizationTaskID == operationID,
+              enableSpeakerDiarization else { return }
+        guard makeCurrentProjectSnapshot() == originalSnapshot else {
+            let detail = "The transcript changed during speaker analysis. Previous speaker labels were kept."
+            transcriptionState.speakerDiarization = previousStatus
+            transcriptionState.speakerDiarization.errorMessage = detail
+            showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: detail)
+            return
+        }
+        guard !timelineSegments.isEmpty,
+              timelineSegments.allSatisfy({ Self.normalizedSpeakerID($0.speakerID) != nil }) else {
+            let detail = timelineSegments.isEmpty ? "No speakers detected." :
+                "Too many speakers detected. Previous speaker labels were kept."
+            transcriptionState.speakerDiarization = previousStatus
+            transcriptionState.speakerDiarization.errorMessage = detail
             showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: detail)
             return
         }
 
-        transcriptionState.speakerDiarization = SpeakerDiarizationState(isRunning: true)
-        showUserMessage(.info, title: "Analyzing Speakers", detail: audioState.audioFileName)
+        let assignments = SpeakerAssignmentMapper.assignments(
+            for: segments,
+            from: timelineSegments
+        )
+        let names = SpeakerAssignmentMapper.reconciledNames(
+            from: transcriptionState.speakerAssignments,
+            names: transcriptionState.speakerNames,
+            to: assignments
+        )
+        let namesNeedReview = names.count < transcriptionState.speakerNames.count
+        let speakerCount = Set(timelineSegments.map(\.speakerID)).count
+        transcriptionState.speakerAssignments = assignments
+        transcriptionState.speakerNames = names
+        transcriptionState.speakerDiarization = SpeakerDiarizationState(
+            isRunning: false,
+            progress: 1,
+            detectedSpeakerCount: speakerCount,
+            errorMessage: namesNeedReview ? "Speaker names need review after reanalysis." : nil
+        )
+        refreshSubtitleQualityIssues()
 
-        let service = SpeakerDiarizationService(modelRootURL: modelRoot)
-        let expectedSpeakerCount = speakerDiarizationExpectedSpeakerCount()
-        do {
-            let timelineSegments = try await service.diarize(
-                audioSamples: audioSamples,
-                expectedSpeakerCount: expectedSpeakerCount
-            ) { [weak self] progress in
-                let progressValue = progress.fractionCompleted.isFinite ? progress.fractionCompleted : 0
-                Task { @MainActor [weak self] in
-                    guard let self,
-                          self.transcriptionState.speakerDiarization.isRunning else {
-                        return
-                    }
-                    self.transcriptionState.speakerDiarization.progress = min(max(progressValue, 0), 1)
-                }
-            }
-            try Task.checkCancellation()
-
-            let assignments = SpeakerAssignmentMapper.assignments(
-                for: transcriptionState.confirmedSegments,
-                from: timelineSegments
-            )
-            let speakerCount = Set(timelineSegments.map(\.speakerID)).count
-            transcriptionState.speakerAssignments = assignments
-            transcriptionState.speakerDiarization = SpeakerDiarizationState(
-                isRunning: false,
-                progress: 1,
-                detectedSpeakerCount: speakerCount,
-                errorMessage: speakerCount == 0 ? "No speakers detected." : nil
-            )
-
-            let assignedCount = assignments.compactMap { $0 }.count
-            showUserMessage(
-                speakerCount > 0 ? .success : .warning,
-                title: speakerCount > 0 ? "Speakers Ready" : "No Speakers Detected",
-                detail: speakerCount > 0
-                    ? "\(speakerCount) speaker(s), \(assignedCount) labeled segment(s)."
-                    : nil
-            )
-        } catch is CancellationError {
-            transcriptionState.speakerDiarization.isRunning = false
-        } catch {
-            transcriptionState.speakerDiarization = SpeakerDiarizationState(
-                errorMessage: error.localizedDescription
-            )
-            showUserMessage(
-                .warning,
-                title: "Speaker Analysis Failed",
-                detail: error.localizedDescription
-            )
-        }
+        let assignedCount = assignments.compactMap { $0 }.count
+        showUserMessage(
+            speakerCount > 0 ? .success : .warning,
+            title: speakerCount > 0 ? "Speakers Ready" : "No Speakers Detected",
+            detail: speakerCount > 0
+                ? "\(speakerCount) speaker(s), \(assignedCount) labeled segment(s)."
+                : nil
+        )
     }
 
     func updateTranscriptionSegmentText(at index: Int, text: String) {
@@ -2991,6 +3464,21 @@ class ContentViewModel: ObservableObject {
         result.segments[index].text = text
         result.segments[index].words = nil
         refreshSubtitleQualityIssues()
+    }
+
+    func beginSubtitleEditing() {
+        guard !transcriptionState.confirmedSegments.isEmpty else { return }
+        uiState.isSubtitleEditing = true
+        uiState.focusedSubtitleSegmentIndex = nil
+    }
+
+    func applySubtitleEdits() {
+        transcriptionResult?.text = transcriptionState.confirmedSegments
+            .map(\.text)
+            .joined(separator: " ")
+        refreshSubtitleQualityIssues()
+        uiState.isSubtitleEditing = false
+        uiState.focusedSubtitleSegmentIndex = nil
     }
 
     @discardableResult
@@ -3104,6 +3592,7 @@ class ContentViewModel: ObservableObject {
         _ sidecar: CaptionMateSidecar,
         sourceURL _: URL? = nil
     ) {
+        cancelActiveSpeakerDiarizationTask()
         let restoredSegments = sidecar.segments.map { segment in
             TranscriptionSegment(
                 start: segment.start,
@@ -3121,15 +3610,18 @@ class ContentViewModel: ObservableObject {
         )
         transcriptionState.currentText = ""
         transcriptionState.confirmedSegments = restoredSegments
+        uiState.isSubtitleEditing = false
         transcriptionState.speakerAssignments = sidecar.segments.map { segment in
             Self.normalizedSpeakerID(segment.speakerID).map(SpeakerSegmentAssignment.init)
         }
-        transcriptionState.speakerNames = Dictionary(
-            uniqueKeysWithValues: sidecar.speakerNames.compactMap { key, value in
-                guard let speakerID = Self.normalizedSpeakerID(Int(key)) else { return nil }
-                return (speakerID, value)
+        var restoredSpeakerNames: [Int: String] = [:]
+        for (key, value) in sidecar.speakerNames.sorted(by: { $0.key < $1.key }) {
+            guard let speakerID = Self.normalizedSpeakerID(Int(key)) else { continue }
+            if restoredSpeakerNames[speakerID] == nil || key == String(speakerID) {
+                restoredSpeakerNames[speakerID] = value
             }
-        )
+        }
+        transcriptionState.speakerNames = restoredSpeakerNames
 
         let preset = SubtitleExportPreset(rawValue: sidecar.exportSettings.selectedExportPreset)
         if let preset {
@@ -3169,6 +3661,7 @@ class ContentViewModel: ObservableObject {
     }
 
     func setSpeakerName(_ name: String, for speakerID: Int) {
+        guard Self.normalizedSpeakerID(speakerID) != nil else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmedName.isEmpty {
             transcriptionState.speakerNames.removeValue(forKey: speakerID)
@@ -3180,23 +3673,34 @@ class ContentViewModel: ObservableObject {
 
     func setSpeakerAssignment(at index: Int, speakerID: Int?) {
         guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+        guard speakerID == nil || Self.normalizedSpeakerID(speakerID) != nil else { return }
         normalizeSpeakerAssignmentCount()
         transcriptionState.speakerAssignments[index] = speakerID.map(SpeakerSegmentAssignment.init)
         refreshSubtitleQualityIssues()
     }
 
     func setSpeakerDiarizationEnabled(_ enabled: Bool) {
-        enableSpeakerDiarization = enabled
         if enabled {
-            prepareDefaultSpeakerDiarizationModelIfNeeded()
+            guard isSpeakerDiarizationAvailable else {
+                enableSpeakerDiarization = false
+                let detail = modelManagementState.isSpeakerDiarizationModelPreparing
+                    ? "Speaker model is still preparing."
+                    : (modelManagementState.speakerDiarizationModelError ??
+                        "Speaker model is not ready.")
+                showUserMessage(
+                    .warning,
+                    title: "Speaker Analysis Unavailable",
+                    detail: detail
+                )
+                refreshSubtitleQualityIssues()
+                return
+            }
+
+            enableSpeakerDiarization = true
         } else {
+            enableSpeakerDiarization = false
             cancelActiveSpeakerDiarizationTask()
             transcriptionState.speakerDiarization = SpeakerDiarizationState()
-            transcriptionState.speakerAssignments = Array(
-                repeating: nil,
-                count: transcriptionState.confirmedSegments.count
-            )
-            transcriptionState.speakerNames = [:]
         }
         refreshSubtitleQualityIssues()
     }
@@ -3214,42 +3718,28 @@ class ContentViewModel: ObservableObject {
 
         guard !transcriptionState.speakerDiarization.isRunning else { return }
 
-        enableSpeakerDiarization = true
-        prepareDefaultSpeakerDiarizationModelIfNeeded()
+        guard isSpeakerDiarizationAvailable else {
+            let detail = modelManagementState.isSpeakerDiarizationModelPreparing
+                ? "Speaker model is still preparing."
+                : (modelManagementState.speakerDiarizationModelError ??
+                    "Speaker model is not ready.")
+            showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: detail)
+            return
+        }
 
-        let taskID = UUID()
-        activeSpeakerDiarizationTaskID = taskID
-        speakerDiarizationTask?.cancel()
-        speakerDiarizationTask = Task { [weak self] in
-            guard let self else { return }
-            defer {
-                if self.activeSpeakerDiarizationTaskID == taskID {
-                    self.speakerDiarizationTask = nil
-                    self.activeSpeakerDiarizationTaskID = nil
+        enableSpeakerDiarization = true
+
+        beginSpeakerDiarization {
+            try await CancellableAudioWork.run {
+                try autoreleasepool {
+                    try AudioProcessor.loadAudioAsFloatArray(fromPath: audioURL.path)
                 }
             }
-
-            do {
-                let audioSamples = try await Task.detached(priority: .userInitiated) {
-                    try autoreleasepool {
-                        try AudioProcessor.loadAudioAsFloatArray(fromPath: audioURL.path)
-                    }
-                }.value
-                try Task.checkCancellation()
-                await self.runSpeakerDiarizationIfEnabled(audioSamples: audioSamples)
-            } catch is CancellationError {
-                self.transcriptionState.speakerDiarization.isRunning = false
-            } catch {
-                self.transcriptionState.speakerDiarization = SpeakerDiarizationState(
-                    errorMessage: error.localizedDescription
-                )
-                self.showUserMessage(
-                    .warning,
-                    title: "Speaker Analysis Failed",
-                    detail: error.localizedDescription
-                )
-            }
         }
+    }
+
+    func cancelSpeakerDiarization() {
+        cancelActiveSpeakerDiarizationTask()
     }
 
     func subtitleSearchMatchCount() -> Int {
@@ -3358,6 +3848,7 @@ class ContentViewModel: ObservableObject {
 
     func focusSubtitleIssue(_ issue: SubtitleQualityIssue) {
         uiState.showSubtitleReview = false
+        uiState.isSubtitleEditing = true
         uiState.focusedSubtitleSegmentIndex = issue.segmentIndex
     }
 
@@ -3870,15 +4361,35 @@ class ContentViewModel: ObservableObject {
             concurrentWorkerCount: Int(concurrentWorkerCount),
             chunkingStrategy: chunkingStrategy
         )
+        let decodingCallback: TranscriptionCallback? = makeDecodingCallback(task: task, options: options)
+        let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
+            audioArray: samples,
+            decodeOptions: options,
+            callback: decodingCallback
+        )
+        return TranscriptionUtilities.mergeTranscriptionResults(
+            transcriptionResults,
+            confirmedWords: []
+        )
+    }
+
+    private func makeDecodingCallback(
+        task: DecodingTask,
+        options: DecodingOptions
+    ) -> TranscriptionCallback {
+        let operationID = activeTranscribeTaskID
         let compressionCheckWindow = Int(compressionCheckWindow)
         let compressionRatioThreshold = options.compressionRatioThreshold
         let logProbThreshold = options.logProbThreshold
 
-        let decodingCallback: TranscriptionCallback? = { [weak self] progress in
+        return { [weak self] progress in
             guard let self else { return false }
 
             DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
+                guard let self,
+                      let operationID,
+                      self.activeTranscribeTaskID == operationID,
+                      self.transcribeTask?.isCancelled == false else { return }
                 let now = Date()
                 guard now.timeIntervalSince(self.lastDecoderPreviewUpdate) >= 0.12 else {
                     return
@@ -3886,7 +4397,7 @@ class ContentViewModel: ObservableObject {
                 self.lastDecoderPreviewUpdate = now
 
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                let chunkId = self.selectedTask == "transcribe" ? 0 : progress.windowId
+                let chunkId = task == .transcribe ? 0 : progress.windowId
                 var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
                 if var currentChunk = self.transcriptionState.currentChunks[chunkId],
                    let previousChunkText = currentChunk.chunkText.last {
@@ -3894,8 +4405,7 @@ class ContentViewModel: ObservableObject {
                         currentChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
                         updatedChunk = currentChunk
                     } else {
-                        if fallbacks == currentChunk.fallbacks && self
-                            .selectedTask == "transcribe" {
+                        if fallbacks == currentChunk.fallbacks && task == .transcribe {
                             updatedChunk
                                 .chunkText = [(updatedChunk.chunkText.first ?? "") + progress.text]
                         } else {
@@ -3933,17 +4443,6 @@ class ContentViewModel: ObservableObject {
             }
             return nil
         }
-
-        let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
-            audioArray: samples,
-            decodeOptions: options,
-            callback: decodingCallback
-        )
-        let mergedResults = TranscriptionUtilities.mergeTranscriptionResults(
-            transcriptionResults,
-            confirmedWords: []
-        )
-        return mergedResults
     }
 
     // MARK: - Audio Preview & Deletion
@@ -4131,6 +4630,8 @@ class ContentViewModel: ObservableObject {
     }
 
     func deleteImportedAudio() {
+        cancelAudioImport()
+        cancelActiveSpeakerDiarizationTask()
         // 재생 중이면 먼저 정지
         stopImportedAudio()
         cancelAudioProcessingTasks()
@@ -4213,9 +4714,7 @@ class ContentViewModel: ObservableObject {
             try Task.checkCancellation()
             // 현재 파형 샘플이 비어있지 않으면 초기화 (새 파일용)
             if !audioState.waveformSamples.isEmpty {
-                await MainActor.run {
-                    audioState.waveformSamples = []
-                }
+                audioState.waveformSamples = []
             }
 
             // 오디오 파일 정보 업데이트 (임포트 직후에도 실행)
@@ -4223,41 +4722,30 @@ class ContentViewModel: ObservableObject {
                 let audioAsset = AVURLAsset(url: url)
                 let duration = try await audioAsset.load(.duration)
                 let durationInSeconds = CMTimeGetSeconds(duration)
-
-                await MainActor.run {
-                    audioState.totalDuration = durationInSeconds
-                }
+                try Task.checkCancellation()
+                guard audioState.importedAudioURL == url else { return }
+                audioState.totalDuration = durationInSeconds
             }
 
             // 파형은 작은 버퍼 단위로 읽어 전체 오디오 샘플 배열을 추가로 만들지 않는다.
-            let waveformSamples = try await Task.detached(priority: .userInitiated) {
+            let waveformSamples = try await CancellableAudioWork.run {
                 try autoreleasepool {
                     try Self.computeWaveform(fromAudioURL: url)
                 }
-            }.value
+            }
             try Task.checkCancellation()
 
-            // 파형 상태 업데이트
-            await MainActor.run {
-                guard audioState.importedAudioURL == url else { return }
-
-                // 모든 정보 업데이트 (동시에 한 번에 갱신)
-                audioState.waveformSamples = waveformSamples
-                audioState.isWaveformProcessing = false
-
-                // 디버그 로그
-                print(
-                    "Waveform update completed: \(waveformSamples.count) samples, total duration: \(audioState.totalDuration) seconds"
-                )
-            }
+            guard audioState.importedAudioURL == url else { return }
+            audioState.waveformSamples = waveformSamples
+            audioState.isWaveformProcessing = false
+            print(
+                "Waveform update completed: \(waveformSamples.count) samples, total duration: \(audioState.totalDuration) seconds"
+            )
         } catch is CancellationError {
-            if audioState.importedAudioURL == url {
-                audioState.isWaveformProcessing = false
-            }
+            // Reset or the replacement worker owns the current loading state.
         } catch {
-            if audioState.importedAudioURL == url {
-                audioState.isWaveformProcessing = false
-            }
+            guard !Task.isCancelled, audioState.importedAudioURL == url else { return }
+            audioState.isWaveformProcessing = false
             print("Error processing waveform: \(error.localizedDescription)")
         }
     }
@@ -4372,7 +4860,17 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - Export Service 호출
 
-    func exportTranscription(skipQualityReview: Bool = false) async {
+    func exportTranscription(
+        skipQualityReview: Bool = false,
+        exporter: (TranscriptionResult, String, Double) async -> ExportOutcome = { result, name, rate in
+            await ExportService.exportTranscriptionResult(result: result, defaultFileName: name, frameRate: rate)
+        }
+    ) async {
+        guard !isExporting, !audioState.isTranscribing else { return }
+        guard !transcriptionState.speakerDiarization.isRunning else {
+            showUserMessage(.info, title: "Analyzing Speakers")
+            return
+        }
         guard let result = transcriptionResult else {
             print("No transcription result available.")
             showUserMessage(.warning, title: "Nothing to Export")
@@ -4401,7 +4899,7 @@ class ContentViewModel: ObservableObject {
         // 세그먼트와 단어 처리: 앞뒤 공백 제거 후 빈 세그먼트 제거 등
         var cleanSegments: [TranscriptionSegment] = []
         let exportPreset = selectedExportPreset
-        for (index, segment) in result.segments.enumerated() {
+        for (index, segment) in transcriptionState.confirmedSegments.enumerated() {
             var cleanSegment = segment
             let speakerAssignment = speakerAssignment(forSegmentAt: index)
             cleanSegment.text = SpeakerLabelFormatter.prefixedText(
@@ -4453,20 +4951,22 @@ class ContentViewModel: ObservableObject {
             timings: result.timings,
             seekTime: result.seekTime
         )
-        let outcome = await ExportService.exportTranscriptionResult(
-            result: exportResult,
-            defaultFileName: audioState.audioFileName,
-            frameRate: frameRate
-        )
+        // The exporter can suspend while the user opens or edits another document.
+        let sidecar = makeCurrentProjectSidecar()
+        let outcome = await exporter(exportResult, audioState.audioFileName, frameRate)
 
         switch outcome {
         case let .success(path):
             do {
-                let sidecarURL = try writeCurrentSidecar(
-                    nextToExportedPath: path,
-                    language: result.language,
-                    timings: result.timings
-                )
+                let exportURL: URL
+                if let fileURL = URL(string: path), fileURL.isFileURL {
+                    exportURL = fileURL
+                } else {
+                    exportURL = URL(fileURLWithPath: path)
+                }
+                let sidecarURL = try sidecar.map {
+                    try CaptionMateSidecarService.write($0, nextToMediaURL: exportURL)
+                }
                 let detail = sidecarURL.map { "\(path)\nSidecar: \($0.path)" } ?? path
                 showUserMessage(.success, title: "Export Complete", detail: detail)
             } catch {
@@ -4483,60 +4983,29 @@ class ContentViewModel: ObservableObject {
         }
     }
 
-    private func writeCurrentSidecar(
-        nextToExportedPath path: String,
-        language: String,
-        timings: TranscriptionTimings
-    ) throws -> URL? {
-        guard !transcriptionState.confirmedSegments.isEmpty else {
-            return nil
-        }
-
-        let sidecarResult = TranscriptionResult(
-            text: transcriptionState.confirmedSegments.map(\.text).joined(separator: " "),
-            segments: transcriptionState.confirmedSegments,
-            language: language,
-            timings: timings
-        )
-        let sidecar = CaptionMateSidecar(
-            result: sidecarResult,
-            audioFileName: audioState.audioFileName,
-            speakerAssignments: transcriptionState.speakerAssignments,
-            speakerNames: transcriptionState.speakerNames,
-            selectedExportPreset: selectedExportPreset,
-            frameRate: frameRate,
-            includeSpeakerLabelsInExport: includeSpeakerLabelsInExport,
-            speakerDiarizationSpeakerCount: speakerDiarizationSpeakerCount
-        )
-        return try CaptionMateSidecarService.write(
-            sidecar,
-            nextToMediaURL: URL(fileURLWithPath: path)
-        )
-    }
-
     // MARK: - Drag and drop
 
     /// 파일 드래그 앤 드롭 메소드
     func handleDroppedFiles(providers: [NSItemProvider]) {
         // 첫 번째 파일만 처리
-        guard let provider = providers.first else { return }
+        guard let provider = providers.first, confirmDiscardingUnsavedChanges() else { return }
+        clearBatchQueue()
+        let operationID = beginAudioImportOperation()
 
         // 드래그 앤 드롭 상태 해제
-        DispatchQueue.main.async {
-            self.uiState.isTargeted = false
-        }
+        uiState.isTargeted = false
 
         provider
             .loadItem(forTypeIdentifier: UTType.fileURL.identifier,
                       options: nil) { [weak self] item, error in
-                guard let self = self else { return }
-
                 if let urlData = item as? Data,
                    let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                    Task { @MainActor in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.activeAudioImportID == operationID else { return }
                         await self.processSelectedFile(
                             url,
-                            needsSecurityScopedAccess: true
+                            needsSecurityScopedAccess: true,
+                            operationID: operationID
                         )
                     }
                 } else {
@@ -4567,7 +5036,7 @@ class ContentViewModel: ObservableObject {
             do {
                 let localSnapshot = try await Task.detached {
                     try ModelCatalogService.loadLocalModelFolders(modelStorage: modelStorage)
-                }.value
+            }.value
 
                 guard !Task.isCancelled else { return }
 
