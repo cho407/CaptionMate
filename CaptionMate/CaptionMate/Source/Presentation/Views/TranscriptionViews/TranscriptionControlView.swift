@@ -26,27 +26,21 @@ import SwiftUI
 struct TranscriptionControlView: View {
     @ObservedObject var viewModel: ContentViewModel
     let disableColor: Color = .brightGray
+    @State private var showDiagnostics = false
     var body: some View {
         VStack {
-            HStack {
-                Text(
-                    "\(viewModel.transcriptionState.effectiveRealTimeFactor, specifier: "%.3f") RTF"
-                )
-                .font(.body)
-                Spacer()
-                Text(
-                    "\(viewModel.transcriptionState.effectiveSpeedFactor, specifier: "%.1f") Speed Factor"
-                )
-                .font(.body)
-                .lineLimit(1)
-                Spacer()
-                Text("\(viewModel.transcriptionState.tokensPerSecond, specifier: "%.0f") tok/s")
-                    .font(.body)
-                Spacer()
-                Text(
-                    "First token: \(viewModel.transcriptionState.firstTokenTime - viewModel.transcriptionState.pipelineStart, specifier: "%.2f")s"
-                )
-                .font(.body)
+            DisclosureGroup("Decoder Diagnostics", isExpanded: $showDiagnostics) {
+                HStack(spacing: 12) {
+                    Text("\(viewModel.transcriptionState.effectiveRealTimeFactor, specifier: "%.3f") RTF")
+                    Spacer()
+                    Text("\(viewModel.transcriptionState.effectiveSpeedFactor, specifier: "%.1f") Speed Factor")
+                        .lineLimit(1)
+                    Spacer()
+                    Text("\(viewModel.transcriptionState.tokensPerSecond, specifier: "%.0f") tok/s")
+                    Spacer()
+                    Text("First token: \(viewModel.transcriptionState.firstTokenTime - viewModel.transcriptionState.pipelineStart, specifier: "%.2f")s")
+                }
+                .font(.caption.monospacedDigit())
             }
             .padding()
             .frame(maxWidth: .infinity)
@@ -73,9 +67,8 @@ struct TranscriptionControlView: View {
 
                 // 자막 내보내기 버튼
                 Button {
-                    Task {
-                        await viewModel.exportTranscription()
-                    }
+                    viewModel.refreshSubtitleQualityIssues()
+                    viewModel.uiState.showSubtitleReview = true
                 } label: {
                     HStack {
                         if viewModel.isExporting {
@@ -92,7 +85,7 @@ struct TranscriptionControlView: View {
                 }
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
                 .disabled(viewModel.transcriptionResult == nil || viewModel.isExporting ||
-                    viewModel.transcriptionState.speakerDiarization.isRunning)
+                    viewModel.isSpeakerDiarizationBusy)
                 .accessibilityIdentifier("transcription.exportButton")
             }
         }

@@ -411,11 +411,11 @@ open class WriteFCPXML: ResultWriting {
                     .filter { !$0.word.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
                 if validWords.isEmpty { continue }
                 let sortedWords = validWords.sorted { $0.start < $1.start }
-                for (index, wordTiming) in sortedWords.enumerated() {
+                for wordTiming in sortedWords {
                     let wordDuration = wordTiming.end - wordTiming.start
                     if wordDuration < 0.01 { continue }
 
-                    let wordStart = index == 0 ? segment.start : wordTiming.start
+                    let wordStart = wordTiming.start
 
                     let wordStartOffset = convertToFCPXMLTime(seconds: wordStart)
                     let wordDurationStr = convertToFCPXMLTime(seconds: wordTiming.end - wordTiming

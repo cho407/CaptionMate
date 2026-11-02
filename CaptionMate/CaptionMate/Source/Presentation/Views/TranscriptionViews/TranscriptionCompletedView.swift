@@ -62,6 +62,7 @@ struct TranscriptionReadBlock: Identifiable, Equatable {
 
 struct TranscriptionModeHeader: View {
     @ObservedObject var viewModel: ContentViewModel
+    @Environment(\.undoManager) private var undoManager
 
     private var title: LocalizedStringKey {
         viewModel.uiState.isSubtitleEditing
@@ -102,6 +103,20 @@ struct TranscriptionModeHeader: View {
                 Spacer()
 
                 if viewModel.uiState.isSubtitleEditing {
+                    Button { undoManager?.undo() } label: {
+                        Label("Undo", systemImage: "arrow.uturn.backward")
+                            .labelStyle(.iconOnly)
+                    }
+                    .disabled(undoManager?.canUndo != true)
+                    .help("Undo")
+                    .accessibilityIdentifier("transcription.undoButton")
+                    Button { undoManager?.redo() } label: {
+                        Label("Redo", systemImage: "arrow.uturn.forward")
+                            .labelStyle(.iconOnly)
+                    }
+                    .disabled(undoManager?.canRedo != true)
+                    .help("Redo")
+                    .accessibilityIdentifier("transcription.redoButton")
                     Button {
                         withAnimation(.easeInOut(duration: 0.16)) {
                             viewModel.applySubtitleEdits()
@@ -145,16 +160,25 @@ struct TranscriptionCompletedView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
-                if viewModel.enableSpeakerDiarization,
-                   viewModel.transcriptionState.speakerDiarization.isRunning ||
-                   viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
+                if viewModel.transcriptionState.speakerDiarization.isRunning ||
+                    viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
                     SpeakerDiarizationStatusView(viewModel: viewModel)
                 }
 
                 ForEach(readBlocks) { block in
                     VStack(alignment: .leading, spacing: 6) {
-                        if block.speakerID != nil || viewModel.enableTimestamps {
+                        if block.speakerID != nil || viewModel.enableTimestamps || viewModel.canPlayImportedAudio {
                             HStack(spacing: 10) {
+                                Button {
+                                    viewModel.playAudioRange(start: block.start, end: block.end)
+                                } label: {
+                                    Label("Replay Segment", systemImage: "play.circle")
+                                        .labelStyle(.iconOnly)
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(!viewModel.canPlayImportedAudio)
+                                .help("Replay Segment")
+                                .accessibilityIdentifier("transcription.replayBlock.\(block.id)")
                                 if let speakerID = block.speakerID {
                                     speakerLabel(for: speakerID)
                                         .accessibilityIdentifier(
@@ -178,7 +202,6 @@ struct TranscriptionCompletedView: View {
                             .lineSpacing(3)
                             .multilineTextAlignment(.leading)
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityLabel(Text(verbatim: block.text))
                             .accessibilityIdentifier(
                                 "transcription.completedText.\(block.id)"
                             )
@@ -202,7 +225,7 @@ struct TranscriptionCompletedView: View {
         }
         .background(Color.transcriptionBackground(for: colorScheme))
         .frame(maxWidth: .infinity)
-        .defaultScrollAnchor(.bottom)
+        .defaultScrollAnchor(.top)
         .textSelection(.enabled)
         .accessibilityIdentifier("transcription.completedView")
     }

@@ -157,8 +157,9 @@ struct CaptionMateApp: App {
 
     private func stabilizeWindowForUITestingIfNeeded() {
 #if DEBUG && os(macOS)
+        // Keep XCTest input and captures on one display in mixed-scale setups.
         guard ProcessInfo.processInfo.arguments.contains("-CaptionMateUITestResetDefaults"),
-              let screenFrame = NSScreen.main?.visibleFrame else {
+              let screenFrame = NSScreen.screens.first?.visibleFrame else {
             return
         }
 

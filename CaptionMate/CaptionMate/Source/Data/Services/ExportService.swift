@@ -34,33 +34,18 @@ enum ExportOutcome {
     case failure(Error)
 }
 
-private enum ExportServiceError: LocalizedError {
-    case unsupportedFileType
-
-    var errorDescription: String? {
-        switch self {
-        case .unsupportedFileType:
-            return "The selected subtitle file type is not supported."
-        }
-    }
-}
-
 struct ExportService {
     /// 파일 내보내기 함수
     static func exportTranscriptionResult(result: TranscriptionResult,
                                           defaultFileName: String = "Subtitle",
-                                          frameRate: Double = 30.0) async -> ExportOutcome {
-        // 모든 허용 UTType (추가된 파일 형식 포함)
-        let allowedContentTypes = SubtitleFileType.allCases.map { $0.utType }
-        // NSSavePanel을 통해 파일 저장 경로와 선택된 파일 형식을 받아옴
-        let (saveURL, selectedUTType) = await NSSavePanel.showSavePanel(
+                                          frameRate: Double = 30.0,
+                                          fileType: SubtitleFileType) async -> ExportOutcome {
+        let allowedContentTypes = [fileType.utType]
+        let (saveURL, _) = await NSSavePanel.showSavePanel(
             allowedFileTypes: allowedContentTypes,
             defaultFileName: defaultFileName
         )
-        guard let saveURL = saveURL,
-	              let selectedUTType = selectedUTType,
-	              let selectedFileType = SubtitleFileType.from(utType: selectedUTType) else {
-            print("Export cancelled or file type not selected")
+        guard let saveURL else {
             return .cancelled
         }
 
@@ -69,8 +54,8 @@ struct ExportService {
         let baseFileName = saveURL.deletingPathExtension().lastPathComponent
 
         // 선택된 파일 형식에 따라 적절한 writer 생성
-        var writer: ResultWriting?
-        switch selectedFileType {
+        let writer: any ResultWriting
+        switch fileType {
         case .srt:
             writer = WriteSRT(outputDir: outputDir)
         case .fcpxml:
@@ -85,18 +70,11 @@ struct ExportService {
             writer = WriteDOC(outputDir: outputDir)
         }
 
-        if let writer = writer {
-            let exportResult = writer.write(result: result, to: baseFileName, options: nil)
-            switch exportResult {
-            case let .success(path):
-                print("Export succeeded: \(path)")
-                return .success(path: path)
-            case let .failure(error):
-                print("Export failed: \(error.localizedDescription)")
-                return .failure(error)
-            }
+        switch writer.write(result: result, to: baseFileName, options: nil) {
+        case let .success(path):
+            return .success(path: path)
+        case let .failure(error):
+            return .failure(error)
         }
-
-        return .failure(ExportServiceError.unsupportedFileType)
     }
 }

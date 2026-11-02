@@ -18,7 +18,7 @@ import Foundation
 import WhisperKit
 
 struct CaptionMateSidecar: Codable, Equatable, Sendable {
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     let version: Int
     let audioFileName: String
@@ -32,6 +32,7 @@ struct CaptionMateSidecar: Codable, Equatable, Sendable {
         let end: Float
         let text: String
         let speakerID: Int?
+        var words: [WordTiming]? = nil
     }
 
     struct ExportSettings: Codable, Equatable, Sendable {
@@ -144,7 +145,8 @@ extension CaptionMateSidecar {
                 end: segment.end,
                 text: segment.text,
                 speakerID: speakerAssignments.indices.contains(index) ?
-                    speakerAssignments[index]?.speakerID : nil
+                    speakerAssignments[index]?.speakerID : nil,
+                words: segment.words
             )
         }
         self.speakerNames = Dictionary(

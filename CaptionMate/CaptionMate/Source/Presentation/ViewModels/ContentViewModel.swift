@@ -129,7 +129,8 @@ class ContentViewModel: ObservableObject {
     // The manual count picker is limited to eight; automatic detection can find more.
     private static let supportedSpeakerIDRange = 0 ..< 256
 
-    private var isLoadingModel = false
+    @Published private var isLoadingModel = false
+    @Published private var isReleasingModel = false
     private var activeTranscribeTaskID: UUID?
     private var transcribeTask: Task<Void, Never>?
     private var activeSpeakerDiarizationTaskID: UUID?
@@ -170,6 +171,8 @@ class ContentViewModel: ObservableObject {
     private let audioImportPreparer: AudioImportPreparer
     private var lastSavedProjectSnapshot: ProjectSnapshot?
     private var isConfirmingUnsavedChanges = false
+    weak var subtitleUndoManager: UndoManager?
+    private var playbackSegmentEnd: TimeInterval?
 
     private struct ProjectSnapshot: Equatable {
         let sidecar: CaptionMateSidecar
@@ -309,10 +312,7 @@ class ContentViewModel: ObservableObject {
     }
 
     func decodingCallbackForTesting() -> TranscriptionCallback {
-        makeDecodingCallback(
-            task: selectedTask == "transcribe" ? .transcribe : .translate,
-            options: DecodingOptions()
-        )
+        makeDecodingCallback(options: DecodingOptions())
     }
 #endif
 
@@ -335,6 +335,7 @@ class ContentViewModel: ObservableObject {
 
     /// Export 진행 여부
     @Published var isExporting: Bool = false
+    @Published var selectedExportFileType: SubtitleFileType = .srt
     @Published var batchQueue: [BatchImportItem] = []
     @Published var currentBatchIndex: Int?
 
@@ -395,7 +396,7 @@ class ContentViewModel: ObservableObject {
     // 기타 설정
     @AppStorage("encoderComputeUnits") var encoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
     @AppStorage("decoderComputeUnits") var decoderComputeUnits: MLComputeUnits = .cpuAndNeuralEngine
-    @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = false
+    @AppStorage("isAutoLanguageEnable") var isAutoLanguageEnable: Bool = true
     @Published var appLanguage: String = AppLanguageResolver.fallbackLanguageCode {
         didSet {
             guard oldValue != appLanguage else { return }
@@ -413,6 +414,16 @@ class ContentViewModel: ObservableObject {
     var selectedExportPreset: SubtitleExportPreset {
         get { SubtitleExportPreset(rawValue: selectedExportPresetRaw) ?? .general }
         set { selectedExportPresetRaw = newValue.rawValue }
+    }
+
+    var isTranscriptionBusy: Bool { transcribeTask != nil }
+    var isSpeakerDiarizationBusy: Bool { speakerDiarizationTask != nil }
+    var canChangeModel: Bool {
+        !audioState.isTranscribing && !isTranscriptionBusy && !isSpeakerDiarizationBusy &&
+            !isLoadingModel && !isReleasingModel && modelLoadTask == nil
+    }
+    var canPlayImportedAudio: Bool {
+        !audioState.isTranscribing && audioState.importedAudioURL != nil
     }
 
     var batchProgressText: String {
@@ -480,6 +491,10 @@ class ContentViewModel: ObservableObject {
         modelManagementState.isSpeakerDiarizationModelReady
     }
 
+    var canChangeSpeakerDiarization: Bool {
+        enableSpeakerDiarization || isSpeakerDiarizationAvailable
+    }
+
     // MARK: - Initialization
 
     private static let supportedAppLanguages: [AppLanguageOption] = [
@@ -545,6 +560,7 @@ class ContentViewModel: ObservableObject {
     private enum UITestArgument {
         static let resetDefaults = "-CaptionMateUITestResetDefaults"
         static let speakerFixture = "-CaptionMateUITestSpeakerFixture"
+        static let modelReadinessFixture = "-CaptionMateUITestModelReadinessFixture"
         static let disableModelDownloads = "-CaptionMateUITestDisableModelDownloads"
     }
 
@@ -659,17 +675,48 @@ class ContentViewModel: ObservableObject {
             detectedSpeakerCount: 2
         )
         audioState.audioFileName = "UITest Speaker Fixture"
-        audioState.importedAudioURL = FileManager.default.temporaryDirectory
+        let audioURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("CaptionMateUITestSpeakerFixture.wav")
-        audioState.totalDuration = 5.4
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1),
+              let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 480_000),
+              let samples = buffer.floatChannelData?[0] else {
+            fatalError("Could not create UI-test audio buffer")
+        }
+        buffer.frameLength = buffer.frameCapacity
+        samples.initialize(repeating: 0, count: Int(buffer.frameLength))
+        do {
+            let file = try AVAudioFile(forWriting: audioURL, settings: format.settings)
+            try file.write(from: buffer)
+        } catch {
+            fatalError("Could not write UI-test audio fixture: \(error)")
+        }
+        audioState.importedAudioURL = audioURL
+        audioState.totalDuration = 30
         uiState.isTranscribingView = true
         uiState.showFirstRunGuide = false
         uiState.isModelmanagerViewPresented = false
         refreshSubtitleQualityIssues()
+        if Self.launchArguments.contains(UITestArgument.modelReadinessFixture) {
+            enableSpeakerDiarization = false
+            modelManagementState.modelState = .loading
+            modelManagementState.speakerDiarizationModelState = .downloading
+            uiState.isTranscribingView = false
+        }
     }
 
     func activateSpeakerFixtureNavigationForUITestingIfNeeded() {
         guard Self.launchArguments.contains(UITestArgument.speakerFixture) else { return }
+        if Self.launchArguments.contains(UITestArgument.modelReadinessFixture) {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 10_000_000_000)
+                guard !Task.isCancelled else { return }
+                self?.modelManagementState.modelState = .loaded
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else { return }
+                self?.modelManagementState.speakerDiarizationModelState = .downloaded
+            }
+            return
+        }
 
         uiState.isTranscribingView = false
         Task { @MainActor [weak self] in
@@ -714,13 +761,16 @@ class ContentViewModel: ObservableObject {
     }
 
     func prepareRecommendedModelFromGuide() {
+        guard canChangeModel else { return }
         let recommendedModel = WhisperKit.recommendedModels().default
-        selectedModel = recommendedModel
+        pendingModelLoadAfterDownload = recommendedModel
         dismissFirstRunGuide()
-        prepareDefaultSpeakerDiarizationModelIfNeeded()
+        if enableSpeakerDiarization {
+            prepareDefaultSpeakerDiarizationModelIfNeeded()
+        }
 
         if modelManagementState.localModels.contains(recommendedModel) {
-            loadModel(recommendedModel)
+            loadPendingModelIfReady()
         } else {
             downloadModel(recommendedModel)
             showUserMessage(
@@ -1351,6 +1401,7 @@ class ContentViewModel: ObservableObject {
         cancelActiveTranscriptionTask()
         cancelActiveSpeakerDiarizationTask()
         stopImportedAudio()
+        subtitleUndoManager?.removeAllActions(withTarget: self)
         uiState.isTranscribingView = false
         audioState.isTranscribing = false
         whisperKit?.audioProcessor.stopRecording()
@@ -1404,9 +1455,8 @@ class ContentViewModel: ObservableObject {
     }
 
     private func cancelActiveTranscriptionTask() {
+        // The task owns its models until its terminal defer has run.
         transcribeTask?.cancel()
-        transcribeTask = nil
-        activeTranscribeTaskID = nil
     }
 
     var isTranscriptionProgressVisible: Bool {
@@ -1425,14 +1475,11 @@ class ContentViewModel: ObservableObject {
     }
 
     private func cancelActiveSpeakerDiarizationTask() {
-        speakerDiarizationTask?.cancel()
-        speakerDiarizationTask = nil
-        activeSpeakerDiarizationTaskID = nil
-        if let previousSpeakerDiarizationStatus {
-            transcriptionState.speakerDiarization = previousSpeakerDiarizationStatus
-        }
-        previousSpeakerDiarizationStatus = nil
-        transcriptionState.speakerDiarization.isRunning = false
+        guard let speakerDiarizationTask else { return }
+        speakerDiarizationTask.cancel()
+        // SpeakerKit 1.1.1 has no public operation-cancellation API. Keep the
+        // worker slot until analysis and model cleanup have actually returned.
+        transcriptionState.speakerDiarization.isCancelling = true
     }
 
     private func cancelAudioProcessingTasks() {
@@ -1587,76 +1634,26 @@ class ContentViewModel: ObservableObject {
 
     /// 모델 해제
     func releaseModel() async {
+        guard canChangeModel else { return }
+        isReleasingModel = true
+        defer { isReleasingModel = false }
         print("Starting model release: \(selectedModel)")
-
-        // 해제 프로세스 시작 상태 설정
-        await MainActor.run {
-            modelManagementState.modelState = .unloading
-            modelManagementState.loadingProgressValue = 0.0
-
-            // 에러 상태 초기화
-            modelManagementState.hasModelLoadError = false
-            modelManagementState.modelLoadError = nil
-        }
-
-        // 점진적인 진행률 업데이트를 위한 Task 시작
-        let releaseProgressTask = Task {
-            await updateProgressBar(startProgress: 0.0, targetProgress: 0.5, maxTime: 2.0)
-        }
-
-        // 백그라운드 작업 취소
+        modelManagementState.modelState = .unloading
+        modelManagementState.hasModelLoadError = false
+        modelManagementState.modelLoadError = nil
         cancelActiveTranscriptionTask()
         uiState.isTranscribingView = false
-
-        // 전사 관련 상태 초기화
         resetState()
 
-        // WhisperKit 인스턴스 해제
-        if let kit = whisperKit {
-            // 모델 언로드 호출로 내부 리소스 정리
-            releaseProgressTask.cancel() // 진행 작업 취소
-
-            // 모델 언로드 작업에 대한 새로운 진행률 표시 시작
-            let unloadProgressTask = Task {
-                await updateProgressBar(startProgress: 0.5, targetProgress: 0.9, maxTime: 2.0)
-            }
-
-            await kit.unloadModels()
-            unloadProgressTask.cancel()
-
-            // 인스턴스 해제 및 완료 진행률 표시
-            let finalProgressTask = Task {
-                await updateProgressBar(startProgress: 0.9, targetProgress: 1.0, maxTime: 0.5)
-            }
-
-            // 짧은 딜레이 후 최종 상태 설정
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-            finalProgressTask.cancel()
-
-            // 인스턴스 해제
-            await MainActor.run {
-                whisperKit = nil
-                modelManagementState.modelState = .unloaded
-                modelManagementState.loadingProgressValue = 0.0 // 마지막에 0으로 리셋
-                currentLoadedModel = ""
-                print("Model release completed: \(selectedModel)")
-            }
-        } else {
-            // WhisperKit 인스턴스가 없는 경우
-            releaseProgressTask.cancel()
-
-            try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-
-            await MainActor.run {
-                modelManagementState.modelState = .unloaded
-                modelManagementState.loadingProgressValue = 0.0
-                currentLoadedModel = ""
-            }
-        }
+        await whisperKit?.unloadModels()
+        whisperKit = nil
+        modelManagementState.modelState = .unloaded
+        currentLoadedModel = ""
+        print("Model release completed: \(selectedModel)")
     }
 
     func selectModel(_ model: String) {
-        guard !isLoadingModel, modelLoadTask == nil else { return }
+        guard canChangeModel else { return }
 
         if modelManagementState.localModels.contains(model) {
             selectedModel = model
@@ -1674,7 +1671,18 @@ class ContentViewModel: ObservableObject {
         }
     }
 
+    private func loadPendingModelIfReady() {
+        guard canChangeModel, let model = pendingModelLoadAfterDownload,
+              modelManagementState.localModels.contains(model) else { return }
+        let isRepair = pendingModelLoadIsRepair
+        pendingModelLoadAfterDownload = nil
+        pendingModelLoadIsRepair = false
+        selectedModel = model
+        loadModel(model, redownload: isRepair)
+    }
+
     func loadModel(_ model: String, redownload: Bool = false) {
+        guard canChangeModel else { return }
         if !modelManagementState.localModels.contains(model) {
             selectedModel = model
             pendingModelLoadAfterDownload = model
@@ -1693,8 +1701,7 @@ class ContentViewModel: ObservableObject {
         activeModelLoadTaskID = taskID
 
         // 상태 초기화
-        modelManagementState.modelState = .unloading
-        modelManagementState.loadingProgressValue = 0.0
+        modelManagementState.modelState = whisperKit == nil ? .loading : .unloading
 
         // 다운로드 진행률 초기화
         if redownload || !modelManagementState.localModels.contains(model) {
@@ -1714,22 +1721,6 @@ class ContentViewModel: ObservableObject {
                     self.isLoadingModel = false
                 }
             }
-            // 로딩 단계별 진행률 비율 설정 (초기화/프리워밍/로딩)
-            let initProgressRatio: Float = 0.9 // 초기화 단계
-            let prewarmProgressRatio: Float = 0.7 // 프리워밍 단계
-            let loadProgressRatio: Float = 1.0 // 로딩 단계
-
-            // 1. 초기화 단계 진행률 표시 시작
-            let initProgressTask = Task {
-                await self.updateProgressBar(
-                    startProgress: 0.0,
-                    targetProgress: initProgressRatio,
-                    maxTime: 2.0,
-                    modelLoadOperationID: taskID
-                )
-            }
-            defer { initProgressTask.cancel() }
-
             // 디스크 공간 확인 및 캐시 정리
             let diskSpace = self.checkDiskSpace()
             if !diskSpace.isEnough {
@@ -1751,12 +1742,7 @@ class ContentViewModel: ObservableObject {
                 self.resetCancelledModelLoadState(operationID: taskID)
                 return
             }
-
-            // 초기화 진행률 업데이트 작업 완료
-            initProgressTask.cancel()
-            await MainActor.run {
-                self.modelManagementState.loadingProgressValue = initProgressRatio
-            }
+            self.modelManagementState.modelState = .loading
 
             print("Selected model: \(model)")
             let computeOptions = self.getComputeOptions()
@@ -1800,7 +1786,6 @@ class ContentViewModel: ObservableObject {
                     self.modelManagementState
                         .modelLoadError =
                         "Model initialization failed: \(error.localizedDescription)"
-                    self.modelManagementState.loadingProgressValue = 0.0
                     self.isLoadingModel = false
                 }
                 return
@@ -1812,7 +1797,6 @@ class ContentViewModel: ObservableObject {
                     self.modelManagementState.modelState = .unloaded
                     self.modelManagementState.hasModelLoadError = true
                     self.modelManagementState.modelLoadError = "WhisperKit instance creation failed"
-                    self.modelManagementState.loadingProgressValue = 0.0
                     self.isLoadingModel = false
                 }
                 return
@@ -1837,7 +1821,6 @@ class ContentViewModel: ObservableObject {
                     self.modelManagementState.hasModelLoadError = true
                     self.modelManagementState
                         .modelLoadError = "Model files unavailable: \(error.localizedDescription)"
-                    self.modelManagementState.loadingProgressValue = 0.0
                     self.isLoadingModel = false
                 }
                 return
@@ -1859,45 +1842,26 @@ class ContentViewModel: ObservableObject {
                     return
                 }
 
-                // 프리워밍 진행률 업데이트 작업 시작
-                let prewarmProgressTask = Task {
-                    await self.updateProgressBar(startProgress: 0.0,
-                                                 targetProgress: prewarmProgressRatio,
-                                                 maxTime: 15,
-                                                 modelLoadOperationID: taskID) // 프리워밍은 보통 시간이 좀 더 걸림
-                }
-                defer { prewarmProgressTask.cancel() }
-
                 // 모델 프리워밍
                 do {
                     try await whisperKit.prewarmModels()
-                    prewarmProgressTask.cancel()
                     guard !Task.isCancelled,
                           self.activeModelLoadTaskID == taskID else {
                         await whisperKit.unloadModels()
                         self.resetCancelledModelLoadState(operationID: taskID)
                         return
                     }
-
-                    // 프리워밍 완료 후 진행률 업데이트
-                    await MainActor.run {
-                        guard self.activeModelLoadTaskID == taskID else { return }
-                        self.modelManagementState.loadingProgressValue = prewarmProgressRatio
-                    }
                 } catch is CancellationError {
-                    prewarmProgressTask.cancel()
                     await whisperKit.unloadModels()
                     self.resetCancelledModelLoadState(operationID: taskID)
                     return
                 } catch {
                     if Task.isCancelled {
-                        prewarmProgressTask.cancel()
                         await whisperKit.unloadModels()
                         self.resetCancelledModelLoadState(operationID: taskID)
                         return
                     }
                     guard self.activeModelLoadTaskID == taskID else { return }
-                    prewarmProgressTask.cancel()
                     await self.handleWhisperPrewarmFailure(
                         model: model,
                         error: error,
@@ -1920,19 +1884,9 @@ class ContentViewModel: ObservableObject {
                     return
                 }
 
-                // 로딩 진행률 업데이트 작업 시작
-                let loadProgressTask = Task {
-                    await self.updateProgressBar(startProgress: prewarmProgressRatio,
-                                                 targetProgress: loadProgressRatio,
-                                                 maxTime: 10,
-                                                 modelLoadOperationID: taskID)
-                }
-                defer { loadProgressTask.cancel() }
-
                 // 모델 로드 시도
                 do {
                     try await whisperKit.loadModels()
-                    loadProgressTask.cancel()
                     guard !Task.isCancelled,
                           self.activeModelLoadTaskID == taskID else {
                         await whisperKit.unloadModels()
@@ -1940,20 +1894,17 @@ class ContentViewModel: ObservableObject {
                         return
                     }
                 } catch is CancellationError {
-                    loadProgressTask.cancel()
                     await whisperKit.unloadModels()
                     self.resetCancelledModelLoadState(operationID: taskID)
                     return
                 } catch {
                     if Task.isCancelled {
-                        loadProgressTask.cancel()
                         await whisperKit.unloadModels()
                         self.resetCancelledModelLoadState(operationID: taskID)
                         return
                     }
                     guard self.activeModelLoadTaskID == taskID else { return }
                     print("⚠️ Model load failed: \(error.localizedDescription)")
-                    loadProgressTask.cancel()
 
                     // MPSGraph 관련 에러인 경우 캐시 정리 후 한 번만 재시도
                     let errorString = error.localizedDescription
@@ -1993,7 +1944,6 @@ class ContentViewModel: ObservableObject {
                                 self.modelManagementState
                                     .modelLoadError =
                                     "Model load failed (after retry): \(error.localizedDescription)"
-                                self.modelManagementState.loadingProgressValue = 0.0
                                 self.isLoadingModel = false
                             }
                             return
@@ -2005,7 +1955,6 @@ class ContentViewModel: ObservableObject {
                             self.modelManagementState.hasModelLoadError = true
                             self.modelManagementState
                                 .modelLoadError = "Model load failed: \(error.localizedDescription)"
-                            self.modelManagementState.loadingProgressValue = 0.0
                             self.isLoadingModel = false
                         }
                         return
@@ -2032,7 +1981,6 @@ class ContentViewModel: ObservableObject {
     ) {
         guard activeModelLoadTaskID == operationID else { return }
         modelManagementState.availableLanguages = Constants.languages.map(\.key).sorted()
-        modelManagementState.loadingProgressValue = 1
         modelManagementState.modelState = modelState
         currentLoadedModel = model
         modelManagementState.hasModelLoadError = false
@@ -2049,7 +1997,6 @@ class ContentViewModel: ObservableObject {
         whisperKit = nil
         currentLoadedModel = ""
         modelManagementState.modelState = .unloaded
-        modelManagementState.loadingProgressValue = 0
     }
 
     private func handleWhisperPrewarmFailure(
@@ -2082,53 +2029,12 @@ class ContentViewModel: ObservableObject {
         modelManagementState.hasModelLoadError = true
         modelManagementState.modelLoadError =
             "Model optimization failed: \(error.localizedDescription)"
-        modelManagementState.loadingProgressValue = 0.0
         isLoadingModel = false
-    }
-
-    /// 진행률 업데이트 - 시작 진행률부터 목표 진행률까지 자연스럽게 증가
-    func updateProgressBar(
-        startProgress: Float = 0.0,
-        targetProgress: Float,
-        maxTime: TimeInterval,
-        modelLoadOperationID: UUID? = nil
-    ) async {
-        let progressRange = targetProgress - startProgress
-        let decayConstant = -log(1 - 0.95) / Float(maxTime) // 95% 완료에 도달하는 시간 기준
-        let startTime = Date()
-        let updateInterval: TimeInterval = 0.2 // 업데이트 간격 (0.2초)
-
-        // 업데이트 간격을 더 길게 설정하여 CPU 사용량 감소
-        while !Task.isCancelled {
-            if let modelLoadOperationID,
-               activeModelLoadTaskID != modelLoadOperationID {
-                break
-            }
-            let elapsedTime = Date().timeIntervalSince(startTime)
-            // 자연스러운 곡선을 위해 지수 함수 사용
-            let decayFactor = exp(-decayConstant * Float(elapsedTime))
-            let progressIncrement = progressRange * (1 - decayFactor)
-            let currentProgress = startProgress + progressIncrement
-
-            // MainActor에서 한 번만 상태 업데이트
-            await MainActor.run {
-                guard modelLoadOperationID == nil ||
-                        activeModelLoadTaskID == modelLoadOperationID else { return }
-                modelManagementState.loadingProgressValue = min(currentProgress, targetProgress)
-            }
-
-            if currentProgress >= targetProgress { break }
-
-            do {
-                try await Task.sleep(nanoseconds: UInt64(updateInterval * 1_000_000_000))
-            } catch {
-                break
-            }
-        }
     }
 
     /// 모델 삭제
     func deleteModel(_ model: String) {
+        guard canChangeModel, model != currentLoadedModel else { return }
         if modelManagementState.localModels.contains(model) {
             do {
                 let modelFolder = try ModelCatalogService.modelFolderURL(
@@ -2174,6 +2080,7 @@ class ContentViewModel: ObservableObject {
         }
 
 #if DEBUG
+        if Self.launchArguments.contains(UITestArgument.modelReadinessFixture) { return }
         if Self.shouldSimulateMissingSpeakerModelForUITesting {
             modelManagementState.speakerDiarizationModelState = .unloaded
             modelManagementState.speakerDiarizationModelPath = ""
@@ -2702,18 +2609,9 @@ class ContentViewModel: ObservableObject {
                         title: "Model Downloaded",
                         detail: self.modelManagementState.displayName(for: model)
                     )
-                    let shouldLoadModel = self.pendingModelLoadAfterDownload == model
-                    let isRepairLoad = shouldLoadModel && self.pendingModelLoadIsRepair
-                    if self.pendingModelLoadAfterDownload == model {
-                        self.selectedModel = model
-                        self.pendingModelLoadAfterDownload = nil
-                        self.pendingModelLoadIsRepair = false
-                    }
                     self.startNextQueuedDownloadIfPossible()
                     self.updateDownloadActivityState()
-                    if shouldLoadModel {
-                        self.loadModel(model, redownload: isRepairLoad)
-                    }
+                    self.loadPendingModelIfReady()
                     return true
                 }
                 guard didCommit else { throw CancellationError() }
@@ -3208,25 +3106,26 @@ class ContentViewModel: ObservableObject {
 
     /// 파일 전사 시작
     func transcribeFile(path: String) {
+        guard canChangeModel else { return }
         guard confirmDiscardingUnsavedChanges() else { return }
         resetState(preservingImportedAudio: true)
         stopImportedAudio()
         whisperKit?.audioProcessor = AudioProcessor()
         let taskID = UUID()
         activeTranscribeTaskID = taskID
+        audioState.isTranscribing = true
         transcribeTask = Task { [weak self] in
-            guard let self,
-                  !Task.isCancelled,
-                  self.activeTranscribeTaskID == taskID else { return }
-            self.audioState.isTranscribing = true
-            self.showUserMessage(.info, title: "Transcribing", detail: self.audioState.audioFileName)
+            guard let self else { return }
             defer {
                 if self.activeTranscribeTaskID == taskID {
                     self.audioState.isTranscribing = false
                     self.transcribeTask = nil
                     self.activeTranscribeTaskID = nil
+                    self.loadPendingModelIfReady()
                 }
             }
+            guard !Task.isCancelled, self.activeTranscribeTaskID == taskID else { return }
+            self.showUserMessage(.info, title: "Transcribing", detail: self.audioState.audioFileName)
 
             do {
                 try await self.transcribeCurrentFile(path: path)
@@ -3318,7 +3217,7 @@ class ContentViewModel: ObservableObject {
               isSpeakerDiarizationAvailable,
               !transcriptionState.confirmedSegments.isEmpty else { return nil }
 
-        cancelActiveSpeakerDiarizationTask()
+        guard !isSpeakerDiarizationBusy else { return nil }
         guard let modelRoot = speakerModelRootURL else { return nil }
         if speakerAnalyzer == nil { refreshSpeakerDiarizationModelState() }
         guard isSpeakerDiarizationAvailable else {
@@ -3338,6 +3237,7 @@ class ContentViewModel: ObservableObject {
         let operationID = UUID()
         activeSpeakerDiarizationTaskID = operationID
         transcriptionState.speakerDiarization.isRunning = true
+        transcriptionState.speakerDiarization.isCancelling = false
         transcriptionState.speakerDiarization.progress = 0
         transcriptionState.speakerDiarization.errorMessage = nil
         showUserMessage(.info, title: "Analyzing Speakers", detail: audioState.audioFileName)
@@ -3346,9 +3246,11 @@ class ContentViewModel: ObservableObject {
             defer {
                 if self?.activeSpeakerDiarizationTaskID == operationID {
                     self?.transcriptionState.speakerDiarization.isRunning = false
+                    self?.transcriptionState.speakerDiarization.isCancelling = false
                     self?.speakerDiarizationTask = nil
                     self?.activeSpeakerDiarizationTaskID = nil
                     self?.previousSpeakerDiarizationStatus = nil
+                    self?.loadPendingModelIfReady()
                 }
             }
 
@@ -3358,7 +3260,8 @@ class ContentViewModel: ObservableObject {
                 let timeline = try await analyze(audioSamples, expectedSpeakerCount) { [weak self] progress in
                     let value = progress.fractionCompleted.isFinite ? progress.fractionCompleted : 0
                     Task { @MainActor [weak self] in
-                        guard let self, self.activeSpeakerDiarizationTaskID == operationID else { return }
+                        guard let self, self.activeSpeakerDiarizationTaskID == operationID,
+                              !self.transcriptionState.speakerDiarization.isCancelling else { return }
                         self.transcriptionState.speakerDiarization.progress = min(max(value, 0), 1)
                     }
                 }
@@ -3368,10 +3271,12 @@ class ContentViewModel: ObservableObject {
                     operationID: operationID, previousStatus: previousStatus
                 )
             } catch is CancellationError {
-                guard self?.activeSpeakerDiarizationTaskID == operationID else { return }
+                guard self?.activeSpeakerDiarizationTaskID == operationID,
+                      self?.makeCurrentProjectSnapshot() == originalSnapshot else { return }
                 self?.transcriptionState.speakerDiarization = previousStatus
             } catch {
-                guard let self, self.activeSpeakerDiarizationTaskID == operationID else { return }
+                guard let self, self.activeSpeakerDiarizationTaskID == operationID,
+                      self.makeCurrentProjectSnapshot() == originalSnapshot else { return }
                 self.transcriptionState.speakerDiarization = previousStatus
                 guard !Task.isCancelled else { return }
                 var detail: String? = error.localizedDescription
@@ -3452,8 +3357,40 @@ class ContentViewModel: ObservableObject {
         )
     }
 
+    private struct SubtitleEditSnapshot {
+        let segments: [TranscriptionSegment]
+        let assignments: [SpeakerSegmentAssignment?]
+        let names: [Int: String]
+        let focusedIndex: Int?
+    }
+
+    private func registerSubtitleUndo() {
+        guard let subtitleUndoManager else { return }
+        let snapshot = SubtitleEditSnapshot(
+            segments: transcriptionState.confirmedSegments,
+            assignments: transcriptionState.speakerAssignments,
+            names: transcriptionState.speakerNames,
+            focusedIndex: uiState.focusedSubtitleSegmentIndex
+        )
+        subtitleUndoManager.registerUndo(withTarget: self) { target in
+            target.restoreSubtitleEdit(snapshot)
+        }
+    }
+
+    private func restoreSubtitleEdit(_ snapshot: SubtitleEditSnapshot) {
+        registerSubtitleUndo()
+        transcriptionState.confirmedSegments = snapshot.segments
+        transcriptionState.speakerAssignments = snapshot.assignments
+        transcriptionState.speakerNames = snapshot.names
+        transcriptionResult?.segments = snapshot.segments
+        transcriptionResult?.text = snapshot.segments.map(\.text).joined(separator: " ")
+        uiState.focusedSubtitleSegmentIndex = snapshot.focusedIndex
+        refreshSubtitleQualityIssues()
+    }
+
     func updateTranscriptionSegmentText(at index: Int, text: String) {
         guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+        guard transcriptionState.confirmedSegments[index].text != text else { return }
 
         transcriptionState.confirmedSegments[index].text = text
         transcriptionState.confirmedSegments[index].words = nil
@@ -3490,8 +3427,7 @@ class ContentViewModel: ObservableObject {
     }
 
     private func speakerLabelReviewIssues() -> [SubtitleQualityIssue] {
-        guard enableSpeakerDiarization,
-              includeSpeakerLabelsInExport,
+        guard includeSpeakerLabelsInExport,
               !transcriptionState.confirmedSegments.isEmpty,
               !availableSpeakerIDs().isEmpty else {
             return []
@@ -3593,11 +3529,13 @@ class ContentViewModel: ObservableObject {
         sourceURL _: URL? = nil
     ) {
         cancelActiveSpeakerDiarizationTask()
+        subtitleUndoManager?.removeAllActions(withTarget: self)
         let restoredSegments = sidecar.segments.map { segment in
             TranscriptionSegment(
                 start: segment.start,
                 end: segment.end,
-                text: segment.text
+                text: segment.text,
+                words: segment.words
             )
         }
         let language = sidecar.language.isEmpty ? selectedLanguage : sidecar.language
@@ -3663,6 +3601,7 @@ class ContentViewModel: ObservableObject {
     func setSpeakerName(_ name: String, for speakerID: Int) {
         guard Self.normalizedSpeakerID(speakerID) != nil else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard speakerName(for: speakerID) != trimmedName else { return }
         if trimmedName.isEmpty {
             transcriptionState.speakerNames.removeValue(forKey: speakerID)
         } else {
@@ -3674,6 +3613,8 @@ class ContentViewModel: ObservableObject {
     func setSpeakerAssignment(at index: Int, speakerID: Int?) {
         guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
         guard speakerID == nil || Self.normalizedSpeakerID(speakerID) != nil else { return }
+        guard speakerAssignment(forSegmentAt: index)?.speakerID != speakerID else { return }
+        registerSubtitleUndo()
         normalizeSpeakerAssignmentCount()
         transcriptionState.speakerAssignments[index] = speakerID.map(SpeakerSegmentAssignment.init)
         refreshSubtitleQualityIssues()
@@ -3700,7 +3641,9 @@ class ContentViewModel: ObservableObject {
         } else {
             enableSpeakerDiarization = false
             cancelActiveSpeakerDiarizationTask()
-            transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            if !isSpeakerDiarizationBusy {
+                transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            }
         }
         refreshSubtitleQualityIssues()
     }
@@ -3716,7 +3659,7 @@ class ContentViewModel: ObservableObject {
             return
         }
 
-        guard !transcriptionState.speakerDiarization.isRunning else { return }
+        guard !isSpeakerDiarizationBusy else { return }
 
         guard isSpeakerDiarizationAvailable else {
             let detail = modelManagementState.isSpeakerDiarizationModelPreparing
@@ -3890,13 +3833,13 @@ class ContentViewModel: ObservableObject {
             segments: &segments,
             assignments: &assignments
         )
-        fixedCount += fillMissingSpeakerAssignments(assignments: &assignments)
 
         guard fixedCount > 0 else {
             refreshSubtitleQualityIssues()
             return 0
         }
 
+        registerSubtitleUndo()
         transcriptionState.confirmedSegments = segments
         transcriptionState.speakerAssignments = Self.normalizedSpeakerAssignments(
             assignments,
@@ -4023,41 +3966,6 @@ class ContentViewModel: ObservableObject {
         return fixedCount
     }
 
-    private func fillMissingSpeakerAssignments(
-        assignments: inout [SpeakerSegmentAssignment?]
-    ) -> Int {
-        guard enableSpeakerDiarization,
-              includeSpeakerLabelsInExport,
-              !assignments.isEmpty else {
-            return 0
-        }
-
-        let detectedIDs = Array(0 ..< transcriptionState.speakerDiarization.detectedSpeakerCount)
-        let configuredIDs = Array(0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0))
-        let namedIDs = Array(transcriptionState.speakerNames.keys)
-        let assignedIDs = assignments.compactMap { $0?.speakerID }
-        let availableIDs = Array(Set(detectedIDs + configuredIDs + namedIDs + assignedIDs)).sorted()
-        guard let fallbackID = availableIDs.first else { return 0 }
-
-        var fixedCount = 0
-        var previousAssignment: SpeakerSegmentAssignment?
-        for index in assignments.indices {
-            if let assignment = assignments[index] {
-                previousAssignment = assignment
-                continue
-            }
-
-            let nextAssignment = assignments[(index + 1)...].compactMap { $0 }.first
-            let replacement = previousAssignment ??
-                nextAssignment ??
-                SpeakerSegmentAssignment(speakerID: fallbackID)
-            assignments[index] = replacement
-            previousAssignment = replacement
-            fixedCount += 1
-        }
-
-        return fixedCount
-    }
 
     func splitTranscriptionSegment(at index: Int) {
         guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
@@ -4198,6 +4106,8 @@ class ContentViewModel: ObservableObject {
     }
 
     private func replaceTranscriptionSegments(_ segments: [TranscriptionSegment]) {
+        guard segments != transcriptionState.confirmedSegments else { return }
+        registerSubtitleUndo()
         let previousSegments = transcriptionState.confirmedSegments
         let previousAssignments = transcriptionState.speakerAssignments
         transcriptionState.confirmedSegments = segments
@@ -4216,6 +4126,10 @@ class ContentViewModel: ObservableObject {
             )
         }
         transcriptionResult?.segments = segments
+        transcriptionResult?.text = segments.map(\.text).joined(separator: " ")
+        if let focused = uiState.focusedSubtitleSegmentIndex, !segments.indices.contains(focused) {
+            uiState.focusedSubtitleSegmentIndex = segments.indices.last
+        }
         refreshSubtitleQualityIssues()
     }
 
@@ -4337,7 +4251,9 @@ class ContentViewModel: ObservableObject {
 
     /// 오디오 샘플 전사
     func transcribeAudioSamples(_ samples: [Float]) async throws -> TranscriptionResult? {
-        guard let whisperKit = whisperKit else { return nil }
+        guard let whisperKit else {
+            throw WhisperError.transcriptionFailed("Transcription model is not loaded.")
+        }
         let languageCode = Constants.languages[
             selectedLanguage,
             default: Constants.defaultLanguageCode
@@ -4351,34 +4267,31 @@ class ContentViewModel: ObservableObject {
             language: isAutoLanguageEnable ? nil : languageCode,
             temperature: Float(temperatureStart),
             temperatureFallbackCount: Int(fallbackCount),
-            sampleLength: sampleLength,
+            sampleLength: min(max(sampleLength, 1), Constants.maxTokenContext),
             usePrefillPrompt: enablePromptPrefill,
             detectLanguage: isAutoLanguageEnable,
             skipSpecialTokens: !enableSpecialCharacters,
-            withoutTimestamps: !enableTimestamps,
+            withoutTimestamps: false,
             wordTimestamps: enableWordTimestamp,
             clipTimestamps: seekClip,
-            concurrentWorkerCount: Int(concurrentWorkerCount),
+            concurrentWorkerCount: min(max(Int(concurrentWorkerCount), 1), 8),
             chunkingStrategy: chunkingStrategy
         )
-        let decodingCallback: TranscriptionCallback? = makeDecodingCallback(task: task, options: options)
-        let transcriptionResults: [TranscriptionResult] = try await whisperKit.transcribe(
-            audioArray: samples,
-            decodeOptions: options,
+        let decodingCallback: TranscriptionCallback? = makeDecodingCallback(options: options)
+        let transcriptionResults = try await WhisperTranscriptionService.transcribe(
+            samples: samples,
+            using: whisperKit,
+            options: options,
             callback: decodingCallback
         )
-        return TranscriptionUtilities.mergeTranscriptionResults(
-            transcriptionResults,
-            confirmedWords: []
-        )
+        return TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults)
     }
 
     private func makeDecodingCallback(
-        task: DecodingTask,
         options: DecodingOptions
     ) -> TranscriptionCallback {
         let operationID = activeTranscribeTaskID
-        let compressionCheckWindow = Int(compressionCheckWindow)
+        let compressionCheckWindow = min(max(Int(compressionCheckWindow), 5), 100)
         let compressionRatioThreshold = options.compressionRatioThreshold
         let logProbThreshold = options.logProbThreshold
 
@@ -4397,28 +4310,11 @@ class ContentViewModel: ObservableObject {
                 self.lastDecoderPreviewUpdate = now
 
                 let fallbacks = Int(progress.timings.totalDecodingFallbacks)
-                let chunkId = task == .transcribe ? 0 : progress.windowId
-                var updatedChunk = (chunkText: [progress.text], fallbacks: fallbacks)
-                if var currentChunk = self.transcriptionState.currentChunks[chunkId],
-                   let previousChunkText = currentChunk.chunkText.last {
-                    if progress.text.count >= previousChunkText.count {
-                        currentChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress.text
-                        updatedChunk = currentChunk
-                    } else {
-                        if fallbacks == currentChunk.fallbacks && task == .transcribe {
-                            updatedChunk
-                                .chunkText = [(updatedChunk.chunkText.first ?? "") + progress.text]
-                        } else {
-                            updatedChunk.chunkText[currentChunk.chunkText.endIndex - 1] = progress
-                                .text
-                            updatedChunk.fallbacks = fallbacks
-                            print("Fallback occurred: \(fallbacks)")
-                        }
-                    }
-                }
-                self.transcriptionState.currentChunks[chunkId] = updatedChunk
+                // Progress revises the current decoder window; shorter text is
+                // not evidence that another sentence has completed.
+                self.transcriptionState.currentChunks[progress.windowId] = progress.text
                 let joinedChunks = self.transcriptionState.currentChunks.sorted { $0.key < $1.key }
-                    .flatMap { $0.value.chunkText }
+                    .lazy.map(\.value)
                     .joined(separator: "\n")
                 self.transcriptionState.currentText = joinedChunks
                 self.transcriptionState.currentFallbacks = fallbacks
@@ -4447,35 +4343,46 @@ class ContentViewModel: ObservableObject {
 
     // MARK: - Audio Preview & Deletion
 
-    /// 오디오 미리듣기
-    func playImportedAudio() {
-        guard let url = audioState.importedAudioURL else { return }
+    private func prepareAudioPlayer() -> Bool {
+        guard let url = audioState.importedAudioURL else { return false }
+        if audioPlayer != nil { return true }
         do {
-            // 플레이어가 없거나 새로운 파일을 재생할 때만 새로 생성
-            if audioPlayer == nil {
-                audioPlayer = try AVAudioPlayer(contentsOf: url)
-                audioPlayer?.prepareToPlay()
-
-                // 총 재생 시간 업데이트 (이미 설정되어 있으면 변경하지 않음)
-                if audioState.totalDuration == 0 {
-                    audioState.totalDuration = audioPlayer?.duration ?? 0.0
-                }
-            }
-
-            // 재생 속도 설정
-            audioPlayer?.enableRate = true
-            audioPlayer?.rate = playbackRates[currentPlaybackRateIndex]
-
-            // 볼륨 적용 (노멀라이제이션된 값 기준)
-            applyVolume()
-
-            audioPlayer?.play()
-            audioState.isPlaying = true
-
-            setupPlaybackTimeUpdater()
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.prepareToPlay()
+            audioPlayer = player
+            audioState.totalDuration = player.duration
+            return true
         } catch {
-            print("Error playing audio: \(error.localizedDescription)")
+            showUserMessage(.error, title: "Audio Playback Failed", detail: error.localizedDescription)
+            return false
         }
+    }
+
+    func playImportedAudio(until endTime: TimeInterval? = nil) {
+        guard !audioState.isTranscribing, prepareAudioPlayer(), let player = audioPlayer else { return }
+        playbackSegmentEnd = endTime
+        player.enableRate = true
+        player.rate = playbackRates[currentPlaybackRateIndex]
+        applyVolume()
+        audioState.isPlaying = player.play()
+        if audioState.isPlaying { setupPlaybackTimeUpdater() }
+    }
+
+    func playAudioRange(start: Float, end: Float) {
+        guard canPlayImportedAudio, start.isFinite, end.isFinite,
+              prepareAudioPlayer(), let player = audioPlayer else { return }
+        let startTime = max(0, min(Double(start), player.duration))
+        let endTime = max(0, min(Double(end), player.duration))
+        guard endTime > startTime else { return }
+        seekToPosition(startTime)
+        playImportedAudio(until: endTime)
+    }
+
+    func playTranscriptionSegment(at index: Int) {
+        guard transcriptionState.confirmedSegments.indices.contains(index) else { return }
+        let segment = transcriptionState.confirmedSegments[index]
+        uiState.focusedSubtitleSegmentIndex = index
+        playAudioRange(start: segment.start, end: segment.end)
     }
 
     // 재생 시간 업데이트를 위한 Combine 타이머 설정
@@ -4488,6 +4395,12 @@ class ContentViewModel: ObservableObject {
             .sink { [weak self] _ in
                 guard let self = self, let player = self.audioPlayer else {
                     self?.invalidatePlaybackTimer()
+                    return
+                }
+                if let end = self.playbackSegmentEnd, player.currentTime >= end {
+                    self.pauseImportedAudio()
+                    player.currentTime = end
+                    self.audioPlaybackState.currentPlayerTime = end
                     return
                 }
 
@@ -4518,14 +4431,12 @@ class ContentViewModel: ObservableObject {
 
     /// 선택된 배속으로 재생
     func changePlaybackRate(faster: Bool) {
-        if faster {
-            currentPlaybackRateIndex = min(currentPlaybackRateIndex + 1, playbackRates.count - 1)
-        } else {
-            currentPlaybackRateIndex = max(currentPlaybackRateIndex - 1, 0)
-        }
+        selectPlaybackRate(at: currentPlaybackRateIndex + (faster ? 1 : -1))
+    }
 
-        // 현재 재생 중이면 속도 변경
-        if let player = audioPlayer, audioState.isPlaying {
+    func selectPlaybackRate(at index: Int) {
+        currentPlaybackRateIndex = min(max(index, 0), playbackRates.count - 1)
+        if let player = audioPlayer {
             player.enableRate = true
             player.rate = playbackRates[currentPlaybackRateIndex]
         }
@@ -4539,25 +4450,23 @@ class ContentViewModel: ObservableObject {
 
     /// 앞으로 이동 (5초)
     func skipForward() {
-        guard let player = audioPlayer else { return }
-        let newTime = min(player.duration, player.currentTime + 5.0)
-        player.currentTime = newTime
+        seekToPosition((audioPlayer?.currentTime ?? audioPlaybackState.currentPlayerTime) + 5)
     }
 
     /// 뒤로 이동 (5초)
     func skipBackward() {
-        guard let player = audioPlayer else { return }
-        let newTime = max(0, player.currentTime - 5.0)
-        player.currentTime = newTime
+        seekToPosition((audioPlayer?.currentTime ?? audioPlaybackState.currentPlayerTime) - 5)
     }
 
     func pauseImportedAudio() {
+        playbackSegmentEnd = nil
         audioPlayer?.pause()
         audioState.isPlaying = false
         invalidatePlaybackTimer()
     }
 
     func stopImportedAudio() {
+        playbackSegmentEnd = nil
         audioPlayer?.stop()
         audioPlayer?.currentTime = 0
         audioPlaybackState.currentPlayerTime = 0
@@ -4567,16 +4476,12 @@ class ContentViewModel: ObservableObject {
 
     /// 재생 위치 이동
     func seekToPosition(_ position: Double) {
-        guard let player = audioPlayer else { return }
-        player.currentTime = position
-
-        // currentPlayerTime 즉시 업데이트
-        audioPlaybackState.currentPlayerTime = position
-
-        // 재생 중이었다면 계속 재생
-        if audioState.isPlaying {
-            player.play()
-        }
+        guard position.isFinite, prepareAudioPlayer(), let player = audioPlayer else { return }
+        playbackSegmentEnd = nil
+        let clampedPosition = max(0, min(position, player.duration))
+        player.currentTime = clampedPosition
+        audioPlaybackState.currentPlayerTime = clampedPosition
+        if audioState.isPlaying { player.play() }
     }
 
     /// 라인 내에서 특정 비율 위치로 이동 (WaveFormView에서 사용)
@@ -4862,11 +4767,14 @@ class ContentViewModel: ObservableObject {
 
     func exportTranscription(
         skipQualityReview: Bool = false,
-        exporter: (TranscriptionResult, String, Double) async -> ExportOutcome = { result, name, rate in
-            await ExportService.exportTranscriptionResult(result: result, defaultFileName: name, frameRate: rate)
-        }
+        exporter: ((TranscriptionResult, String, Double) async -> ExportOutcome)? = nil
     ) async {
         guard !isExporting, !audioState.isTranscribing else { return }
+        guard selectedExportFileType != .fcpxml ||
+            (frameRate.isFinite && (1 ... 240).contains(frameRate)) else {
+            showUserMessage(.warning, title: "Frame rate must be between 1 and 240.")
+            return
+        }
         guard !transcriptionState.speakerDiarization.isRunning else {
             showUserMessage(.info, title: "Analyzing Speakers")
             return
@@ -4899,6 +4807,7 @@ class ContentViewModel: ObservableObject {
         // 세그먼트와 단어 처리: 앞뒤 공백 제거 후 빈 세그먼트 제거 등
         var cleanSegments: [TranscriptionSegment] = []
         let exportPreset = selectedExportPreset
+        let usesCaptionLayout = selectedExportFileType.supportsCaptionLayout
         for (index, segment) in transcriptionState.confirmedSegments.enumerated() {
             var cleanSegment = segment
             let speakerAssignment = speakerAssignment(forSegmentAt: index)
@@ -4908,16 +4817,29 @@ class ContentViewModel: ObservableObject {
                 speakerName: speakerDisplayName(for: speakerAssignment),
                 includeSpeakerLabel: includeSpeakerLabelsInExport
             )
-            cleanSegment.text = Self.wrappedSubtitleText(
-                cleanSegment.text,
-                maxLineLength: exportPreset.maxLineLength,
-                maxLines: exportPreset.maxLines
-            )
-            if let words = segment.words {
+            if usesCaptionLayout {
+                cleanSegment.text = Self.wrappedSubtitleText(
+                    cleanSegment.text,
+                    maxLineLength: exportPreset.maxLineLength,
+                    maxLines: exportPreset.maxLines
+                )
+            }
+            if usesCaptionLayout, let words = segment.words {
                 var cleanWords: [WordTiming] = []
                 for word in words {
                     var cleanWord = word
-                    cleanWord.word = word.word.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let wordText = word.word.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !wordText.isEmpty else { continue }
+                    cleanWord.word = Self.wrappedSubtitleText(
+                        SpeakerLabelFormatter.prefixedText(
+                            wordText,
+                            assignment: speakerAssignment,
+                            speakerName: speakerDisplayName(for: speakerAssignment),
+                            includeSpeakerLabel: includeSpeakerLabelsInExport
+                        ),
+                        maxLineLength: exportPreset.maxLineLength,
+                        maxLines: exportPreset.maxLines
+                    )
                     if !cleanWord.word.isEmpty {
                         cleanWords.append(cleanWord)
                     }
@@ -4953,7 +4875,15 @@ class ContentViewModel: ObservableObject {
         )
         // The exporter can suspend while the user opens or edits another document.
         let sidecar = makeCurrentProjectSidecar()
-        let outcome = await exporter(exportResult, audioState.audioFileName, frameRate)
+        let outcome: ExportOutcome
+        if let exporter {
+            outcome = await exporter(exportResult, audioState.audioFileName, frameRate)
+        } else {
+            outcome = await ExportService.exportTranscriptionResult(
+                result: exportResult, defaultFileName: audioState.audioFileName,
+                frameRate: frameRate, fileType: selectedExportFileType
+            )
+        }
 
         switch outcome {
         case let .success(path):

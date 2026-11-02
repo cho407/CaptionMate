@@ -35,13 +35,19 @@ enum TranscriptionLanguageSelection {
 
 struct BasicSettingsView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject private var modelState: ModelManagementState
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        modelState = viewModel.modelManagementState
+    }
 
     private var languageSelection: Binding<String?> {
         Binding(
             get: {
                 TranscriptionLanguageSelection.resolvedValue(
                     selectedLanguage: viewModel.selectedLanguage,
-                    availableLanguages: viewModel.modelManagementState.availableLanguages
+                    availableLanguages: modelState.availableLanguages
                 )
             },
             set: { selectedLanguage in
@@ -59,7 +65,7 @@ struct BasicSettingsView: View {
     }
 
     private var speakerModelAvailabilityMessage: LocalizedStringKey {
-        viewModel.modelManagementState.isSpeakerDiarizationModelPreparing
+        modelState.isSpeakerDiarizationModelPreparing
             ? "Speaker model is still preparing."
             : "Speaker model is not ready."
     }
@@ -69,7 +75,9 @@ struct BasicSettingsView: View {
             HStack {
                 Picker("", selection: $viewModel.selectedTask) {
                     ForEach(DecodingTask.allCases, id: \.self) { task in
-                        Text(LocalizedStringKey(task.description.capitalized)).tag(task.description)
+                        Text(task == .translate
+                             ? LocalizedStringKey("Translate to English")
+                             : LocalizedStringKey("Transcribe")).tag(task.description)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -152,33 +160,24 @@ struct BasicSettingsView: View {
             }
             .toggleStyle(.checkbox)
             .fixedSize(horizontal: true, vertical: false)
-            .disabled(!viewModel.isSpeakerDiarizationAvailable)
+            .disabled(!viewModel.canChangeSpeakerDiarization)
             .accessibilityIdentifier("transcription.speakerDiarizationToggle")
 
-            HStack(spacing: 8) {
-                Label("Speaker Count", systemImage: "person.2")
-                Picker("", selection: $viewModel.speakerDiarizationSpeakerCount) {
-                    ForEach(0 ... 8, id: \.self) { count in
-                        Text(viewModel.speakerCountOptionTitleKey(for: count)).tag(count)
+            if viewModel.enableSpeakerDiarization {
+                HStack(spacing: 8) {
+                    Label("Speaker Count", systemImage: "person.2")
+                    Picker("Speaker Count", selection: $viewModel.speakerDiarizationSpeakerCount) {
+                        ForEach(0 ... 8, id: \.self) { count in
+                            Text(viewModel.speakerCountOptionTitleKey(for: count)).tag(count)
+                        }
                     }
+                    .labelsHidden()
+                    .frame(width: 104)
+                    .disabled(!viewModel.isSpeakerDiarizationAvailable)
+                    .accessibilityIdentifier("transcription.speakerCountPicker")
                 }
-                .frame(width: 104)
-                .disabled(!viewModel.enableSpeakerDiarization ||
-                    !viewModel.isSpeakerDiarizationAvailable)
-                .accessibilityLabel(Text("Speaker Count"))
-                .accessibilityIdentifier("transcription.speakerCountPicker")
+                .fixedSize(horizontal: true, vertical: false)
             }
-            .fixedSize(horizontal: true, vertical: false)
-
-            Toggle(
-                "Include Speaker Names",
-                isOn: $viewModel.includeSpeakerLabelsInExport
-            )
-            .toggleStyle(.checkbox)
-            .fixedSize(horizontal: true, vertical: false)
-            .disabled(!viewModel.enableSpeakerDiarization ||
-                !viewModel.isSpeakerDiarizationAvailable)
-            .accessibilityIdentifier("transcription.exportSpeakerLabelsToggle")
 
             if !viewModel.isSpeakerDiarizationAvailable {
                 Label(speakerModelAvailabilityMessage, systemImage: "info.circle")
@@ -189,6 +188,10 @@ struct BasicSettingsView: View {
                     .help(Text(speakerModelAvailabilityMessage))
                     .accessibilityLabel(Text(speakerModelAvailabilityMessage))
                     .frame(maxWidth: 220, alignment: .leading)
+                Button("Download Model") {
+                    viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded()
+                }
+                .disabled(modelState.isSpeakerDiarizationModelPreparing)
             }
 
         }

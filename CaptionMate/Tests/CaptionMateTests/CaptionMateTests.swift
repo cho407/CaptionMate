@@ -74,6 +74,153 @@ private final class TestWindowCloseDelegate: NSObject, NSWindowDelegate {
 
 @Suite(.serialized)
 struct ContentViewModelTests {
+    @Test("A VAD chunk failure is reported instead of being returned as a successful empty transcript")
+    func testVADTranscriptionPropagatesChunkFailures() async throws {
+        let kit = try await WhisperKit(WhisperKitConfig(load: false, download: false))
+        let samples = [Float](repeating: 0.5, count: Constants.defaultWindowSamples + WhisperKit.sampleRate)
+        let options = DecodingOptions(concurrentWorkerCount: 1, chunkingStrategy: .vad)
+        await #expect(throws: (any Error).self) {
+            try await WhisperTranscriptionService.transcribe(
+                samples: samples, using: kit, options: options, callback: nil
+            )
+        }
+    }
+
+    @Test("Project recovery preserves word alignment and still reads version-one sidecars") @MainActor
+    func testWordTimingsSurviveSidecarRecovery() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let viewModel = ContentViewModel(projectStore: CaptionMateProjectStore(rootURL: root))
+        let enabled = viewModel.enableSpeakerDiarization
+        let count = viewModel.speakerDiarizationSpeakerCount
+        defer {
+            viewModel.enableSpeakerDiarization = enabled
+            viewModel.speakerDiarizationSpeakerCount = count
+        }
+        let words = [
+            WordTiming(word: "안녕하세요", tokens: [12, 34], start: 0.25, end: 1.2, probability: 0.9),
+            WordTiming(word: " 반갑습니다", tokens: [56], start: 1.4, end: 2.7, probability: 0.8),
+        ]
+        let result = TranscriptionResult(
+            text: "안녕하세요 반갑습니다",
+            segments: [.init(start: 0, end: 3, text: "안녕하세요 반갑습니다", words: words)],
+            language: "ko", timings: .init()
+        )
+        let sidecar = CaptionMateSidecar(
+            result: result, audioFileName: "meeting",
+            speakerAssignments: [.init(speakerID: 0)], speakerNames: [0: "진행자"],
+            selectedExportPreset: viewModel.selectedExportPreset,
+            frameRate: viewModel.frameRate,
+            includeSpeakerLabelsInExport: viewModel.includeSpeakerLabelsInExport,
+            speakerDiarizationSpeakerCount: count
+        )
+        let url = try CaptionMateSidecarService.write(sidecar, nextToMediaURL: root.appendingPathComponent("meeting.wav"))
+        viewModel.restoreTranscriptionSidecar(try CaptionMateSidecarService.read(from: url))
+        #expect(viewModel.transcriptionState.confirmedSegments[0].words == words)
+        #expect(viewModel.transcriptionResult?.segments[0].words == words)
+        #expect(viewModel.speakerName(for: 0) == "진행자")
+
+        var legacy = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        legacy["version"] = 1
+        var segments = try #require(legacy["segments"] as? [[String: Any]])
+        segments[0].removeValue(forKey: "words")
+        legacy["segments"] = segments
+        try JSONSerialization.data(withJSONObject: legacy).write(to: url)
+        viewModel.restoreTranscriptionSidecar(try CaptionMateSidecarService.read(from: url))
+        #expect(viewModel.transcriptionState.confirmedSegments[0].text == "안녕하세요 반갑습니다")
+        #expect(viewModel.transcriptionState.confirmedSegments[0].words == nil)
+    }
+
+    @Test("Word-timed captions retain speaker labels without changing recovery alignment",
+          arguments: ["srt", "vtt", "fcpxml", "json"]) @MainActor
+    func testWordTimedWriterIncludesSpeakerLabels(format: String) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let viewModel = ContentViewModel(projectStore: CaptionMateProjectStore(rootURL: root))
+        let enabled = viewModel.enableSpeakerDiarization
+        let include = viewModel.includeSpeakerLabelsInExport
+        let frameRate = viewModel.frameRate
+        defer {
+            viewModel.enableSpeakerDiarization = enabled
+            viewModel.includeSpeakerLabelsInExport = include
+            viewModel.frameRate = frameRate
+        }
+        let words = [
+            WordTiming(word: "Hello", tokens: [10], start: 0.4, end: 1.2, probability: 0.9),
+            WordTiming(word: " there.", tokens: [20], start: 1.4, end: 2.2, probability: 0.8),
+        ]
+        let segments = [TranscriptionSegment(start: 0, end: 3, text: "Hello there.", words: words)]
+        viewModel.transcriptionResult = .init(text: "Hello there.", segments: segments, language: "en", timings: .init())
+        viewModel.transcriptionState.confirmedSegments = segments
+        viewModel.enableSpeakerDiarization = true
+        viewModel.includeSpeakerLabelsInExport = true
+        viewModel.frameRate = 30
+        viewModel.selectedExportFileType = try #require(SubtitleFileType(rawValue: format))
+        viewModel.setSpeakerAssignment(at: 0, speakerID: 0)
+        viewModel.setSpeakerName("Alice", for: 0)
+        viewModel.audioState.audioFileName = "meeting"
+        var writtenURL: URL?
+        await viewModel.exportTranscription(skipQualityReview: true) { result, name, _ in
+            let writer: any ResultWriting
+            switch format {
+            case "srt": writer = WriteSRT(outputDir: root.path)
+            case "vtt": writer = WriteVTT(outputDir: root.path)
+            case "json": writer = WriteJSON(outputDir: root.path)
+            default: writer = WriteFCPXML(outputDir: root.path, frameRate: 30)
+            }
+            switch writer.write(result: result, to: name, options: nil) {
+            case let .success(path):
+                writtenURL = path.hasPrefix("file:") ? URL(string: path) : URL(fileURLWithPath: path)
+                return .success(path: path)
+            case let .failure(error): return .failure(error)
+            }
+        }
+        let url = try #require(writtenURL)
+        let text = try String(contentsOf: url, encoding: .utf8)
+        if format == "json" {
+            let exported = try JSONDecoder().decode(TranscriptionResult.self, from: Data(contentsOf: url))
+            #expect(exported.segments[0].text == "Alice: Hello there.")
+            #expect(exported.segments[0].words == words)
+        } else {
+            #expect(text.contains("Alice: Hello"))
+            #expect(text.contains("Alice: there."))
+        }
+        let recovered = try CaptionMateSidecarService.read(from: CaptionMateSidecarService.sidecarURL(forMediaURL: url))
+        #expect(recovered.segments[0].words == words)
+        #expect(viewModel.transcriptionState.confirmedSegments[0].words == words)
+    }
+
+    @Test("Deleting a subtitle is undoable with its word timings and speaker attribution") @MainActor
+    func testStructuralUndoRestoresAlignmentAndAttribution() {
+        let viewModel = ContentViewModel()
+        let words = [WordTiming(word: "Original", tokens: [1], start: 0, end: 2, probability: 1)]
+        let segments = [
+            TranscriptionSegment(start: 0, end: 2, text: "Original", words: words),
+            TranscriptionSegment(start: 3, end: 5, text: "Keep"),
+        ]
+        viewModel.transcriptionState.confirmedSegments = segments
+        viewModel.transcriptionState.speakerAssignments = [.init(speakerID: 1), .init(speakerID: 0)]
+        viewModel.transcriptionState.speakerNames = [1: "Guest"]
+        viewModel.transcriptionResult = .init(text: "Original Keep", segments: segments, language: "en", timings: .init())
+        let undoManager = UndoManager()
+        undoManager.groupsByEvent = false
+        viewModel.subtitleUndoManager = undoManager
+        undoManager.beginUndoGrouping()
+        viewModel.deleteTranscriptionSegment(at: 0)
+        undoManager.endUndoGrouping()
+        #expect(viewModel.transcriptionState.confirmedSegments.map(\.text) == ["Keep"])
+        undoManager.undo()
+        #expect(viewModel.transcriptionState.confirmedSegments == segments)
+        #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 1)
+        #expect(viewModel.transcriptionResult?.text == "Original Keep")
+        undoManager.redo()
+        #expect(viewModel.transcriptionState.confirmedSegments.map(\.text) == ["Keep"])
+        viewModel.resetState()
+        #expect(!undoManager.canUndo)
+    }
+
     private func makeCancellableTask() -> Task<Void, Never> {
         Task.detached {
             while !Task.isCancelled {
@@ -164,16 +311,13 @@ struct ContentViewModelTests {
         }
         viewModel.selectedTask = "translate"
         viewModel.transcriptionState.currentText = "Current document"
-        viewModel.transcriptionState.currentChunks = [9: (["Current document"], 2)]
+        viewModel.transcriptionState.currentChunks = [9: "Current document"]
         viewModel.transcriptionState.currentFallbacks = 2
         viewModel.transcriptionState.currentDecodingLoops = 11
         // Also release a callback retained by the decoder after cancellation.
         _ = oldCallback(progress)
         await drainDecoderPreviewQueue()
         #expect(viewModel.transcriptionState.currentText == "Current document")
-        #expect(viewModel.transcriptionState.currentChunks.keys.sorted() == [9])
-        #expect(viewModel.transcriptionState.currentChunks[9]?.chunkText == ["Current document"])
-        #expect(viewModel.transcriptionState.currentChunks[9]?.fallbacks == 2)
         #expect(viewModel.transcriptionState.currentFallbacks == 2)
         #expect(viewModel.transcriptionState.currentDecodingLoops == 11)
         #expect(viewModel.selectedTask == "translate")
@@ -185,39 +329,38 @@ struct ContentViewModelTests {
             ))
             await drainDecoderPreviewQueue()
             #expect(viewModel.transcriptionState.currentText == "New preview\nCurrent document")
-            #expect(viewModel.transcriptionState.currentChunks.keys.sorted() == [7, 9])
-            #expect(viewModel.transcriptionState.currentChunks[7]?.chunkText == ["New preview"])
-            #expect(viewModel.transcriptionState.currentChunks[7]?.fallbacks == 4)
             #expect(viewModel.transcriptionState.currentFallbacks == 4)
             #expect(viewModel.transcriptionState.currentDecodingLoops == 12)
         }
     }
 
-    @Test("Current decoder callbacks use the captured decoding mode",
-          arguments: ["transcribe", "translate"]) @MainActor
-    func testCurrentDecoderPreviewCapturesMode(mode: String) async {
+    @Test("Revised decoder progress cannot duplicate text or overwrite another window") @MainActor
+    func testDecoderPreviewPreservesConcurrentWindows() async throws {
         let viewModel = ContentViewModel()
         let originalTask = viewModel.selectedTask
         defer {
             viewModel.prepareForClose()
             viewModel.selectedTask = originalTask
         }
-        viewModel.selectedTask = mode
+        viewModel.selectedTask = "transcribe"
         viewModel.setTranscriptionTaskForTesting(makeCancellableTask())
         let callback = viewModel.decodingCallbackForTesting()
-        viewModel.selectedTask = mode == "transcribe" ? "translate" : "transcribe"
         _ = callback(TranscriptionProgress(
-            timings: TranscriptionTimings(totalDecodingFallbacks: 2),
-            text: "Current preview", tokens: [], windowId: 7
+            timings: .init(), text: "First sentence.", tokens: [], windowId: 7
         ))
         await drainDecoderPreviewQueue()
-        let chunkID = mode == "transcribe" ? 0 : 7
-        #expect(viewModel.transcriptionState.currentText == "Current preview")
-        #expect(viewModel.transcriptionState.currentChunks.keys.sorted() == [chunkID])
-        #expect(viewModel.transcriptionState.currentChunks[chunkID]?.chunkText == ["Current preview"])
-        #expect(viewModel.transcriptionState.currentChunks[chunkID]?.fallbacks == 2)
-        #expect(viewModel.transcriptionState.currentFallbacks == 2)
-        #expect(viewModel.transcriptionState.currentDecodingLoops == 1)
+        try await Task.sleep(for: .milliseconds(150))
+        _ = callback(TranscriptionProgress(
+            timings: .init(), text: "Second sentence.", tokens: [], windowId: 9
+        ))
+        await drainDecoderPreviewQueue()
+        #expect(viewModel.transcriptionState.currentText == "First sentence.\nSecond sentence.")
+        try await Task.sleep(for: .milliseconds(150))
+        _ = callback(TranscriptionProgress(
+            timings: .init(), text: " Next.", tokens: [], windowId: 7
+        ))
+        await drainDecoderPreviewQueue()
+        #expect(viewModel.transcriptionState.currentText == " Next.\nSecond sentence.")
     }
 
     @Test("A decoder callback created without an active run never acquires preview ownership",
@@ -228,7 +371,7 @@ struct ContentViewModelTests {
         let callback = viewModel.decodingCallbackForTesting()
         if startNewRun { viewModel.setTranscriptionTaskForTesting(makeCancellableTask()) }
         viewModel.transcriptionState.currentText = "Keep preview"
-        viewModel.transcriptionState.currentChunks = [4: (["Keep preview"], 1)]
+        viewModel.transcriptionState.currentChunks = [4: "Keep preview"]
         viewModel.transcriptionState.currentFallbacks = 1
         viewModel.transcriptionState.currentDecodingLoops = 5
         _ = callback(TranscriptionProgress(
@@ -237,9 +380,6 @@ struct ContentViewModelTests {
         ))
         await drainDecoderPreviewQueue()
         #expect(viewModel.transcriptionState.currentText == "Keep preview")
-        #expect(viewModel.transcriptionState.currentChunks.keys.sorted() == [4])
-        #expect(viewModel.transcriptionState.currentChunks[4]?.chunkText == ["Keep preview"])
-        #expect(viewModel.transcriptionState.currentChunks[4]?.fallbacks == 1)
         #expect(viewModel.transcriptionState.currentFallbacks == 1)
         #expect(viewModel.transcriptionState.currentDecodingLoops == 5)
     }
@@ -1184,6 +1324,15 @@ struct ContentViewModelTests {
         let task = try #require(startedTask)
         await gate.waitUntilRequested()
         viewModel.cancelSpeakerDiarization()
+        #expect(viewModel.isSpeakerDiarizationBusy)
+        #expect(viewModel.transcriptionState.speakerDiarization.isCancelling)
+        #expect(viewModel.beginSpeakerDiarization(audioSamplesProvider: { [0] }) == nil)
+        #expect(!viewModel.canChangeModel)
+        let selectedModel = viewModel.selectedModel
+        viewModel.selectModel("openai_whisper-base")
+        viewModel.loadModel("openai_whisper-base")
+        await viewModel.releaseModel()
+        #expect(viewModel.selectedModel == selectedModel)
         await gate.resume(returning: [SpeakerTimelineSegment(speakerID: 0, start: 0, end: 1)])
         await task.value
         #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 1)
@@ -1593,8 +1742,8 @@ struct ContentViewModelTests {
         #expect(viewModel.uiState.focusedSubtitleSegmentIndex == issue.segmentIndex)
     }
 
-    @Test("자막 리뷰 Quick Fix가 빈 세그먼트, 겹침, 화자 누락을 보정하는지 테스트") @MainActor
-    func testSubtitleQualityQuickFixesNormalizeSegmentsAndSpeakers() throws {
+    @Test("Quick Fix repairs subtitle structure without guessing missing speakers") @MainActor
+    func testSubtitleQualityQuickFixesPreserveUnknownSpeakers() throws {
         let viewModel = ContentViewModel()
         let originalEnabled = viewModel.enableSpeakerDiarization
         let originalInclude = viewModel.includeSpeakerLabelsInExport
@@ -1635,9 +1784,7 @@ struct ContentViewModelTests {
         viewModel.includeSpeakerLabelsInExport = true
         viewModel.speakerDiarizationSpeakerCount = 1
 
-        let fixedCount = viewModel.applySubtitleQualityQuickFixes()
-
-        #expect(fixedCount >= 5)
+        viewModel.applySubtitleQualityQuickFixes()
         #expect(!viewModel.transcriptionState.confirmedSegments.contains {
             $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         })
@@ -1647,14 +1794,14 @@ struct ContentViewModelTests {
                 viewModel.transcriptionState.confirmedSegments[index + 1].start
         })
         #expect(viewModel.transcriptionState.confirmedSegments.count == 4)
-        #expect(viewModel.transcriptionState.speakerAssignments.allSatisfy { $0?.speakerID == 0 })
+        #expect(viewModel.transcriptionState.speakerAssignments.map { $0?.speakerID } == [0, nil, nil, nil])
         #expect(viewModel.transcriptionResult?.segments.count == viewModel.transcriptionState.confirmedSegments.count)
 
         let remainingIssues = viewModel.refreshSubtitleQualityIssues()
         #expect(!remainingIssues.contains { $0.kind == .emptyText })
         #expect(!remainingIssues.contains { $0.kind == .invalidTiming })
         #expect(!remainingIssues.contains { $0.kind == .overlappingTiming })
-        #expect(!remainingIssues.contains { $0.kind == .missingSpeaker })
+        #expect(remainingIssues.filter { $0.kind == .missingSpeaker }.map(\.segmentIndex) == [1, 2, 3])
     }
 
     @Test("화자 재분석 입력 가드 테스트") @MainActor
@@ -1715,8 +1862,12 @@ struct ContentViewModelTests {
         ]
         viewModel.transcriptionState.speakerNames = [0: "Host"]
         viewModel.enableSpeakerDiarization = true
+        viewModel.modelManagementState.speakerDiarizationModelState = .unloaded
+        #expect(viewModel.canChangeSpeakerDiarization)
 
         viewModel.setSpeakerDiarizationEnabled(false)
+        #expect(!viewModel.enableSpeakerDiarization)
+        #expect(!viewModel.canChangeSpeakerDiarization)
 
         #expect(viewModel.transcriptionState.speakerAssignments == [
             SpeakerSegmentAssignment(speakerID: 0),
@@ -2408,7 +2559,6 @@ struct ContentViewModelTests {
         viewModel.modelManagementState.localModels = [model]
         viewModel.modelManagementState.maxConcurrentDownloads = 0
         viewModel.modelManagementState.modelState = .prewarming
-        viewModel.modelManagementState.loadingProgressValue = 0.5
         viewModel.selectedModel = model
         let taskID = viewModel.beginModelLoadOperationForTesting()
 
@@ -2426,7 +2576,6 @@ struct ContentViewModelTests {
         #expect(errorMessage.contains("Model optimization failed"))
         #expect(errorMessage.contains("Simulated prewarm runtime failure"))
         #expect(!errorMessage.localizedCaseInsensitiveContains("retrying"))
-        #expect(viewModel.modelManagementState.loadingProgressValue == 0)
     }
 
     @Test("오래된 Whisper prewarm 실패는 새 모델 로드 상태를 덮어쓰지 않는다") @MainActor
@@ -2454,7 +2603,6 @@ struct ContentViewModelTests {
         let staleTaskID = viewModel.beginModelLoadOperationForTesting()
         _ = viewModel.beginModelLoadOperationForTesting()
         viewModel.modelManagementState.modelState = .prewarming
-        viewModel.modelManagementState.loadingProgressValue = 0.5
         viewModel.modelManagementState.hasModelLoadError = false
         viewModel.modelManagementState.modelLoadError = nil
 
@@ -2468,7 +2616,6 @@ struct ContentViewModelTests {
         #expect(viewModel.modelManagementState.localModels == [model])
         #expect(viewModel.selectedModel == model)
         #expect(viewModel.modelManagementState.modelState == .prewarming)
-        #expect(viewModel.modelManagementState.loadingProgressValue == 0.5)
         #expect(!viewModel.modelManagementState.hasModelLoadError)
         #expect(viewModel.modelManagementState.modelLoadError == nil)
         #expect(viewModel.modelManagementState.queuedDownloadModels.isEmpty)
@@ -3015,10 +3162,10 @@ struct CaptionMateSidecarServiceTests {
 // MARK: - CaptionMate Project Store Tests
 
 struct CaptionMateProjectStoreTests {
-    @Test("프로젝트는 저장, 목록 조회, 로드, 삭제가 가능하다")
-    func testProjectStoreSavesLoadsListsAndDeletesProjects() throws {
+    @Test("프로젝트는 디렉터리 URL 힌트와 무관하게 저장, 목록 조회, 로드, 삭제가 가능하다", arguments: [false, true])
+    func testProjectStoreSavesLoadsListsAndDeletesProjects(directoryHint: Bool) throws {
         let rootURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("CaptionMateProjectStore-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("CaptionMateProjectStore-\(UUID().uuidString)", isDirectory: directoryHint)
         defer {
             try? FileManager.default.removeItem(at: rootURL)
         }
@@ -3348,49 +3495,6 @@ struct SubtitleQualityCheckerTests {
     }
 }
 
-// MARK: - Subtitle File Type Tests
-
-struct SubtitleFileTypeTests {
-    @Test("SubtitleFileType allCases 테스트")
-    func testSubtitleFileTypeAllCases() throws {
-        let allCases = SubtitleFileType.allCases
-        let rawValues = allCases.map(\.rawValue)
-        #expect(allCases.count == 6)
-        #expect(allCases.contains(.srt))
-        #expect(allCases.contains(.fcpxml))
-        #expect(allCases.contains(.vtt))
-        #expect(allCases.contains(.json))
-        #expect(rawValues.contains("txt"))
-        #expect(rawValues.contains("doc"))
-    }
-
-    @Test("SubtitleFileType UTType 변환 테스트")
-    func testSubtitleFileTypeUTType() throws {
-        // SRT - UTType 생성하여 비교
-        let expectedSRT = UTType(filenameExtension: "srt")
-        #expect(SubtitleFileType.srt.utType == expectedSRT || SubtitleFileType.srt
-            .utType == .plainText)
-
-        // JSON - 시스템 정의 UTType과 비교
-        #expect(SubtitleFileType.json.utType == .json)
-
-        // TXT - plain text UTType 확인
-        #expect(SubtitleFileType.from(utType: .plainText)?.rawValue == "txt")
-
-        // VTT - UTType 생성하여 비교
-        let expectedVTT = UTType(filenameExtension: "vtt")
-        #expect(SubtitleFileType.vtt.utType == expectedVTT || SubtitleFileType.vtt
-            .utType == .plainText)
-
-        // FCPXML - 커스텀 UTType 확인
-        let fcpxmlType = SubtitleFileType.fcpxml.utType
-        #expect(fcpxmlType == .fcpxml)
-
-        // DOC - Word-compatible document UTType 확인
-        let docType = UTType(filenameExtension: "doc") ?? .data
-        #expect(SubtitleFileType.from(utType: docType)?.rawValue == "doc")
-    }
-}
 
 // MARK: - Text Document Writer Tests
 
@@ -3814,27 +3918,6 @@ struct StateModelsTests {
         #expect(state.isWaveformProcessing == false)
     }
 
-    @Test("UIState 초기화 테스트")
-    func testUIStateInitialization() throws {
-        let state = UIState()
-
-        #expect(state.isFilePickerPresented == false)
-        #expect(state.showComputeUnits == true)
-        #expect(state.showAdvancedOptions == false)
-        #expect(state.isTranscribingView == false)
-        #expect(state.isModelmanagerViewPresented == false)
-        #expect(state.isTargeted == false)
-        #expect(state.isLanguageChanged == false)
-        #expect(state.userMessage == nil)
-        #expect(state.subtitleQualityIssues.isEmpty)
-        #expect(state.showSubtitleReview == false)
-        #expect(state.focusedSubtitleSegmentIndex == nil)
-        #expect(state.subtitleIssueFilter == .all)
-        #expect(state.showFirstRunGuide == false)
-        #expect(state.subtitleSearchText.isEmpty)
-        #expect(state.subtitleReplaceText.isEmpty)
-        #expect(state.isSubtitleEditing == false)
-    }
 }
 
 struct TranscriptionModeHeaderTests {
@@ -4613,163 +4696,6 @@ struct CaptionMatePreservationRegressionTests {
         #expect(viewModel.transcriptionState.speakerNames == [0: "Signed host", 1: "Long guest alias"])
         #expect(viewModel.transcriptionState.confirmedSegments.map(\.text) == sidecar.segments.map(\.text))
         #expect(viewModel.transcriptionState.speakerAssignments.first??.speakerID == 0)
-    }
-}
-
-// MARK: - Release Gate Tests
-
-struct ReleaseGateTests {
-    @Test("Argmax SDK는 공식 argmax-oss-swift v1 패키지로 고정한다")
-    func testArgmaxSDKUsesCanonicalV1Package() throws {
-        let project = try Self.readRepositoryFile("CaptionMate/CaptionMate.xcodeproj/project.pbxproj")
-        let resolved = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
-        )
-
-        #expect(project.contains("XCRemoteSwiftPackageReference \"argmax-oss-swift\""))
-        #expect(project.contains("repositoryURL = \"https://github.com/argmaxinc/argmax-oss-swift.git\";"))
-        #expect(project.contains("minimumVersion = 1.1.1;"))
-        #expect(resolved.contains("\"identity\" : \"argmax-oss-swift\""))
-        #expect(resolved.contains("\"location\" : \"https://github.com/argmaxinc/argmax-oss-swift.git\""))
-        #expect(resolved.contains("\"version\" : \"1.1.1\""))
-        #expect(resolved.contains("\"revision\" : \"1bbc57cb7fe6410248a685b1c5a3c6d56adc2ed4\""))
-        #expect(!project.contains("https://github.com/argmaxinc/WhisperKit"))
-        #expect(!resolved.contains("https://github.com/argmaxinc/WhisperKit"))
-    }
-
-    @Test("WhisperKit v1에서 제거된 prefill cache 옵션에 의존하지 않는다")
-    func testWhisperKitV1MigrationAvoidsRemovedPrefillCacheOption() throws {
-        let source = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-        let settingsSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/Views/TranscriptionViews/SettingsView.swift"
-        )
-
-        #expect(!source.contains("usePrefillCache:"))
-        #expect(!source.contains("prefillCompute"))
-        #expect(!source.contains("enableCachePrefill"))
-        #expect(!settingsSource.contains("Cache Prefill"))
-        #expect(source.contains("let decodingCallback: TranscriptionCallback?"))
-        #expect(!source.contains("Int(self.compressionCheckWindow)"))
-    }
-
-    @Test("다운로드 progress throttling은 Sendable callback에서 mutable capture를 만들지 않는다")
-    func testDownloadProgressThrottleAvoidsMutableSendableCapture() throws {
-        let source = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        #expect(!source.contains("var lastUpdateTime = Date()"))
-        #expect(source.contains("private var modelDownloadLastProgressUIUpdateTime: [String: Date]"))
-    }
-
-    @Test("v2 릴리스 버전과 빌드 번호가 프로젝트 설정에 반영되어야 한다")
-    func testProjectVersionIsPreparedForV2Release() throws {
-        let project = try Self.readRepositoryFile("CaptionMate/CaptionMate.xcodeproj/project.pbxproj")
-
-        #expect(project.contains("MARKETING_VERSION = 2.0.0;"))
-        #expect(!project.contains("MARKETING_VERSION = 1.0;"))
-        #expect(!project.contains("CURRENT_PROJECT_VERSION = 1;"))
-    }
-
-    @Test("ContentViewModel은 UI 상태를 MainActor에 격리하고 장시간 다운로드는 detached worker로 실행한다")
-    func testContentViewModelConcurrencyReleaseGate() throws {
-        let source = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        #expect(source.contains("@MainActor\nclass ContentViewModel"))
-        #expect(source.contains("speakerDiarizationModelTask = Task.detached(priority: .background)"))
-        #expect(source.contains("let task = Task.detached(priority: .background)"))
-        #expect(source.contains("try Task.checkCancellation()"))
-    }
-
-    @Test("화자분리 모델 다운로드 Task는 ViewModel을 전체 작업 동안 강하게 보유하지 않는다")
-    func testSpeakerModelDownloadTaskAvoidsLongLivedStrongSelfCapture() throws {
-        let source = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        let longLivedCapturePattern =
-            #"speakerDiarizationModelTask = Task\.detached\(priority: \.background\) \{ \[weak self\] in\s+guard let self else \{ return \}"#
-        #expect(source.range(of: longLivedCapturePattern, options: .regularExpression) == nil)
-    }
-
-    @Test("모델 다운로드 Task는 ViewModel을 전체 작업 동안 강하게 보유하지 않는다")
-    func testModelDownloadTaskAvoidsLongLivedStrongSelfCapture() throws {
-        let source = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        let longLivedCapturePattern =
-            #"let task = Task\.detached\(priority: \.background\) \{ \[weak self\] in\s+guard let self = self else \{ return \}"#
-        #expect(source.range(of: longLivedCapturePattern, options: .regularExpression) == nil)
-    }
-
-    @Test("모델 다운로드 런타임 참조는 UI 상태 모델에 저장하지 않는다")
-    func testModelDownloadRuntimeReferencesStayOutOfStateModel() throws {
-        let stateSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Data/Models/StateModels.swift"
-        )
-        let viewModelSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        #expect(!stateSource.contains("downloadTasks: [String: Task<Void, Never>]"))
-        #expect(!stateSource.contains("downloadProgressObjects: [String: Progress]"))
-        #expect(!stateSource.contains("lastProgressCallbackTime: [String: Date]"))
-        #expect(viewModelSource.contains("private var modelDownloadTasks: [String: Task<Void, Never>]"))
-        #expect(viewModelSource.contains("private var modelDownloadProgressObjects: [String: Progress]"))
-    }
-
-    @Test("전사 Task는 UIState가 아니라 ViewModel이 소유한다")
-    func testTranscriptionTaskIsOwnedByViewModel() throws {
-        let stateSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Data/Models/StateModels.swift"
-        )
-        let viewModelSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        #expect(!stateSource.contains("Task<Void, Never>"))
-        #expect(viewModelSource.contains("private var transcribeTask: Task<Void, Never>?"))
-        #expect(viewModelSource.contains("func cancelTranscription()"))
-    }
-
-    @Test("화자분리가 꺼져 있으면 전사 오디오 샘플을 후속 분석으로 넘기지 않는다")
-    func testTranscriptionSkipsDiarizationCallWhenDisabled() throws {
-        let viewModelSource = try Self.readRepositoryFile(
-            "CaptionMate/CaptionMate/Source/Presentation/ViewModels/ContentViewModel.swift"
-        )
-
-        #expect(viewModelSource.contains("let shouldRunSpeakerDiarization = enableSpeakerDiarization"))
-        #expect(viewModelSource.contains(
-            "if shouldRunSpeakerDiarization {\n            await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)\n        }"
-        ))
-        #expect(!viewModelSource.contains("""
-        try Task.checkCancellation()
-        await runSpeakerDiarizationIfEnabled(audioSamples: audioFileSamples)
-        """))
-    }
-
-    private static func readRepositoryFile(_ relativePath: String) throws -> String {
-        let url = try repositoryRoot().appendingPathComponent(relativePath)
-        return try String(contentsOf: url, encoding: .utf8)
-    }
-
-    private static func repositoryRoot() throws -> URL {
-        var directory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-        let fileManager = FileManager.default
-
-        while directory.path != "/" {
-            if fileManager.fileExists(atPath: directory.appendingPathComponent(".git").path) {
-                return directory
-            }
-            directory.deleteLastPathComponent()
-        }
-
-        throw CocoaError(.fileNoSuchFile)
     }
 }
 

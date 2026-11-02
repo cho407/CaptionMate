@@ -247,7 +247,7 @@ struct CaptionMateProjectStore {
             .appendingPathComponent(id, isDirectory: false)
             .appendingPathExtension(Self.pathExtension)
             .standardizedFileURL
-        guard projectURL.deletingLastPathComponent().standardizedFileURL == standardizedRootURL else {
+        guard projectURL.deletingLastPathComponent().standardizedFileURL.path == standardizedRootURL.path else {
             throw CaptionMateProjectStoreError.unsafeProjectID(id)
         }
         return projectURL

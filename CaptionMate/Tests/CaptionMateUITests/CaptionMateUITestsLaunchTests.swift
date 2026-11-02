@@ -33,16 +33,43 @@ final class CaptionMateUITestsLaunchTests: XCTestCase {
     }
 
     @MainActor
-    func testLaunch() throws {
-        let app = XCUIApplication()
-        app.launch()
+    func testImportPickerFromLaunch() throws {
+        let app = XCUIApplication.captionMate()
+        app.launchFreshForUITest()
+        defer { app.terminate() }
 
-        // 메인 윈도우가 나타날 때까지 대기 (빈 화면 캡처 방지)
-        let window = app.windows.firstMatch
-        XCTAssertTrue(window.waitForExistence(timeout: 5.0), "메인 윈도우가 로드되어야 합니다")
+        let importButton = app.buttons["Import File"]
+        let importReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in importButton.exists && importButton.isHittable },
+            object: nil
+        )
+        XCTAssertEqual(
+            XCTWaiter.wait(for: [importReady], timeout: 5.0),
+            .completed,
+            "Import must remain reachable in the window"
+        )
+        importButton.click()
+        let pickerOpened = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                app.dialogs.firstMatch.exists || app.sheets.firstMatch.exists
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [pickerOpened], timeout: 5.0), .completed)
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 3.0))
+        app.typeKey(.escape, modifierFlags: [])
+        app.activate()
+        let importAvailable = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                !app.dialogs.firstMatch.exists && !app.sheets.firstMatch.exists && importButton.isHittable
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [importAvailable], timeout: 5.0), .completed)
 
-        let attachment = XCTAttachment(screenshot: app.screenshot())
-        attachment.name = "Launch Screen"
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Import picker cancelled after launch"
         attachment.lifetime = .keepAlways
         add(attachment)
     }

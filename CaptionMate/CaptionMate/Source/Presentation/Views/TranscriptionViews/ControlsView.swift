@@ -25,9 +25,21 @@ import SwiftUI
 
 struct ControlsView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject private var modelState: ModelManagementState
     @Environment(\.colorScheme) private var colorScheme
 
     private let contentMaxWidth: CGFloat = 960
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        modelState = viewModel.modelManagementState
+    }
+
+    private var canStartTranscription: Bool {
+        viewModel.canChangeModel && modelState.modelState == .loaded &&
+            viewModel.audioState.importedAudioURL != nil &&
+            (!viewModel.enableSpeakerDiarization || viewModel.isSpeakerDiarizationAvailable)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -86,16 +98,13 @@ struct ControlsView: View {
                         viewModel.uiState.isTranscribingView = true
                     }
                     .simpleButtonStyle(
-                        background: (viewModel.audioState.isTranscribing || viewModel
-                            .modelManagementState.modelState != .loaded || viewModel.audioState
-                            .importedAudioURL == nil) ? .brightGray : .accentColor,
+                        background: canStartTranscription ? .accentColor : .brightGray,
                         foreground: Color.controlButtonForeground(for: colorScheme),
                         cornerRadius: 8,
                         horizontalPadding: 16,
                         verticalPadding: 10
                     )
-                    .disabled(viewModel.audioState.isTranscribing || viewModel.modelManagementState
-                        .modelState != .loaded || viewModel.audioState.importedAudioURL == nil)
+                    .disabled(!canStartTranscription)
                     .accessibilityIdentifier("Start Transcription")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -108,9 +117,6 @@ struct ControlsView: View {
         .padding(.bottom, 16)
         .sheet(isPresented: $viewModel.uiState.showAdvancedOptions) {
             SettingsView(viewModel: viewModel)
-                .presentationDetents([.medium, .large])
-                .presentationBackgroundInteraction(.enabled)
-                .presentationContentInteraction(.scrolls)
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
         .navigationDestination(isPresented: $viewModel.uiState.isTranscribingView) {

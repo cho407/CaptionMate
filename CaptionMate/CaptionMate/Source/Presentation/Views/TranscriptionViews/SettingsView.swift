@@ -38,6 +38,7 @@ private struct SettingRow<Control: View>: View {
                 InfoButton(infoKey)
             }
             control()
+                .accessibilityLabel(Text(title))
         }
     }
 }
@@ -45,257 +46,133 @@ private struct SettingRow<Control: View>: View {
 struct SettingsView: View {
     @ObservedObject var viewModel: ContentViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showExpertOptions = false
 
-    // 기존 포맷터 유지
-    private var numberFormatter: NumberFormatter {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.maximumFractionDigits = 2
-        f.minimumFractionDigits = 0
-        f.minimum = 1
-        return f
+    private var tokenLimit: Int {
+        min(viewModel.whisperKit?.textDecoder.kvCacheMaxSequenceLength ?? Constants.maxTokenContext,
+            Constants.maxTokenContext)
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // MARK: Header
-
-                HStack(alignment: .firstTextBaseline) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "gearshape.fill")
-                            .foregroundStyle(.secondary)
-                        Text("decoding_options")
-                            .font(.title3.weight(.semibold))
-                            .accessibilityIdentifier("settings.sheet")
-                    }
-                    Spacer()
-                    Button {
-                        viewModel.uiState.showAdvancedOptions = false
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .imageScale(.large)
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(Text("Close"))
-                    }
-                    .buttonStyle(.plain)
+        VStack(spacing: 0) {
+            HStack {
+                Label("decoding_options", systemImage: "slider.horizontal.3")
+                    .font(.title3.weight(.semibold))
+                    .accessibilityIdentifier("settings.sheet")
+                Spacer()
+                Button("Close") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
                     .accessibilityIdentifier("settings.closeButton")
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
+            }
+            .padding(16)
+            Divider()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    GroupBox {
+                        VStack(spacing: 12) {
+                            SettingRow(title: "Show Timestamps", infoKey: "info.show_timestamps") {
+                                Toggle("Show Timestamps", isOn: $viewModel.enableTimestamps).labelsHidden()
+                            }
+                            SettingRow(title: "Word Timestamps", infoKey: "info.word_timestamps") {
+                                Toggle("Word Timestamps", isOn: $viewModel.enableWordTimestamp).labelsHidden()
+                            }
+                            SettingRow(title: "Show Decoder Preview", infoKey: "info.show_decoder_preview") {
+                                Toggle("Show Decoder Preview", isOn: $viewModel.enableDecoderPreview).labelsHidden()
+                            }
+                        }
+                        .padding(8)
+                    } label: {
+                        Label("format_and_preview", systemImage: "doc.text")
+                    }
 
-                Divider()
-                    .padding(.horizontal, 16)
-
-                // MARK: 1. Output & Format
-
-                GroupBox {
-                    VStack(spacing: 8) {
-                        SettingRow(title: "Show Timestamps", infoKey: "info.show_timestamps") {
-                            Toggle("", isOn: $viewModel.enableTimestamps).labelsHidden()
-                        }
-                        Divider()
-                        SettingRow(title: "Word Timestamps", infoKey: "info.word_timestamps") {
-                            Toggle("", isOn: $viewModel.enableWordTimestamp).labelsHidden()
-                        }
-                        Divider()
-                        SettingRow(title: "Special Characters",
-                                   infoKey: "info.special_characters") {
-                            Toggle("", isOn: $viewModel.enableSpecialCharacters).labelsHidden()
-                        }
-                        Divider()
-                        SettingRow(
-                            title: "Show Decoder Preview",
-                            infoKey: "info.show_decoder_preview"
-                        ) {
-                            Toggle("", isOn: $viewModel.enableDecoderPreview).labelsHidden()
-                        }
-                        Divider()
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 10) {
-                                Text("Export Preset")
-                                Spacer()
-                                Picker("", selection: Binding(
-                                    get: { viewModel.selectedExportPreset },
-                                    set: { preset in
-                                        viewModel.selectedExportPreset = preset
-                                        viewModel.applySelectedExportPreset()
+                    DisclosureGroup(isExpanded: $showExpertOptions) {
+                        VStack(spacing: 16) {
+                            GroupBox {
+                                VStack(spacing: 12) {
+                                    SettingRow(title: "Prompt Prefill", infoKey: "info.prompt_prefill") {
+                                        Toggle("Prompt Prefill", isOn: $viewModel.enablePromptPrefill).labelsHidden()
                                     }
-                                )) {
-                                    ForEach(SubtitleExportPreset.allCases) { preset in
-                                        Text(preset.displayNameKey).tag(preset)
+                                    SettingRow(title: "Model Special Tokens", infoKey: nil) {
+                                        Toggle("Model Special Tokens", isOn: $viewModel.enableSpecialCharacters).labelsHidden()
+                                    }
+                                    settingSlider("Starting Temperature", info: "info.starting_temperature",
+                                                  value: $viewModel.temperatureStart, range: 0 ... 1, step: 0.1)
+                                    settingSlider("Max Fallback Count", info: "info.max_fallback_count",
+                                                  value: $viewModel.fallbackCount, range: 0 ... 5, step: 1)
+                                    settingSlider("Compression Check Tokens", info: "info.compression_check_tokens",
+                                                  value: $viewModel.compressionCheckWindow, range: 5 ... 100, step: 5)
+                                    settingSlider(
+                                        "Max Tokens Per Loop", info: "info.max_tokens_per_loop",
+                                        value: Binding(
+                                            get: { Double(viewModel.sampleLength) },
+                                            set: { viewModel.sampleLength = Int($0) }
+                                        ),
+                                        range: 1 ... Double(tokenLimit), step: 1
+                                    )
+                                }
+                                .padding(8)
+                            } label: {
+                                Label("decoding_quality", systemImage: "slider.horizontal.3")
+                            }
+
+                            GroupBox {
+                                VStack(spacing: 12) {
+                                    SettingRow(title: "Chunking Strategy", infoKey: "info.chunking_strategy") {
+                                        Picker("Chunking Strategy", selection: $viewModel.chunkingStrategy) {
+                                            Text("None").tag(ChunkingStrategy.none)
+                                            Text("VAD").tag(ChunkingStrategy.vad)
+                                        }
+                                        .labelsHidden()
+                                        .frame(width: 160)
+                                    }
+                                    settingSlider("Workers", info: "info.workers",
+                                                  value: $viewModel.concurrentWorkerCount, range: 1 ... 8, step: 1)
+                                    Button {
+                                        viewModel.applyRecommendedPerformanceSettings()
+                                    } label: {
+                                        Label("Auto Tune Performance", systemImage: "wand.and.stars")
                                     }
                                 }
-                                .frame(width: 190)
+                                .padding(8)
+                            } label: {
+                                Label("performance", systemImage: "speedometer")
                             }
-                            Text(viewModel.selectedExportPreset.summaryKey)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
                         }
-                        Divider()
-                        HStack(spacing: 10) {
-                            Text("Frame Rate (fps)")
-                            InfoButton("info.frame_rate")
-                            Spacer()
-                            TextField("30", value: $viewModel.frameRate, formatter: numberFormatter)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 88)
-                        }
+                        .padding(.top, 12)
+                    } label: {
+                        Button("Advanced Settings") { showExpertOptions.toggle() }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("settings.advancedDisclosure")
                     }
-                    .padding(.vertical, 6)
-                } label: {
-                    Label("format_and_preview", systemImage: "doc.text")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 16)
-
-                // MARK: 2. Decoding Quality
-
-                GroupBox {
-                    VStack(spacing: 8) {
-                        SettingRow(title: "Prompt Prefill", infoKey: "info.prompt_prefill") {
-                            Toggle("", isOn: $viewModel.enablePromptPrefill).labelsHidden()
-                        }
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Starting Temperature")
-                                InfoButton("info.starting_temperature")
-                            }
-                            HStack(spacing: 10) {
-                                Slider(value: $viewModel.temperatureStart, in: 0 ... 1, step: 0.1)
-                                Text(viewModel.temperatureStart.formatted(.number))
-                                    .monospacedDigit()
-                                    .frame(width: 40, alignment: .trailing)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Max Fallback Count")
-                                InfoButton("info.max_fallback_count")
-                            }
-                            HStack(spacing: 10) {
-                                Slider(value: $viewModel.fallbackCount, in: 0 ... 5, step: 1)
-                                Text(viewModel.fallbackCount.formatted(.number))
-                                    .monospacedDigit()
-                                    .frame(width: 40, alignment: .trailing)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Compression Check Tokens")
-                                InfoButton("info.compression_check_tokens")
-                            }
-                            HStack(spacing: 10) {
-                                Slider(
-                                    value: $viewModel.compressionCheckWindow,
-                                    in: 0 ... 100,
-                                    step: 5
-                                )
-                                Text(viewModel.compressionCheckWindow.formatted(.number))
-                                    .monospacedDigit()
-                                    .frame(width: 40, alignment: .trailing)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 6)
-                } label: {
-                    Label("decoding_quality", systemImage: "slider.horizontal.3")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-
-                // MARK: 3. Performance
-
-                GroupBox {
-                    VStack(spacing: 12) {
-                        HStack(spacing: 10) {
-                            Text("Chunking Strategy")
-                            InfoButton("info.chunking_strategy")
-                            Spacer()
-                            Picker("", selection: $viewModel.chunkingStrategy) {
-                                Text("None").tag(ChunkingStrategy.none)
-                                Text("VAD").tag(ChunkingStrategy.vad)
-                            }
-                            .pickerStyle(.segmented)
-                            .frame(width: 160)
-                        }
-
-                        Divider()
-
-                        HStack(spacing: 10) {
-                            Text("Workers")
-                            InfoButton("info.workers")
-                            Spacer()
-                            Slider(value: $viewModel.concurrentWorkerCount, in: 0 ... 32, step: 1)
-                                .frame(maxWidth: 240)
-                            Text(viewModel.concurrentWorkerCount.formatted(.number))
-                                .monospacedDigit()
-                                .frame(width: 36, alignment: .trailing)
-                                .foregroundStyle(.secondary)
-                        }
-
-                        Button {
-                            viewModel.applyRecommendedPerformanceSettings()
-                        } label: {
-                            Label("Auto Tune Performance", systemImage: "wand.and.stars")
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderless)
-
-                        Divider()
-
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("Max Tokens Per Loop")
-                                InfoButton("info.max_tokens_per_loop")
-                            }
-                            HStack(spacing: 10) {
-                                Slider(
-                                    value: Binding(
-                                        get: { Double(viewModel.sampleLength) },
-                                        set: { viewModel.sampleLength = Int($0) }
-                                    ),
-                                    in: 0 ... Double(min(
-                                        viewModel.whisperKit?.textDecoder.kvCacheMaxSequenceLength
-                                            ?? Constants.maxTokenContext,
-                                        Constants.maxTokenContext
-                                    )),
-                                    step: 10
-                                )
-                                Text("\(viewModel.sampleLength)")
-                                    .monospacedDigit()
-                                    .frame(width: 40, alignment: .trailing)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 6)
-                } label: {
-                    Label("performance", systemImage: "speedometer")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.horizontal, 16)
-
-                Spacer(minLength: 8)
+                .disabled(viewModel.isTranscriptionBusy)
+                .padding(16)
             }
-            .padding(.bottom, 16)
         }
-        .padding(.vertical, 8)
-        .frame(minHeight: 700)
+        .frame(width: 520, height: 560)
+        .onAppear {
+            viewModel.sampleLength = min(max(viewModel.sampleLength, 1), tokenLimit)
+            viewModel.concurrentWorkerCount = min(max(viewModel.concurrentWorkerCount, 1), 8)
+            viewModel.compressionCheckWindow = min(max(viewModel.compressionCheckWindow, 5), 100)
+        }
+    }
+
+    private func settingSlider(
+        _ title: LocalizedStringKey, info: LocalizedStringKey,
+        value: Binding<Double>, range: ClosedRange<Double>, step: Double
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title)
+                InfoButton(info)
+                Spacer()
+                Text(value.wrappedValue.formatted(.number))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: value, in: range, step: step)
+                .accessibilityLabel(Text(title))
+        }
     }
 }
 

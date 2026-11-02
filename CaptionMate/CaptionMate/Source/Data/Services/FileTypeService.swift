@@ -48,7 +48,10 @@ public enum SubtitleFileType: String, CaseIterable {
         }
     }
 
-    public static func from(utType: UTType) -> SubtitleFileType? {
-        return allCases.first { $0.utType.identifier == utType.identifier }
+    var supportsCaptionLayout: Bool {
+        switch self {
+        case .srt, .vtt, .fcpxml: return true
+        case .json, .txt, .doc: return false
+        }
     }
 }

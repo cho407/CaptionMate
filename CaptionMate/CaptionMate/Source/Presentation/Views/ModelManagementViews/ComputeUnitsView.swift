@@ -50,6 +50,8 @@ struct ComputeUnitsView: View {
                                 .modelManagementState.modelState != .unloaded
                         )
                     Text("Audio Encoder")
+                        .lineLimit(1)
+                        .help("Audio Encoder")
                     Spacer()
                     Picker("", selection: $viewModel.encoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
@@ -61,6 +63,8 @@ struct ComputeUnitsView: View {
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
+                    .accessibilityLabel(Text("Audio Encoder"))
+                    .disabled(!viewModel.canChangeModel)
                 }
                 HStack {
                     Image(systemName: "circle.fill")
@@ -75,6 +79,8 @@ struct ComputeUnitsView: View {
                                 .modelManagementState.modelState != .unloaded
                         )
                     Text("Text Decoder")
+                        .lineLimit(1)
+                        .help("Text Decoder")
                     Spacer()
                     Picker("", selection: $viewModel.decoderComputeUnits) {
                         Text("CPU").tag(MLComputeUnits.cpuOnly)
@@ -86,6 +92,8 @@ struct ComputeUnitsView: View {
                     }
                     .pickerStyle(MenuPickerStyle())
                     .frame(width: 150)
+                    .accessibilityLabel(Text("Text Decoder"))
+                    .disabled(!viewModel.canChangeModel)
                 }
             }
             .padding(.top)

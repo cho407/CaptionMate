@@ -54,7 +54,7 @@ extension ModelState {
 
 struct TranscriptionState {
     var currentText: String = ""
-    var currentChunks: [Int: (chunkText: [String], fallbacks: Int)] = [:]
+    var currentChunks: [Int: String] = [:]
 
     // 전사 결과 관련
     var tokensPerSecond: TimeInterval = 0
@@ -87,6 +87,7 @@ struct SpeakerSegmentAssignment: Equatable, Sendable {
 
 struct SpeakerDiarizationState: Equatable, Sendable {
     var isRunning: Bool = false
+    var isCancelling: Bool = false
     var progress: Double = 0
     var detectedSpeakerCount: Int = 0
     var errorMessage: String?
@@ -445,9 +446,7 @@ class ModelManagementState: ObservableObject {
     @Published var modelLoadError: String? = nil
     @Published var hasModelLoadError: Bool = false
 
-    // 다운로드/로딩 진행률 - 자주 업데이트되는 값들
-    @Published var loadingProgressValue: Float = 0.0
-    @Published var specializationProgressRatio: Float = 0.2
+    // Measured download progress; Core ML loading exposes stages, not a percentage.
     @Published var downloadProgress: [String: Float] = [:]
 
     // 모델 크기 정보
@@ -750,7 +749,7 @@ struct AudioState {
 struct UIState {
     var isFilePickerPresented: Bool = false
     var columnVisibility: NavigationSplitViewVisibility = .all
-    var showComputeUnits: Bool = true
+    var showComputeUnits: Bool = false
     var showAdvancedOptions: Bool = false
     var isTranscribingView: Bool = false
     var isModelmanagerViewPresented: Bool = false

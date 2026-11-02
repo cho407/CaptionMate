@@ -35,8 +35,7 @@ struct ContentView: View {
                 ModelSelectorView(viewModel: viewModel)
                     .padding(.vertical)
                 ComputeUnitsView(viewModel: viewModel)
-                    .disabled(viewModel.modelManagementState.modelState != .loaded && viewModel
-                        .modelManagementState.modelState != .unloaded)
+                    .disabled(!viewModel.canChangeModel)
                     .padding(.bottom)
 
                 ProjectLibraryView(viewModel: viewModel)
@@ -84,7 +83,11 @@ struct ContentView: View {
         .onAppear {
             viewModel.fetchModels()
             viewModel.refreshProjectLibrary()
-            viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded()
+            if viewModel.enableSpeakerDiarization {
+                viewModel.prepareDefaultSpeakerDiarizationModelIfNeeded()
+            } else {
+                viewModel.refreshSpeakerDiarizationModelState()
+            }
             viewModel.presentFirstRunGuideIfNeeded()
 #if DEBUG
             viewModel.activateSpeakerFixtureNavigationForUITestingIfNeeded()
@@ -474,13 +477,19 @@ private struct ProjectLibraryRow: View {
 
 private struct FirstRunGuideView: View {
     @ObservedObject var viewModel: ContentViewModel
+    @ObservedObject private var modelState: ModelManagementState
+
+    init(viewModel: ContentViewModel) {
+        self.viewModel = viewModel
+        modelState = viewModel.modelManagementState
+    }
 
     private var recommendedModel: String {
         WhisperKit.recommendedModels().default
     }
 
     private var recommendedModelIsLocal: Bool {
-        viewModel.modelManagementState.localModels.contains(recommendedModel)
+        modelState.localModels.contains(recommendedModel)
     }
 
     var body: some View {
@@ -505,14 +514,14 @@ private struct FirstRunGuideView: View {
                     title: recommendedModelIsLocal ?
                         LocalizedStringKey("Recommended model is local") :
                         LocalizedStringKey("Recommended model"),
-                    detail: Text(verbatim: viewModel.modelManagementState.displayName(for: recommendedModel))
+                    detail: Text(verbatim: modelState.displayName(for: recommendedModel))
                 )
                 FirstRunChecklistRow(
-                    symbol: viewModel.modelManagementState.isSpeakerDiarizationModelReady ? "checkmark.circle.fill" : "person.2.wave.2",
+                    symbol: modelState.isSpeakerDiarizationModelReady ? "checkmark.circle.fill" : "person.2.wave.2",
                     title: "Speaker diarization",
-                    detail: viewModel.modelManagementState.isSpeakerDiarizationModelReady ?
+                    detail: modelState.isSpeakerDiarizationModelReady ?
                         Text("Offline model is ready") :
-                        Text("Default offline model · \(viewModel.modelManagementState.formattedSpeakerDiarizationModelSize)")
+                        Text("Default offline model · \(modelState.formattedSpeakerDiarizationModelSize)")
                 )
                 FirstRunChecklistRow(
                     symbol: "waveform",

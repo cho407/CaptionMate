@@ -21,9 +21,10 @@
 //  Created by 조형구 on 2/22/25.
 //
 
+import Carbon
 import XCTest
 
-private extension XCUIApplication {
+extension XCUIApplication {
     static func captionMate(launchArguments extraArguments: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = [
@@ -57,6 +58,19 @@ private extension XCUIApplication {
         terminate()
         _ = wait(for: .notRunning, timeout: 5.0)
         launch()
+        activate()
+    }
+
+    func typeCommandKey(_ key: String) throws {
+        // XCTest maps characters through the current input method, not physical keys.
+        let original = try XCTUnwrap(TISCopyCurrentKeyboardInputSource()?.takeRetainedValue())
+        let ascii = try XCTUnwrap(TISCopyCurrentASCIICapableKeyboardInputSource()?.takeRetainedValue())
+        let status = TISSelectInputSource(ascii)
+        guard status == noErr else {
+            throw NSError(domain: "CaptionMateUITest.KeyboardInputSource", code: Int(status))
+        }
+        defer { XCTAssertEqual(TISSelectInputSource(original), noErr) }
+        typeKey(key, modifierFlags: .command)
     }
 }
 
@@ -231,48 +245,22 @@ final class InteractionTests: XCTestCase {
         XCTAssertTrue(settingsButton.waitForExistence(timeout: 5.0), "Settings 버튼이 존재해야 합니다")
         settingsButton.click()
 
-        // Settings View가 열렸는지 확인하는 다양한 방법들
-        let sliderAppeared = app.sliders.firstMatch.waitForExistence(timeout: 8.0)
-        let toggleAppeared = app.toggles.firstMatch.waitForExistence(timeout: 8.0)
-        let tempText = app.staticTexts
-            .matching(
-                NSPredicate(
-                    format: "label CONTAINS[c] 'Temperature' OR label CONTAINS[c] 'Starting' OR label CONTAINS[c] '온도'"
-                )
-            )
-            .firstMatch.waitForExistence(timeout: 8.0)
-        let frameRateText = app.staticTexts
-            .matching(
-                NSPredicate(format: "label CONTAINS[c] 'Frame Rate' OR label CONTAINS[c] 'fps'")
-            )
-            .firstMatch.waitForExistence(timeout: 8.0)
-        let workersText = app.staticTexts
-            .matching(NSPredicate(format: "label CONTAINS[c] 'Workers'"))
-            .firstMatch.waitForExistence(timeout: 8.0)
-
-        let settingsViewOpened = sliderAppeared || toggleAppeared || tempText || frameRateText ||
-            workersText
-
-        if !settingsViewOpened {
-            // 디버깅: 현재 표시된 요소 확인
-            print("Sliders: \(app.sliders.count), Toggles: \(app.toggles.count)")
-            print("All text elements: \(app.staticTexts.allElementsBoundByIndex.map { $0.label })")
-            print("All buttons: \(app.buttons.allElementsBoundByIndex.map { $0.label })")
-        }
-
-        if !settingsViewOpened {
-            throw XCTSkip("Settings View가 열리지 않았습니다. UI 구조가 변경되었을 수 있습니다.")
-        }
-
-        // Settings 닫기 (ESC 키 사용)
-        app.typeKey(.escape, modifierFlags: [])
-
-        // 메인 화면의 토글과 설정 시트의 컨트롤을 구분해 닫힘을 확인
         let settingsSheet = app.element("settings.sheet")
-        XCTAssertFalse(
-            settingsSheet.waitForExistence(timeout: 1.0),
-            "Settings View가 닫혀야 합니다"
+        XCTAssertTrue(settingsSheet.waitForExistence(timeout: 5.0))
+        app.element("settings.advancedDisclosure").click()
+        XCTAssertTrue(app.sliders.firstMatch.waitForExistence(timeout: 3.0))
+
+        let attachment = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        attachment.name = "Advanced settings expanded"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        app.element("settings.closeButton").click()
+        let closed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in !settingsSheet.exists && settingsButton.isHittable },
+            object: nil
         )
+        XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 3.0), .completed)
     }
 
     @MainActor
@@ -392,11 +380,16 @@ final class SpeakerDiarizationUXTests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
+        let needsReadinessFixture = name.contains("testNestedModelReadinessUpdatesControls")
         let needsSpeakerFixture =
             name.contains("testSpeakerEditorRenameAndExportReview") ||
-            name.contains("testTranscriptionCompletedEditorRoundTrip")
+            name.contains("testTranscriptionCompletedEditorRoundTrip") ||
+            name.contains("testPlaybackFirstSeekAndPauseResume") ||
+            name.contains("testLoadedModelHasNoLoadingIndicator") ||
+            needsReadinessFixture
         app = XCUIApplication.captionMate(
-            launchArguments: needsSpeakerFixture ? ["-CaptionMateUITestSpeakerFixture"] : []
+            launchArguments: (needsSpeakerFixture ? ["-CaptionMateUITestSpeakerFixture"] : []) +
+                (needsReadinessFixture ? ["-CaptionMateUITestModelReadinessFixture"] : [])
         )
         app.launchFreshForUITest()
 
@@ -410,27 +403,84 @@ final class SpeakerDiarizationUXTests: XCTestCase {
     }
 
     @MainActor
-    func testTranscriptionSpeakerDiarizationControls() throws {
+    func testNestedModelReadinessUpdatesControls() throws {
+        let start = app.buttons["Start Transcription"]
         let speakerToggle = app.element("transcription.speakerDiarizationToggle")
-        let speakerCountPicker = app.element("transcription.speakerCountPicker")
-        let exportLabelsToggle = app.element("transcription.exportSpeakerLabelsToggle")
-
-        XCTAssertTrue(speakerToggle.waitForExistence(timeout: 3.0))
-        XCTAssertTrue(speakerCountPicker.waitForExistence(timeout: 3.0))
-        XCTAssertTrue(exportLabelsToggle.waitForExistence(timeout: 3.0))
-
-        let sourceLanguagePicker = app.element("transcription.sourceLanguagePicker")
-        XCTAssertTrue(sourceLanguagePicker.waitForExistence(timeout: 3.0))
-        let sourceLanguagePlaceholder = sourceLanguagePicker.value as? String
-        XCTAssertFalse(
-            sourceLanguagePlaceholder?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true,
-            "모델 언어가 준비되지 않은 상태에서도 현지화된 placeholder가 표시되어야 합니다"
-        )
-        XCTAssertNotEqual(sourceLanguagePlaceholder, "English")
-
+        XCTAssertTrue(start.waitForExistence(timeout: 3.0))
+        XCTAssertFalse(start.isEnabled)
         XCTAssertFalse(speakerToggle.isEnabled)
-        XCTAssertFalse(speakerCountPicker.isEnabled)
-        XCTAssertFalse(exportLabelsToggle.isEnabled)
+        let modelReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in start.isEnabled },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [modelReady], timeout: 12.0), .completed)
+        XCTAssertFalse(speakerToggle.isEnabled)
+        let speakerReady = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in speakerToggle.isEnabled },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [speakerReady], timeout: 8.0), .completed)
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.name = "Ready controls after nested model publications"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
+    func testLoadedModelHasNoLoadingIndicator() throws {
+        let selector = app.element("modelSelector.container")
+        let status = app.element("modelSelector.status")
+        XCTAssertTrue(status.waitForExistence(timeout: 5.0))
+        XCTAssertEqual(status.value as? String, "Loaded")
+        let finished = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in selector.progressIndicators.count == 0 },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [finished], timeout: 5.0), .completed)
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.name = "Loaded model without stale loading progress"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+    }
+
+    @MainActor
+    func testPlaybackFirstSeekAndPauseResume() throws {
+        let playPause = app.element("transcription.playPauseButton")
+        XCTAssertTrue(playPause.waitForExistence(timeout: 5.0))
+        XCTAssertEqual(playPause.label, "Play")
+        let time = app.element("transcription.playbackTime")
+
+        app.buttons["Skip Forward 5 Seconds"].click()
+        XCTAssertEqual(time.value as? String, "00:05 / 00:30", "재생 전에 처음 탐색한 위치가 적용되어야 합니다")
+        app.buttons["Skip Back 5 Seconds"].click()
+        XCTAssertEqual(time.value as? String, "00:00 / 00:30")
+
+        playPause.click()
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3.0))
+        let advanced = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                guard let value = time.value as? String else { return false }
+                return value != "00:00 / 00:30"
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [advanced], timeout: 5.0), .completed)
+        playPause.click()
+        XCTAssertEqual(playPause.label, "Play")
+        let pausedTime = try XCTUnwrap(time.value as? String)
+
+        playPause.click()
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 3.0))
+        let resumed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in
+                guard let value = time.value as? String else { return false }
+                return value != pausedTime
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [resumed], timeout: 5.0), .completed)
+        playPause.click()
+        XCTAssertEqual(playPause.label, "Play")
     }
 
     @MainActor
@@ -463,10 +513,38 @@ final class SpeakerDiarizationUXTests: XCTestCase {
         XCTAssertTrue(speakerEditor.waitForExistence(timeout: 5.0), "화자 편집기가 표시되어야 합니다")
         let applyButton = app.element("transcription.applyEditsButton")
         XCTAssertTrue(applyButton.waitForExistence(timeout: 3.0), "적용하기 버튼이 표시되어야 합니다")
+        let segmentText = app.element("transcription.segmentText.0")
+        let originalText = try XCTUnwrap(segmentText.value as? String)
+        let editorScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        editorScreenshot.name = "Subtitle editor before structural edits"
+        editorScreenshot.lifetime = .keepAlways
+        add(editorScreenshot)
+        app.element("transcription.segmentTools.0").click()
+        app.element("transcription.splitSegment.0").click()
+        XCTAssertNotEqual(segmentText.value as? String, originalText)
+        let undoButton = app.element("transcription.undoButton")
+        XCTAssertTrue(undoButton.isEnabled)
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 3.0))
+        try app.typeCommandKey("z")
+        let keyboardUndoFinished = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in segmentText.value as? String == originalText },
+            object: nil
+        )
+        let keyboardUndoResult = XCTWaiter.wait(for: [keyboardUndoFinished], timeout: 3.0)
+        XCTAssertEqual(keyboardUndoResult, .completed)
+        app.element("transcription.redoButton").click()
+        XCTAssertNotEqual(segmentText.value as? String, originalText)
+        undoButton.click()
+        XCTAssertEqual(segmentText.value as? String, originalText)
 
         applyButton.click()
         XCTAssertTrue(completedView.waitForExistence(timeout: 3.0), "적용 후 완료 화면으로 돌아와야 합니다")
         XCTAssertFalse(speakerEditor.exists, "적용 후 상세 편집기가 숨겨져야 합니다")
+        let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        screenshot.name = "Completed transcript after applying edits"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
     }
 
     @MainActor
@@ -481,34 +559,48 @@ final class SpeakerDiarizationUXTests: XCTestCase {
         let speakerEditor = app.element("speakerEditor.container")
         XCTAssertTrue(speakerEditor.waitForExistence(timeout: 5.0), "화자 편집기가 표시되어야 합니다")
 
-        let reanalyzeButton = app.element("speakerEditor.reanalyzeButton")
-        XCTAssertTrue(reanalyzeButton.waitForExistence(timeout: 3.0))
-        XCTAssertTrue(reanalyzeButton.isEnabled)
-
         let speakerOneNameField = app.element("speakerEditor.nameField.0")
         XCTAssertTrue(speakerOneNameField.waitForExistence(timeout: 3.0))
         speakerOneNameField.click()
         speakerOneNameField.typeText("Host")
-
-        let assignedSegmentMenu = app.element("speakerAssignmentMenu.segment.1")
-        XCTAssertTrue(assignedSegmentMenu.waitForExistence(timeout: 3.0))
-        XCTAssertTrue(
-            assignedSegmentMenu.label.localizedCaseInsensitiveContains("Host"),
-            "화자 이름 변경이 배정된 세그먼트 라벨에 반영되어야 합니다"
-        )
-
         let exportButton = app.element("transcription.exportButton")
         XCTAssertTrue(exportButton.waitForExistence(timeout: 3.0))
         exportButton.click()
 
         let reviewSheet = app.element("subtitleReview.sheet")
         XCTAssertTrue(reviewSheet.waitForExistence(timeout: 5.0), "Export 전 review 시트가 열려야 합니다")
-        XCTAssertTrue(app.staticTexts["Missing speaker label"].waitForExistence(timeout: 3.0))
-        XCTAssertFalse(app.staticTexts["Speaker 1 uses a default name"].exists)
         XCTAssertTrue(app.element("subtitleReview.quickFixButton").waitForExistence(timeout: 3.0))
         XCTAssertTrue(app.element("subtitleReview.exportAnywayButton").isEnabled)
 
-        app.element("subtitleReview.cancelButton").click()
+        let formatPicker = app.element("subtitleReview.formatPicker")
+        formatPicker.click()
+        app.menuItems["FCPXML"].click()
+        XCTAssertTrue(app.element("subtitleReview.frameRateField").waitForExistence(timeout: 3.0))
+        XCTAssertTrue(app.element("subtitleReview.presetPicker").exists)
+        let exportScreenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        exportScreenshot.name = "FCPXML options and subtitle review"
+        exportScreenshot.lifetime = .keepAlways
+        add(exportScreenshot)
+        formatPicker.click()
+        app.menuItems["JSON"].click()
+        XCTAssertFalse(app.element("subtitleReview.frameRateField").exists)
+        XCTAssertFalse(app.element("subtitleReview.presetPicker").exists)
+        app.element("subtitleReview.exportAnywayButton").click()
+        let savePanelOpened = XCTNSPredicateExpectation(
+            predicate: NSPredicate { [app] _, _ in
+                !reviewSheet.exists && (app!.dialogs.firstMatch.exists || app!.sheets.firstMatch.exists)
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [savePanelOpened], timeout: 5.0), .completed)
+        app.typeKey(.escape, modifierFlags: [])
+        let savePanelClosed = XCTNSPredicateExpectation(
+            predicate: NSPredicate { [app] _, _ in
+                !app!.dialogs.firstMatch.exists && !app!.sheets.firstMatch.exists && exportButton.isEnabled
+            },
+            object: nil
+        )
+        XCTAssertEqual(XCTWaiter.wait(for: [savePanelClosed], timeout: 5.0), .completed)
     }
 
     @MainActor

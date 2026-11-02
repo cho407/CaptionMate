@@ -26,10 +26,15 @@ import SwiftUI
 struct TranscriptionView: View {
     @ObservedObject var viewModel: ContentViewModel
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         VStack(spacing: 0) {
             TranscriptionModeHeader(viewModel: viewModel)
+            if !viewModel.audioState.isTranscribing,
+               !viewModel.transcriptionState.confirmedSegments.isEmpty {
+                TranscriptionPlaybackBar(viewModel: viewModel)
+            }
 
             if viewModel.uiState.isSubtitleEditing {
                 ScrollViewReader { proxy in
@@ -45,9 +50,8 @@ struct TranscriptionView: View {
                                     .padding(.bottom, 8)
                             }
 
-                            if viewModel.enableSpeakerDiarization,
-                               (viewModel.transcriptionState.speakerDiarization.isRunning ||
-                                   viewModel.transcriptionState.speakerDiarization.errorMessage != nil) {
+                            if viewModel.transcriptionState.speakerDiarization.isRunning ||
+                                viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
                                 SpeakerDiarizationStatusView(viewModel: viewModel)
                                     .padding(.bottom, 8)
                             }
@@ -68,6 +72,16 @@ struct TranscriptionView: View {
                                     ""
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 8) {
+                                        Button {
+                                            viewModel.playTranscriptionSegment(at: index)
+                                        } label: {
+                                            Label("Replay Segment", systemImage: "play.circle")
+                                                .labelStyle(.iconOnly)
+                                        }
+                                        .buttonStyle(.borderless)
+                                        .disabled(!viewModel.canPlayImportedAudio)
+                                        .help("Replay Segment")
+                                        .accessibilityIdentifier("transcription.replaySegment.\(index)")
                                         if !timestampText.isEmpty {
                                             Text(timestampText)
                                                 .font(.caption.monospacedDigit())
@@ -109,10 +123,10 @@ struct TranscriptionView: View {
                                             }
                                         )
                                     )
-                                    .font(.headline)
-                                    .fontWeight(.bold)
+                                    .font(.body)
                                     .scrollContentBackground(.hidden)
                                     .frame(minHeight: 52)
+                                    .accessibilityIdentifier("transcription.segmentText.\(index)")
                                     .padding(6)
                                     .background(Color(nsColor: .textBackgroundColor).opacity(0.55))
                                     .clipShape(RoundedRectangle(cornerRadius: 6))
@@ -151,7 +165,7 @@ struct TranscriptionView: View {
                 }
                 .background(Color.transcriptionBackground(for: colorScheme))
                 .frame(maxWidth: .infinity)
-                .defaultScrollAnchor(.bottom)
+                .defaultScrollAnchor(.top)
                 .textSelection(.enabled)
             } else {
                 TranscriptionCompletedView(viewModel: viewModel)
@@ -179,9 +193,11 @@ struct TranscriptionView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("transcription.view")
+        .onAppear { viewModel.subtitleUndoManager = undoManager }
+        .onChange(of: undoManager) { _, manager in viewModel.subtitleUndoManager = manager }
         .sheet(isPresented: $viewModel.uiState.showSubtitleReview) {
             SubtitleReviewSheet(viewModel: viewModel)
-                .frame(minWidth: 480, minHeight: 420)
+                .frame(width: 600, height: 620)
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
     }
@@ -291,22 +307,14 @@ private struct SubtitleSegmentToolButtons: View {
     let index: Int
 
     var body: some View {
-        HStack(spacing: 6) {
-            Button {
+        Menu {
+            Button("Nudge Earlier") {
                 viewModel.nudgeTranscriptionSegment(at: index, by: -0.1)
-            } label: {
-                Image(systemName: "backward.frame")
             }
-            .help("Nudge Earlier")
-
-            Button {
+            Button("Nudge Later") {
                 viewModel.nudgeTranscriptionSegment(at: index, by: 0.1)
-            } label: {
-                Image(systemName: "forward.frame")
             }
-            .help("Nudge Later")
-
-            Menu {
+            Menu("Adjust Timing") {
                 Button("Start -0.1s") {
                     viewModel.adjustTranscriptionSegmentStart(at: index, by: -0.1)
                 }
@@ -320,45 +328,31 @@ private struct SubtitleSegmentToolButtons: View {
                 Button("End +0.1s") {
                     viewModel.adjustTranscriptionSegmentEnd(at: index, by: 0.1)
                 }
-            } label: {
-                Image(systemName: "timer")
             }
-            .menuStyle(.borderlessButton)
-            .help("Adjust Timing")
-
-            Button {
+            Divider()
+            Button("Merge Previous") {
                 viewModel.mergeTranscriptionSegment(at: index, withNext: false)
-            } label: {
-                Image(systemName: "arrow.up.square")
             }
             .disabled(index == 0)
-            .help("Merge Previous")
-
-            Button {
+            Button("Split") {
                 viewModel.splitTranscriptionSegment(at: index)
-            } label: {
-                Image(systemName: "scissors")
             }
-            .help("Split")
-
-            Button {
+            .accessibilityIdentifier("transcription.splitSegment.\(index)")
+            Button("Merge Next") {
                 viewModel.mergeTranscriptionSegment(at: index, withNext: true)
-            } label: {
-                Image(systemName: "arrow.down.square")
             }
             .disabled(index >= viewModel.transcriptionState.confirmedSegments.count - 1)
-            .help("Merge Next")
-
-            Button {
+            Divider()
+            Button("Delete", role: .destructive) {
                 viewModel.deleteTranscriptionSegment(at: index)
-            } label: {
-                Image(systemName: "trash")
-                    .foregroundStyle(.red)
             }
-            .help("Delete")
+        } label: {
+            Label("Edit Subtitles", systemImage: "ellipsis")
+                .labelStyle(.iconOnly)
         }
-        .buttonStyle(.borderless)
-        .controlSize(.small)
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        .accessibilityIdentifier("transcription.segmentTools.\(index)")
     }
 }
 
@@ -470,9 +464,13 @@ struct SpeakerDiarizationStatusView: View {
     var body: some View {
         HStack(spacing: 8) {
             if viewModel.transcriptionState.speakerDiarization.isRunning {
-                ProgressView(value: viewModel.transcriptionState.speakerDiarization.progress)
-                    .frame(width: 90)
-                Label("Analyzing Speakers", systemImage: "person.2.wave.2")
+                ProgressView()
+                    .controlSize(.small)
+                Label(
+                    viewModel.transcriptionState.speakerDiarization.isCancelling
+                        ? LocalizedStringKey("Cancelling...") : LocalizedStringKey("Analyzing Speakers"),
+                    systemImage: "person.2.wave.2"
+                )
                     .font(.caption.weight(.medium))
                 Button {
                     viewModel.cancelSpeakerDiarization()
@@ -482,6 +480,7 @@ struct SpeakerDiarizationStatusView: View {
                 .buttonStyle(.borderless)
                 .help("Cancel")
                 .accessibilityLabel(Text("Cancel"))
+                .disabled(viewModel.transcriptionState.speakerDiarization.isCancelling)
             } else if let errorMessage = viewModel.transcriptionState.speakerDiarization.errorMessage {
                 Label(LocalizedStringKey(errorMessage), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.medium))
@@ -667,6 +666,8 @@ private struct SubtitleReviewSheet: View {
                 Spacer()
             }
 
+            ExportOptionsView(viewModel: viewModel)
+
             Picker("", selection: Binding(
                 get: { viewModel.uiState.subtitleIssueFilter },
                 set: { viewModel.uiState.subtitleIssueFilter = $0 }
@@ -734,7 +735,9 @@ private struct SubtitleReviewSheet: View {
                 } label: {
                     Label("Quick Fix", systemImage: "wand.and.stars")
                 }
-                .disabled(viewModel.uiState.subtitleQualityIssues.isEmpty)
+                .disabled(!viewModel.uiState.subtitleQualityIssues.contains {
+                    $0.kind != .missingSpeaker && $0.kind != .defaultSpeakerName
+                })
                 .accessibilityIdentifier("subtitleReview.quickFixButton")
                 Spacer()
                 if hasBlockingIssues {
@@ -743,13 +746,17 @@ private struct SubtitleReviewSheet: View {
                         .foregroundStyle(.red)
                         .accessibilityIdentifier("subtitleReview.blockingMessage")
                 }
-                Button("Export Anyway") {
+                Button {
                     viewModel.uiState.showSubtitleReview = false
                     Task {
                         await viewModel.exportTranscription(skipQualityReview: true)
                     }
+                } label: {
+                    Text(viewModel.uiState.subtitleQualityIssues.isEmpty
+                         ? LocalizedStringKey("Export Subtitle") : LocalizedStringKey("Export Anyway"))
                 }
-                .disabled(hasBlockingIssues)
+                .disabled(hasBlockingIssues || (viewModel.selectedExportFileType == .fcpxml &&
+                    (!viewModel.frameRate.isFinite || !(1 ... 240).contains(viewModel.frameRate))))
                 .accessibilityIdentifier("subtitleReview.exportAnywayButton")
             }
         }

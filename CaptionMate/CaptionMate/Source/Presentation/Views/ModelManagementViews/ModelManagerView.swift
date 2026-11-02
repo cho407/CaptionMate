@@ -30,9 +30,6 @@ struct ModelManagerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var searchText: String = ""
 
-    // 필터링할 단어 목록
-    let filterWords: [String] = ["distil", "MB", "2024"]
-
     init(viewModel: ContentViewModel) {
         self.viewModel = viewModel
         modelState = viewModel.modelManagementState
@@ -191,11 +188,7 @@ struct ModelManagerView: View {
                 let matchesFilter = searchText.isEmpty ||
                     model.lowercased().contains(searchText.lowercased())
 
-                let notFiltered = !filterWords.contains { filter in
-                    model.lowercased().contains(filter.lowercased())
-                }
-
-                return matchesFilter && notFiltered
+                return matchesFilter
             }
 
             // 필터링된 모델 목록
@@ -203,22 +196,14 @@ struct ModelManagerView: View {
                 let matchesFilter = searchText.isEmpty ||
                     model.lowercased().contains(searchText.lowercased())
 
-                let notFiltered = !filterWords.contains { filter in
-                    model.lowercased().contains(filter.lowercased())
-                }
-
-                return matchesFilter && notFiltered
+                return matchesFilter
             }
 
             let filteredRemoteModels = remoteModels.filter { model in
                 let matchesFilter = searchText.isEmpty ||
                     model.lowercased().contains(searchText.lowercased())
 
-                let notFiltered = !filterWords.contains { filter in
-                    model.lowercased().contains(filter.lowercased())
-                }
-
-                return matchesFilter && notFiltered
+                return matchesFilter
             }
 
             // 다운로드 가능한 모델의 총 크기 계산
@@ -800,6 +785,7 @@ struct ModelRowView: View {
                         .foregroundColor(.red)
                 }
                 .help("You must unload the model before deleting it")
+                .disabled(!viewModel.canChangeModel)
             } else if viewModel.modelManagementState.isCancelling(model: model) {
                 // 취소 중 - 취소 아이콘
                 Image(systemName: "hourglass")
@@ -849,6 +835,7 @@ struct ModelRowView: View {
                 }
                 .buttonStyle(.plain)
                 .help("Delete Model")
+                .disabled(!viewModel.canChangeModel)
             }
 
         } else if viewModel.modelManagementState.isCancelling(model: model) {
