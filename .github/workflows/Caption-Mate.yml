@@ -53,43 +53,53 @@ jobs:
       - name: Test the CaptionMate (Unit Tests Only)
         run: |
           echo "Starting unit tests..."
-          set -e
+          set -euo pipefail
 
           # Run tests with detailed error output
           xcodebuild \
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
+            -destination "platform=macOS,arch=$(uname -m)" \
             test \
             -only-testing:CaptionMateTests \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY="" \
+            -resultBundlePath "$RUNNER_TEMP/CaptionMate-UnitTests.xcresult" \
+            CAPTIONMATE_TEST_BUNDLE_SUFFIX=.Testing \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            DEVELOPMENT_TEAM="" \
             -verbose 2>&1 | tee test_output.log || {
               echo "Test failed, showing detailed error:"
               cat test_output.log
               exit 1
             }
+          python3 scripts/check_test_results.py "$RUNNER_TEMP/CaptionMate-UnitTests.xcresult"
 
-      - name: UI Tests (Optional)
-        continue-on-error: true
+      - name: UI Tests
         run: |
+          set -euo pipefail
+          xcrun swift scripts/check_ui_session.swift
           xcodebuild \
             -project CaptionMate/CaptionMate.xcodeproj \
-            -scheme "CaptionMate" \
+            -scheme "CaptionMateUITests" \
             -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
+            -destination "platform=macOS,arch=$(uname -m)" \
+            -parallel-testing-enabled NO \
+            -resultBundlePath "$RUNNER_TEMP/CaptionMate-UITests.xcresult" \
             test \
             -only-testing:CaptionMateUITests \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CAPTIONMATE_TEST_BUNDLE_SUFFIX=.Testing \
+            DEVELOPMENT_TEAM=""
+          python3 scripts/check_test_results.py "$RUNNER_TEMP/CaptionMate-UITests.xcresult"
 
       - name: Build the CaptionMate
         run: |
           echo "Starting build process..."
-          set -e
+          set -euo pipefail
 
           # First, clean the build folder
           echo "Cleaning build folder..."
@@ -97,7 +107,7 @@ jobs:
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
+            -destination "platform=macOS,arch=$(uname -m)" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY=""
@@ -108,7 +118,7 @@ jobs:
             -project CaptionMate/CaptionMate.xcodeproj \
             -scheme "CaptionMate" \
             -sdk macosx \
-            -destination 'platform=macOS,arch=arm64' \
+            -destination "platform=macOS,arch=$(uname -m)" \
             build \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
