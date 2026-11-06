@@ -192,6 +192,52 @@ struct ContentViewModelTests {
         #expect(viewModel.transcriptionState.confirmedSegments[0].words == words)
     }
 
+    @Test("Co-timed captions retain positive durations in exported files",
+          arguments: ["srt", "vtt"]) @MainActor
+    func testCoTimedCaptionsDoNotCollapseDuringExport(format: String) async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let viewModel = ContentViewModel(projectStore: CaptionMateProjectStore(rootURL: root))
+        let segments = [
+            TranscriptionSegment(start: 1, end: 2, text: "First caption."),
+            TranscriptionSegment(start: 1, end: 3, text: "Second caption."),
+        ]
+        viewModel.transcriptionResult = .init(
+            text: "First caption. Second caption.", segments: segments, language: "en", timings: .init()
+        )
+        viewModel.transcriptionState.confirmedSegments = segments
+        viewModel.selectedExportFileType = try #require(SubtitleFileType(rawValue: format))
+        var writtenURL: URL?
+        await viewModel.exportTranscription(skipQualityReview: true) { result, name, _ in
+            let writer: any ResultWriting = format == "srt" ?
+                WriteSRT(outputDir: root.path) : WriteVTT(outputDir: root.path)
+            switch writer.write(result: result, to: name, options: nil) {
+            case let .success(path):
+                writtenURL = path.hasPrefix("file:") ? URL(string: path) : URL(fileURLWithPath: path)
+                return .success(path: path)
+            case let .failure(error): return .failure(error)
+            }
+        }
+        let text = try String(contentsOf: #require(writtenURL), encoding: .utf8)
+        let timelines = text.split(whereSeparator: \.isNewline).filter { $0.contains(" --> ") }
+        #expect(timelines.count == 2)
+        for timeline in timelines {
+            let fields = timeline.split(separator: " ")
+            let start = try #require(fields.first)
+            let end = try #require(fields.dropFirst(2).first)
+            let seconds: (Substring) -> Double = { timestamp in
+                timestamp.split(separator: ":").reduce(0) {
+                    $0 * 60 + (Double($1.replacingOccurrences(of: ",", with: ".")) ?? .nan)
+                }
+            }
+            #expect(seconds(end) > seconds(start))
+        }
+        #expect(text.contains("First caption."))
+        #expect(text.contains("Second caption."))
+        #expect(viewModel.transcriptionState.confirmedSegments == segments)
+    }
+
     @Test("Deleting a subtitle is undoable with its word timings and speaker attribution") @MainActor
     func testStructuralUndoRestoresAlignmentAndAttribution() {
         let viewModel = ContentViewModel()
@@ -3602,6 +3648,45 @@ struct FCPXMLWriterTests {
         let document = try XMLDocument(xmlString: xml)
         let textStyleNodes = try document.nodes(forXPath: "//text-style")
         #expect(textStyleNodes.first?.stringValue == subtitleText)
+    }
+
+    @Test("FCPXML sequence contains every retained co-timed caption",
+          arguments: [false, true])
+    func testFCPXMLSequenceContainsCoTimedCaptions(wordTimed: Bool) throws {
+        let xml = try writeFCPXML(
+            segments: [
+                TranscriptionSegment(
+                    start: 1, end: 20, text: "Long caption.",
+                    words: wordTimed ? [
+                        WordTiming(word: "Long caption.", tokens: [1], start: 1, end: 20, probability: 1),
+                    ] : nil
+                ),
+                TranscriptionSegment(
+                    start: 1, end: 2, text: "Short caption.",
+                    words: wordTimed ? [
+                        WordTiming(word: "Short caption.", tokens: [2], start: 1, end: 2, probability: 1),
+                    ] : nil
+                ),
+            ],
+            frameRate: 30,
+            fileName: "fcpxml_co_timed"
+        )
+        let document = try XMLDocument(xmlString: xml)
+        let sequences = try document.nodes(forXPath: "//sequence")
+        let sequence = try #require(sequences.first as? XMLElement)
+        let timelineValue = try #require(sequence.attribute(forName: "duration")?.stringValue)
+        let timelineDuration = try #require(seconds(fromFCPXMLTime: timelineValue))
+        let titles = try document.nodes(forXPath: "//title")
+        #expect(titles.count == 2)
+        for node in titles {
+            let title = try #require(node as? XMLElement)
+            let offsetValue = try #require(title.attribute(forName: "offset")?.stringValue)
+            let durationValue = try #require(title.attribute(forName: "duration")?.stringValue)
+            let offset = try #require(seconds(fromFCPXMLTime: offsetValue))
+            let duration = try #require(seconds(fromFCPXMLTime: durationValue))
+            #expect(duration > 0)
+            #expect(offset + duration <= timelineDuration)
+        }
     }
 
     @Test("FCPXML 29.97fps fractional seconds 테스트")

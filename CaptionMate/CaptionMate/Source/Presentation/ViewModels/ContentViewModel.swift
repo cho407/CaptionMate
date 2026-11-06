@@ -4838,7 +4838,9 @@ class ContentViewModel: ObservableObject {
         // 세그먼트 간 겹침 조정
         if cleanSegments.count > 1 {
             for i in 0 ..< (cleanSegments.count - 1) {
-                if cleanSegments[i].end > cleanSegments[i + 1].start {
+                // Preserve both positive spans when captions begin together.
+                if cleanSegments[i].end > cleanSegments[i + 1].start,
+                   cleanSegments[i + 1].start > cleanSegments[i].start {
                     cleanSegments[i].end = cleanSegments[i + 1].start
                 }
             }

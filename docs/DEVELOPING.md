@@ -159,6 +159,9 @@ ASR or diarization accuracy test; use real cached models for runtime smoke check
   Caption presets apply only to subtitle formats; frame rate applies only to
   FCPXML. Missing speaker attribution needs manual review or acoustic analysis:
   Quick Fix must not infer identity from adjacent captions.
+- Export must not collapse co-starting captions to zero duration. Preserve their
+  positive spans and keep overlap review warnings. FCPXML sequences must cover
+  the furthest retained cue end, not just the final start-sorted cue.
 - Playback uses the original imported audio. Verify seek-before-play, segment
   end boundaries, pause/resume, and playback rate. Exercise split/delete/merge
   Undo and Redo through the window's native undo manager, including Command-Z.

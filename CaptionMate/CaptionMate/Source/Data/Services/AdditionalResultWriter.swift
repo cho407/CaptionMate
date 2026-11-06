@@ -351,9 +351,9 @@ open class WriteFCPXML: ResultWriting {
             .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         let sortedSegments = validSegments.sorted { $0.start < $1.start }
 
-        // XML 템플릿의 타임라인 전체 길이 계산 (마지막 세그먼트 끝에 여유 추가)
-        let lastSegmentEnd = sortedSegments.last?.end ?? 60.0
-        let timelineDuration = convertToFCPXMLTime(seconds: lastSegmentEnd + 5.0)
+        // Include the furthest retained end, not just the last start-sorted cue.
+        let latestSegmentEnd = sortedSegments.lazy.map(\.end).max() ?? 60.0
+        let timelineDuration = convertToFCPXMLTime(seconds: latestSegmentEnd + 5.0)
 
         // 프로젝트 시작 시간은 0초로 고정
         let tcStartString = "0s"
