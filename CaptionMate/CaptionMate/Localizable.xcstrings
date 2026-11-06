@@ -1,6 +1,2704 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Preparing Audio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تحضير الصوت"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio wird vorbereitet"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing Audio"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparing Audio"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando audio"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Préparation de l’audio"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो तैयार हो रहा है"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声を準備中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오디오 준비 중"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preparando áudio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在准备音频"
+          }
+        }
+      }
+    },
+    "Finalizing Speaker Labels" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ إنهاء تسميات المتحدثين"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprecherzuordnung wird abgeschlossen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizing Speaker Labels"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizing Speaker Labels"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizando etiquetas de hablantes"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalisation des étiquettes de locuteurs"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वक्ता लेबल पूरे किए जा रहे हैं"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者ラベルを仕上げ中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 배정 마무리 중"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Finalizando rótulos de falantes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在完成说话人标注"
+          }
+        }
+      }
+    },
+    "Unassigned Speakers" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متحدثون غير معيّنين"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht zugeordnete Sprecher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned Speakers"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned Speakers"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hablantes sin asignar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locuteurs non attribués"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "असाइन नहीं किए गए वक्ता"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未割り当ての話者"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 미배정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falantes não atribuídos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分配的说话人"
+          }
+        }
+      }
+    },
+    "Mixed Speaker Candidates" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مرشحون مختلطون للمتحدثين"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemischte Sprecherkandidaten"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed Speaker Candidates"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed Speaker Candidates"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidatos de hablantes mixtos"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidats de locuteurs mixtes"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मिश्रित वक्ता उम्मीदवार"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数話者の候補"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 혼합 후보"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidatos de falantes mistos"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "混合说话人候选"
+          }
+        }
+      }
+    },
+    "Multiple speaker candidates in one subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدة مرشحين للمتحدث في مقطع ترجمة واحد"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mehrere Sprecherkandidaten in einem Untertitel"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multiple speaker candidates in one subtitle"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Multiple speaker candidates in one subtitle"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Varios candidatos de hablantes en un subtítulo"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plusieurs candidats de locuteurs dans un même sous-titre"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "एक उपशीर्षक में कई संभावित वक्ता"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1つの字幕に複数の話者候補があります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "한 자막에 여러 화자 후보가 있습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vários candidatos de falantes em uma legenda"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一字幕中有多个说话人候选"
+          }
+        }
+      }
+    },
+    "Listen to this range and split at a speaker change when word timings are available." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استمع إلى هذا النطاق وقسّمه عند تغيّر المتحدث إذا توفرت توقيتات الكلمات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höre dir diesen Bereich an und teile ihn bei einem Sprecherwechsel, wenn Wortzeitangaben vorliegen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listen to this range and split at a speaker change when word timings are available."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listen to this range and split at a speaker change when word timings are available."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escucha este intervalo y divide donde cambie el hablante si hay tiempos por palabra disponibles."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écoutez ce passage et scindez-le à un changement de locuteur si les repères temporels des mots sont disponibles."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह अंश सुनें और शब्दों के समय उपलब्ध होने पर वक्ता बदलने के स्थान पर विभाजित करें।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この区間を聴き、単語の時刻情報がある場合は話者が変わる位置で分割してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 구간을 듣고, 단어 시각 정보가 있으면 화자가 바뀌는 지점에서 분할하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouça este trecho e divida na mudança de falante quando houver tempos por palavra disponíveis."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请听取此区间；如有单词时间信息，请在说话人切换处拆分。"
+          }
+        }
+      }
+    },
+    "Listen to the original audio and assign a speaker if identifiable. Leave uncertain speech unassigned." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استمع إلى الصوت الأصلي وعيّن متحدثًا فقط إذا أمكن تحديده. اترك الكلام غير المؤكد دون تعيين."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Höre dir das Originalaudio an und ordne nur erkennbare Sprecher zu. Lass unklare Äußerungen ohne Zuordnung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listen to the original audio and assign a speaker if identifiable. Leave uncertain speech unassigned."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listen to the original audio and assign a speaker if identifiable. Leave uncertain speech unassigned."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Escucha el audio original y asigna un hablante solo si puedes identificarlo. Deja sin asignar el habla que no puedas identificar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écoutez l’audio d’origine et attribuez un locuteur uniquement s’il est identifiable. Laissez les paroles incertaines sans attribution."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मूल ऑडियो सुनें और पहचान होने पर ही वक्ता असाइन करें। अनिश्चित कथन को बिना असाइन किए छोड़ दें।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元の音声を聴き、識別できる場合にのみ話者を割り当ててください。不確かな発話は未割り当てのままにしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원음을 듣고 식별할 수 있는 경우에만 화자를 배정하세요. 불확실한 발화는 미배정으로 두세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouça o áudio original e atribua um falante apenas se for possível identificá-lo. Deixe falas incertas sem atribuição."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请听取原始音频，仅在能识别时分配说话人。无法确定的语音请保持未分配。"
+          }
+        }
+      }
+    },
+    "Speaker-boundary splitting needs matching word timings. Transcribe again with speaker diarization enabled." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب التقسيم عند تغيّر المتحدث توقيتات كلمات مطابقة للنص. أعد التفريغ مع تفعيل فصل المتحدثين."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Teilen bei Sprecherwechseln sind passende Wortzeitangaben nötig. Transkribiere erneut mit aktivierter Sprechertrennung."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker-boundary splitting needs matching word timings. Transcribe again with speaker diarization enabled."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speaker-boundary splitting needs matching word timings. Transcribe again with speaker diarization enabled."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Para dividir en los cambios de hablante se necesitan tiempos por palabra que coincidan con el texto. Vuelve a transcribir con la diarización de hablantes activada."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La division aux changements de locuteur nécessite des repères temporels correspondant aux mots du texte. Relancez la transcription avec la diarisation activée."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वक्ता बदलने के स्थान पर विभाजन के लिए पाठ से मेल खाते शब्दों के समय चाहिए। वक्ता पृथक्करण चालू करके फिर से ट्रांसक्राइब करें।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者の境界で分割するには、本文と一致する単語の時刻情報が必要です。話者分離を有効にして再度文字起こししてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 경계 분할에는 본문과 일치하는 단어 시각이 필요합니다. 화자 분리를 켜고 다시 전사하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A divisão nas mudanças de falante exige tempos por palavra que correspondam ao texto. Transcreva novamente com a diarização de falantes ativada."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按说话人边界拆分需要与正文匹配的单词时间信息。请启用说话人分离后重新转录。"
+          }
+        }
+      }
+    },
+    "Could Not Open Project Folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر فتح مجلد المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projektordner konnte nicht geöffnet werden"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Open Project Folder"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could Not Open Project Folder"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se pudo abrir la carpeta del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible d’ouvrir le dossier du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट फ़ोल्डर नहीं खुल सका"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトフォルダを開けませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 폴더를 열 수 없습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível abrir a pasta do projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开项目文件夹"
+          }
+        }
+      }
+    },
+    "Replace manual speaker corrections?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد استبدال تصحيحات المتحدثين اليدوية؟"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manuelle Sprecherkorrekturen ersetzen?"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace manual speaker corrections?"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace manual speaker corrections?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Reemplazar las correcciones manuales de hablantes?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remplacer les corrections manuelles de locuteurs ?"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वक्ता के मैन्युअल सुधार बदलें?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手動で修正した話者の割り当てを置き換えますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "수동으로 수정한 화자 배정을 교체할까요?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Substituir as correções manuais de falantes?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换手动修正的说话人分配？"
+          }
+        }
+      }
+    },
+    "Reanalyze and Replace" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة التحليل والاستبدال"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neu analysieren und ersetzen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanalyze and Replace"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanalyze and Replace"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a analizar y reemplazar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réanalyser et remplacer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फिर से विश्लेषण करें और बदलें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再解析して置き換える"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재분석 후 교체"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Analisar novamente e substituir"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新分析并替换"
+          }
+        }
+      }
+    },
+    "Reanalysis replaces speaker assignments. Previous labels can be restored before further edits." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تستبدل إعادة التحليل تعيينات المتحدثين. يمكنك استعادة التسميات السابقة قبل إجراء تعديلات أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die erneute Analyse ersetzt die Sprecherzuordnungen. Vor weiteren Bearbeitungen kannst du die vorherigen Zuordnungen wiederherstellen."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanalysis replaces speaker assignments. Previous labels can be restored before further edits."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanalysis replaces speaker assignments. Previous labels can be restored before further edits."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nuevo análisis reemplaza las asignaciones de hablantes. Puedes restaurar las etiquetas anteriores antes de hacer más cambios."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réanalyse remplace les attributions de locuteurs. Vous pouvez restaurer les étiquettes précédentes avant toute autre modification."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फिर से विश्लेषण करने पर वक्ता असाइनमेंट बदल जाते हैं। आगे संपादन करने से पहले पिछले लेबल बहाल किए जा सकते हैं।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再解析すると話者の割り当てが置き換わります。さらに編集する前であれば、以前のラベルを復元できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재분석하면 화자 배정이 교체됩니다. 추가로 편집하기 전에는 이전 배정을 복원할 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A nova análise substitui as atribuições de falantes. Os rótulos anteriores podem ser restaurados antes de outras edições."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新分析会替换说话人分配。在进一步编辑之前，可以恢复之前的标注。"
+          }
+        }
+      }
+    },
+    "Detected groups: %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المجموعات المكتشفة: %lld"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erkannte Gruppen: %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detected groups: %lld"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detected groups: %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupos detectados: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Groupes détectés : %lld"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पता चले समूह: %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "検出されたグループ：%lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "검출된 그룹: %lld개"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Grupos detectados: %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检测到的分组：%lld"
+          }
+        }
+      }
+    },
+    "Unassigned: %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "غير المعيّن: %lld"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht zugeordnet: %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned: %lld"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned: %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin asignar: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non attribués : %lld"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "असाइन नहीं किए गए: %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未割り当て：%lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "미배정: %lld개"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não atribuídos: %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分配：%lld"
+          }
+        }
+      }
+    },
+    "Mixed candidates: %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المرشحون المختلطون: %lld"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gemischte Kandidaten: %lld"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed candidates: %lld"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mixed candidates: %lld"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidatos mixtos: %lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidats mixtes : %lld"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मिश्रित उम्मीदवार: %lld"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "複数話者の候補：%lld"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "혼합 후보: %lld개"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Candidatos mistos: %lld"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "混合候选：%lld"
+          }
+        }
+      }
+    },
+    "Automatic speaker labels need listening review." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحتاج تسميات المتحدثين التلقائية إلى مراجعة بالاستماع."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Sprecherzuordnungen müssen durch Anhören geprüft werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic speaker labels need listening review."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic speaker labels need listening review."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las etiquetas automáticas de hablantes deben revisarse escuchando el audio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les étiquettes automatiques de locuteurs doivent être vérifiées à l’écoute."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "स्वचालित वक्ता लेबल की ऑडियो सुनकर समीक्षा करनी चाहिए।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動で付けられた話者ラベルは、音声を聴いて確認する必要があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동 화자 배정은 원음을 들으며 검수해야 합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os rótulos automáticos de falantes precisam ser revisados ouvindo o áudio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动生成的说话人标注需要听取音频后复核。"
+          }
+        }
+      }
+    },
+    "No formatting issues" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا توجد مشاكل في التنسيق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keine Formatierungsprobleme"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No formatting issues"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No formatting issues"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sin problemas de formato"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun problème de mise en forme"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फ़ॉर्मैट की कोई समस्या नहीं"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "書式の問題はありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "형식 문제가 없습니다"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nenhum problema de formatação"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无格式问题"
+          }
+        }
+      }
+    },
+    "Split at Speaker Changes" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقسيم عند تغيّر المتحدث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bei Sprecherwechseln teilen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split at Speaker Changes"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Split at Speaker Changes"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dividir en cambios de hablante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Scinder aux changements de locuteur"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वक्ता बदलने पर विभाजित करें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者が変わる位置で分割"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 전환 지점에서 분할"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dividir nas mudanças de falante"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在说话人切换处拆分"
+          }
+        }
+      }
+    },
+    "Requires matching word timings and a detected speaker change." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب توقيتات كلمات مطابقة للنص وتغيّرًا مكتشفًا للمتحدث."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erfordert passende Wortzeitangaben und einen erkannten Sprecherwechsel."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires matching word timings and a detected speaker change."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requires matching word timings and a detected speaker change."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Requiere tiempos por palabra que coincidan con el texto y un cambio de hablante detectado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nécessite des repères temporels correspondant aux mots du texte et un changement de locuteur détecté."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पाठ से मेल खाते शब्दों के समय और पहचाना गया वक्ता परिवर्तन ज़रूरी है।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本文と一致する単語の時刻情報と、検出された話者の交代が必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "본문과 일치하는 단어 시각과 검출된 화자 전환이 필요합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exige tempos por palavra que correspondam ao texto e uma mudança de falante detectada."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要与正文匹配的单词时间信息，以及检测到的说话人切换。"
+          }
+        }
+      }
+    },
+    "Next Analysis" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "التحليل التالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nächste Analyse"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Analysis"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Analysis"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próximo análisis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prochaine analyse"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अगला विश्लेषण"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次回の解析"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 분석"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Próxima análise"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次分析"
+          }
+        }
+      }
+    },
+    "Next Analysis Speaker Count" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عدد المتحدثين للتحليل التالي"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sprecheranzahl für die nächste Analyse"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Analysis Speaker Count"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Next Analysis Speaker Count"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Número de hablantes para el próximo análisis"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nombre de locuteurs pour la prochaine analyse"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अगले विश्लेषण के लिए वक्ताओं की संख्या"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次回の解析で使用する話者数"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다음 분석에 사용할 화자 수"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Número de falantes para a próxima análise"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下次分析的说话人数"
+          }
+        }
+      }
+    },
+    "Changes apply only when you reanalyze." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا تسري التغييرات إلا عند إعادة التحليل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Änderungen gelten erst bei einer erneuten Analyse."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes apply only when you reanalyze."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changes apply only when you reanalyze."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los cambios solo se aplican al volver a analizar."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les modifications ne s’appliquent qu’à la prochaine réanalyse."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बदलाव केवल फिर से विश्लेषण करने पर लागू होंगे।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更は再解析時にのみ適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변경 사항은 재분석할 때만 적용됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As alterações só se aplicam ao analisar novamente."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改仅在重新分析时生效。"
+          }
+        }
+      }
+    },
+    "Restore Previous Speaker Labels" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استعادة تسميات المتحدثين السابقة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vorherige Sprecherzuordnungen wiederherstellen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Previous Speaker Labels"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restore Previous Speaker Labels"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar etiquetas de hablantes anteriores"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurer les étiquettes de locuteurs précédentes"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पिछले वक्ता लेबल बहाल करें"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前の話者ラベルを復元"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 화자 배정 복원"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restaurar rótulos de falantes anteriores"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复之前的说话人标注"
+          }
+        }
+      }
+    },
+    "Play a representative speaker range" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تشغيل نطاق نموذجي للمتحدث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einen repräsentativen Sprecherbereich abspielen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play a representative speaker range"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play a representative speaker range"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproducir un intervalo representativo del hablante"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lire un passage représentatif du locuteur"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वक्ता का प्रतिनिधि अंश चलाएँ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "話者の代表的な区間を再生"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 대표 구간 재생"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reproduzir um trecho representativo do falante"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放说话人的代表性区间"
+          }
+        }
+      }
+    },
+    "Unassigned Speaker" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متحدث غير معيّن"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nicht zugeordneter Sprecher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned Speaker"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unassigned Speaker"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hablante sin asignar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locuteur non attribué"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "असाइन नहीं किया गया वक्ता"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未割り当ての話者"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화자 미배정"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Falante não atribuído"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未分配的说话人"
+          }
+        }
+      }
+    },
+    "Last Updated: November 2026" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "آخر تحديث: نوفمبر 2026"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zuletzt aktualisiert: November 2026"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last Updated: November 2026"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last Updated: November 2026"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última actualización: noviembre de 2026"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière mise à jour : novembre 2026"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अंतिम अपडेट: नवंबर 2026"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最終更新：2026年11月"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최종 업데이트: 2026년 11월"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Última atualização: novembro de 2026"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最后更新：2026年11月"
+          }
+        }
+      }
+    },
+    "CaptionMate processes audio on your device. Audio and transcript content are not sent to a remote transcription service." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعالج CaptionMate الصوت على جهازك. لا يُرسل الصوت ولا محتوى التفريغ إلى خدمة تفريغ عن بُعد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate verarbeitet Audio auf deinem Gerät. Audio und Transkriptinhalte werden nicht an einen entfernten Transkriptionsdienst gesendet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate processes audio on your device. Audio and transcript content are not sent to a remote transcription service."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate processes audio on your device. Audio and transcript content are not sent to a remote transcription service."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate procesa el audio en tu dispositivo. El audio y el contenido de la transcripción no se envían a un servicio de transcripción remoto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate traite l’audio sur votre appareil. L’audio et le contenu de la transcription ne sont pas envoyés à un service de transcription distant."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate आपके डिवाइस पर ऑडियो संसाधित करता है। ऑडियो और ट्रांसक्रिप्ट की सामग्री किसी रिमोट ट्रांसक्रिप्शन सेवा को नहीं भेजी जाती।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMateはこのデバイスで音声を処理します。音声と文字起こしの内容がリモートの文字起こしサービスに送信されることはありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate는 이 기기에서 음성을 처리합니다. 음성과 전사 본문은 원격 전사 서비스로 전송되지 않습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O CaptionMate processa o áudio no seu dispositivo. O áudio e o conteúdo da transcrição não são enviados a um serviço remoto de transcrição."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate 在你的设备上处理音频。音频和转录内容不会发送到远程转录服务。"
+          }
+        }
+      }
+    },
+    "CaptionMate accesses audio and video you choose, including files opened through a saved project reference." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يصل CaptionMate إلى ملفات الصوت والفيديو التي تختارها، بما فيها الملفات المفتوحة عبر مرجع في مشروع محفوظ."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate greift auf von dir ausgewählte Audio- und Videodateien zu, auch auf Dateien, die über einen Verweis in einem gespeicherten Projekt geöffnet werden."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate accesses audio and video you choose, including files opened through a saved project reference."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate accesses audio and video you choose, including files opened through a saved project reference."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate accede al audio y al video que eliges, incluidos los archivos abiertos mediante una referencia de un proyecto guardado."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate accède aux fichiers audio et vidéo que vous choisissez, y compris ceux ouverts via une référence dans un projet enregistré."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate आपके चुने हुए ऑडियो और वीडियो तक पहुँचता है, जिनमें सहेजे गए प्रोजेक्ट के संदर्भ से खोली गई फ़ाइलें भी शामिल हैं।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMateは、選択した音声と動画にアクセスします。保存済みプロジェクトの参照から開いたファイルも含まれます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate는 사용자가 선택한 오디오와 비디오에 접근하며, 저장된 프로젝트의 참조로 여는 파일도 포함됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O CaptionMate acessa os áudios e vídeos que você escolhe, incluindo arquivos abertos por uma referência em um projeto salvo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate 会访问你选择的音频和视频，包括通过已保存项目中的引用打开的文件。"
+          }
+        }
+      }
+    },
+    "Model downloads and model catalog checks use network access. Audio inference stays on your device." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تستخدم تنزيلات النماذج وعمليات التحقق من فهرس النماذج الشبكة. يبقى الاستدلال الصوتي على جهازك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modelldownloads und Prüfungen des Modellkatalogs nutzen das Netzwerk. Die Audioinferenz bleibt auf deinem Gerät."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model downloads and model catalog checks use network access. Audio inference stays on your device."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Model downloads and model catalog checks use network access. Audio inference stays on your device."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las descargas de modelos y las consultas del catálogo de modelos usan la red. La inferencia de audio se realiza en tu dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le téléchargement des modèles et la consultation de leur catalogue utilisent le réseau. L’inférence audio reste sur votre appareil."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "मॉडल डाउनलोड और मॉडल कैटलॉग की जाँच के लिए नेटवर्क का उपयोग होता है। ऑडियो इन्फ़रेंस आपके डिवाइस पर ही होता है।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モデルのダウンロードとモデルカタログの確認にはネットワークを使用します。音声の推論はこのデバイスで実行されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "모델 다운로드와 모델 목록 확인에는 네트워크를 사용합니다. 음성 추론은 이 기기에서 실행됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloads de modelos e consultas ao catálogo de modelos usam a rede. A inferência de áudio permanece no seu dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下载模型和检查模型目录需要使用网络。音频推理始终在你的设备上进行。"
+          }
+        }
+      }
+    },
+    "Preferences, cached models, saved projects, and recovery files are stored locally. Saved projects and recovery files can contain transcript text, speaker labels, timing data, and audio file references." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُخزّن التفضيلات والنماذج المخزنة مؤقتًا والمشاريع المحفوظة وملفات الاسترداد محليًا. قد تحتوي المشاريع المحفوظة وملفات الاسترداد على نص التفريغ وتسميات المتحدثين وبيانات التوقيت ومراجع ملفات الصوت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Einstellungen, zwischengespeicherte Modelle, gespeicherte Projekte und Wiederherstellungsdateien werden lokal gespeichert. Projekte und Wiederherstellungsdateien können Transkripttext, Sprecherzuordnungen, Zeitangaben und Verweise auf Audiodateien enthalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferences, cached models, saved projects, and recovery files are stored locally. Saved projects and recovery files can contain transcript text, speaker labels, timing data, and audio file references."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preferences, cached models, saved projects, and recovery files are stored locally. Saved projects and recovery files can contain transcript text, speaker labels, timing data, and audio file references."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Las preferencias, los modelos en caché, los proyectos guardados y los archivos de recuperación se almacenan localmente. Los proyectos guardados y los archivos de recuperación pueden contener texto transcrito, etiquetas de hablantes, datos de tiempo y referencias a archivos de audio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les préférences, les modèles en cache, les projets enregistrés et les fichiers de récupération sont stockés localement. Les projets et les fichiers de récupération peuvent contenir le texte transcrit, les étiquettes de locuteurs, les données temporelles et les références aux fichiers audio."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्राथमिकताएँ, कैश किए गए मॉडल, सहेजे गए प्रोजेक्ट और रिकवरी फ़ाइलें स्थानीय रूप से संग्रहीत होते हैं। सहेजे गए प्रोजेक्ट और रिकवरी फ़ाइलों में ट्रांसक्रिप्ट पाठ, वक्ता लेबल, समय डेटा और ऑडियो फ़ाइल संदर्भ हो सकते हैं।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "環境設定、キャッシュされたモデル、保存済みプロジェクト、復元ファイルはローカルに保存されます。プロジェクトと復元ファイルには、文字起こしの本文、話者ラベル、時刻情報、音声ファイルへの参照が含まれる場合があります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정, 캐시된 모델, 저장된 프로젝트와 복구 파일은 로컬에 저장됩니다. 프로젝트와 복구 파일에는 전사 본문, 화자 배정, 시각 정보와 오디오 파일 참조가 포함될 수 있습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As preferências, os modelos em cache, os projetos salvos e os arquivos de recuperação são armazenados localmente. Os projetos salvos e os arquivos de recuperação podem conter texto transcrito, rótulos de falantes, dados de tempo e referências a arquivos de áudio."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "偏好设置、缓存模型、已保存的项目和恢复文件均存储在本地。已保存的项目和恢复文件可能包含转录文本、说话人标注、时间信息和音频文件引用。"
+          }
+        }
+      }
+    },
+    "CaptionMate uses WhisperKit and SpeakerKit for on-device transcription and speaker analysis." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم CaptionMate كلًا من WhisperKit وSpeakerKit للتفريغ وتحليل المتحدثين على الجهاز."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate nutzt WhisperKit und SpeakerKit für Transkription und Sprecheranalyse auf dem Gerät."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate uses WhisperKit and SpeakerKit for on-device transcription and speaker analysis."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate uses WhisperKit and SpeakerKit for on-device transcription and speaker analysis."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate usa WhisperKit y SpeakerKit para la transcripción y el análisis de hablantes en el dispositivo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate utilise WhisperKit et SpeakerKit pour la transcription et l’analyse des locuteurs sur l’appareil."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate डिवाइस पर ट्रांसक्रिप्शन और वक्ता विश्लेषण के लिए WhisperKit और SpeakerKit का उपयोग करता है।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMateは、デバイス上での文字起こしと話者解析にWhisperKitとSpeakerKitを使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate는 기기 내 전사와 화자 분석에 WhisperKit과 SpeakerKit을 사용합니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O CaptionMate usa WhisperKit e SpeakerKit para transcrição e análise de falantes no dispositivo."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "CaptionMate 使用 WhisperKit 和 SpeakerKit 在设备上进行转录和说话人分析。"
+          }
+        }
+      }
+    },
+    "Manage saved projects in the project library. Delete exported subtitles and recovery files separately in Finder. Deleting a project does not delete the original recording." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدِر المشاريع المحفوظة في مكتبة المشاريع. احذف ملفات الترجمة المُصدَّرة وملفات الاسترداد بشكل منفصل في Finder. حذف المشروع لا يحذف التسجيل الأصلي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwalte gespeicherte Projekte in der Projektmediathek. Lösche exportierte Untertitel und Wiederherstellungsdateien separat im Finder. Beim Löschen eines Projekts bleibt die Originalaufnahme erhalten."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage saved projects in the project library. Delete exported subtitles and recovery files separately in Finder. Deleting a project does not delete the original recording."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manage saved projects in the project library. Delete exported subtitles and recovery files separately in Finder. Deleting a project does not delete the original recording."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gestiona los proyectos guardados en la biblioteca de proyectos. Elimina por separado en Finder los subtítulos exportados y los archivos de recuperación. Eliminar un proyecto no elimina la grabación original."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gérez les projets enregistrés dans la bibliothèque de projets. Supprimez séparément les sous-titres exportés et les fichiers de récupération dans Finder. Supprimer un projet ne supprime pas l’enregistrement d’origine."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सहेजे गए प्रोजेक्ट, प्रोजेक्ट लाइब्रेरी में प्रबंधित करें। निर्यात किए गए उपशीर्षक और रिकवरी फ़ाइलें Finder में अलग से हटाएँ। प्रोजेक्ट हटाने से मूल रिकॉर्डिंग नहीं हटती।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済みプロジェクトはプロジェクトライブラリで管理してください。書き出した字幕と復元ファイルはFinderで個別に削除してください。プロジェクトを削除しても、元の録音は削除されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 프로젝트는 프로젝트 보관함에서 관리하세요. 내보낸 자막과 복구 파일은 Finder에서 별도로 삭제하세요. 프로젝트를 삭제해도 원본 녹음은 삭제되지 않습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gerencie os projetos salvos na biblioteca de projetos. Exclua separadamente no Finder as legendas exportadas e os arquivos de recuperação. Excluir um projeto não exclui a gravação original."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在项目库中管理已保存的项目。导出的字幕和恢复文件需要在 Finder 中单独删除。删除项目不会删除原始录音。"
+          }
+        }
+      }
+    },
+    "Audio is processed on this Mac." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُعالج الملفات الصوتية على هذا الـ Mac."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio wird auf diesem Mac verarbeitet."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio is processed on this Mac."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio is processed on this Mac."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El audio se procesa en este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’audio est traité sur ce Mac."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ऑडियो इसी Mac पर संसाधित होता है।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声はこのMacで処理されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "음성은 이 Mac에서 처리됩니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O áudio é processado neste Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频在此 Mac 上处理。"
+          }
+        }
+      }
+    },
+    "Privacy & Storage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الخصوصية والتخزين"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Datenschutz & Speicher"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy & Storage"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy & Storage"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacidad y almacenamiento"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confidentialité et stockage"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "गोपनीयता और स्टोरेज"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プライバシーとストレージ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "개인정보 및 저장 공간"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacidade e armazenamento"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐私与存储"
+          }
+        }
+      }
+    },
+    "Saved projects contain transcript text, speaker labels, timing data, and a reference to the original audio. They do not copy the recording." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحتوي المشاريع المحفوظة على نص التفريغ وتسميات المتحدثين وبيانات التوقيت ومرجع إلى الصوت الأصلي. ولا تنسخ التسجيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gespeicherte Projekte enthalten Transkripttext, Sprecherzuordnungen, Zeitangaben und einen Verweis auf das Originalaudio. Die Aufnahme wird nicht kopiert."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved projects contain transcript text, speaker labels, timing data, and a reference to the original audio. They do not copy the recording."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved projects contain transcript text, speaker labels, timing data, and a reference to the original audio. They do not copy the recording."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los proyectos guardados contienen texto transcrito, etiquetas de hablantes, datos de tiempo y una referencia al audio original. No copian la grabación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les projets enregistrés contiennent le texte transcrit, les étiquettes de locuteurs, les données temporelles et une référence à l’audio d’origine. Ils ne copient pas l’enregistrement."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सहेजे गए प्रोजेक्ट में ट्रांसक्रिप्ट पाठ, वक्ता लेबल, समय डेटा और मूल ऑडियो का संदर्भ होता है। वे रिकॉर्डिंग की कॉपी नहीं बनाते।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済みプロジェクトには、文字起こしの本文、話者ラベル、時刻情報、元の音声への参照が含まれます。録音はコピーされません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 프로젝트에는 전사 본문, 화자 배정, 시각 정보와 원본 오디오 참조가 포함됩니다. 원본 녹음은 복사하지 않습니다."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os projetos salvos contêm texto transcrito, rótulos de falantes, dados de tempo e uma referência ao áudio original. Eles não copiam a gravação."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已保存的项目包含转录文本、说话人标注、时间信息和原始音频的引用，不会复制录音。"
+          }
+        }
+      }
+    },
+    "Project Folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مجلد المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projektordner"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Folder"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Project Folder"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carpeta del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट फ़ोल्डर"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトフォルダ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 폴더"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasta do projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "项目文件夹"
+          }
+        }
+      }
+    },
+    "Show Project Folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إظهار مجلد المشروع"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Projektordner anzeigen"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Project Folder"
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Project Folder"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar carpeta del proyecto"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Afficher le dossier du projet"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "प्रोजेक्ट फ़ोल्डर दिखाएँ"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "プロジェクトフォルダを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "프로젝트 폴더 보기"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mostrar pasta do projeto"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示项目文件夹"
+          }
+        }
+      }
+    },
+    "Recovery files ending in .captionmate.json are saved beside exported subtitles. Delete them separately in Finder." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تُحفظ ملفات الاسترداد التي تنتهي بـ .captionmate.json بجانب الترجمات المصدّرة. احذفها بشكل منفصل في Finder."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wiederherstellungsdateien mit der Endung .captionmate.json werden neben exportierten Untertiteln gespeichert. Lösche sie separat im Finder."
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery files ending in .captionmate.json are saved beside exported subtitles. Delete them separately in Finder."
+          }
+        },
+        "en-GB" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recovery files ending in .captionmate.json are saved beside exported subtitles. Delete them separately in Finder."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Los archivos de recuperación con la extensión .captionmate.json se guardan junto a los subtítulos exportados. Elimínalos por separado en Finder."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fichiers de récupération se terminant par .captionmate.json sont enregistrés à côté des sous-titres exportés. Supprimez-les séparément dans Finder."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".captionmate.json से समाप्त होने वाली रिकवरी फ़ाइलें निर्यात किए गए उपशीर्षकों के साथ सहेजी जाती हैं। उन्हें Finder में अलग से हटाएँ।"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".captionmate.jsonで終わる復元ファイルは、書き出した字幕と同じフォルダに保存されます。Finderで個別に削除してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ".captionmate.json으로 끝나는 복구 파일은 내보낸 자막과 같은 폴더에 저장됩니다. Finder에서 별도로 삭제하세요."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Os arquivos de recuperação com a extensão .captionmate.json são salvos junto às legendas exportadas. Exclua-os separadamente no Finder."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以 .captionmate.json 结尾的恢复文件与导出的字幕保存在同一文件夹中。请在 Finder 中单独删除。"
+          }
+        }
+      }
+    },
     "Advanced Settings" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2482,76 +5180,6 @@
         }
       }
     },
-    "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تُخزَّن تفضيلات التطبيق وإعداداته محليًا باستخدام UserDefaults. تُنزَّل نماذج الذكاء الاصطناعي وتُخزَّن مؤقتًا محليًا على جهازك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App-Einstellungen werden lokal mit UserDefaults gespeichert. KI-Modelle werden auf dein Gerät heruntergeladen und dort zwischengespeichert."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las preferencias y los ajustes de la app se guardan localmente con UserDefaults. Los modelos de IA se descargan y se almacenan en caché localmente en tu dispositivo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Les préférences et réglages de l’app sont stockés localement avec UserDefaults. Les modèles d’IA sont téléchargés et mis en cache sur votre appareil."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ऐप प्राथमिकताएँ और सेटिंग्स UserDefaults में स्थानीय रूप से सहेजी जाती हैं। AI मॉडल आपके डिवाइस पर डाउनलोड और कैश किए जाते हैं।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アプリの環境設定と設定はUserDefaultsを使用してローカルに保存されます。AIモデルはデバイス上にダウンロードされ、ローカルにキャッシュされます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱 환경설정은 UserDefaults를 사용해 로컬에 저장됩니다. AI 모델은 기기에 다운로드되어 로컬 캐시에 보관됩니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Preferências e ajustes do app são armazenados localmente usando UserDefaults. Modelos de IA são baixados e mantidos em cache no seu dispositivo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "应用偏好和设置会使用 UserDefaults 本地保存。AI 模型会下载并缓存在你的设备上。"
-          }
-        }
-      }
-    },
     "App Version: %@ (%@)" : {
       "localizations" : {
         "ar" : {
@@ -4312,146 +6940,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "CaptionMate"
-          }
-        }
-      }
-    },
-    "CaptionMate does not collect, store, or transmit any personal data. All processing is done locally on your device." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "لا يجمع CaptionMate أي بيانات شخصية أو يخزنها أو يرسلها. تتم كل المعالجة محليًا على جهازك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate erfasst, speichert oder überträgt keine personenbezogenen Daten. Die gesamte Verarbeitung erfolgt lokal auf deinem Gerät."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate does not collect, store, or transmit any personal data. All processing is done locally on your device."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate does not collect, store, or transmit any personal data. All processing is done locally on your device."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate no recopila, almacena ni transmite datos personales. Todo el procesamiento se realiza localmente en tu dispositivo."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate ne collecte, ne stocke ni ne transmet aucune donnée personnelle. Tout le traitement est effectué localement sur votre appareil."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate कोई व्यक्तिगत डेटा एकत्र, संग्रहीत या प्रसारित नहीं करता। सारी प्रोसेसिंग आपके डिवाइस पर स्थानीय रूप से होती है।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMateは個人データを収集、保存、送信しません。すべての処理はデバイス上でローカルに行われます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate는 개인 데이터를 수집, 저장, 전송하지 않습니다. 모든 처리는 기기 안에서 로컬로 수행됩니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O CaptionMate não coleta, armazena nem transmite dados pessoais. Todo o processamento é feito localmente no seu dispositivo."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate 不会收集、存储或传输任何个人数据。所有处理都在你的设备本地完成。"
-          }
-        }
-      }
-    },
-    "CaptionMate uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يستخدم CaptionMate ‏WhisperKit للتعرف على الكلام، ويعالج كل البيانات محليًا على جهازك. لا تُرسل أي بيانات إلى خوادم خارجية للتفريغ."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate verwendet WhisperKit für Spracherkennung und verarbeitet alle Daten lokal auf deinem Gerät. Für die Transkription werden keine Daten an externe Server gesendet."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate usa WhisperKit para el reconocimiento de voz y procesa todos los datos localmente en tu dispositivo. No se envían datos a servidores externos para la transcripción."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate utilise WhisperKit pour la reconnaissance vocale, avec un traitement local sur votre appareil. Aucune donnée n’est envoyée à des serveurs externes pour la transcription."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate भाषण पहचान के लिए WhisperKit का उपयोग करता है, जो सारा डेटा आपके डिवाइस पर स्थानीय रूप से संसाधित करता है। ट्रांसक्रिप्शन के लिए कोई डेटा बाहरी सर्वर पर नहीं भेजा जाता।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMateは音声認識にWhisperKitを使用し、すべてのデータをデバイス上でローカル処理します。文字起こしのために外部サーバーへデータを送信することはありません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate는 음성 인식에 WhisperKit을 사용하며 모든 데이터는 기기에서 로컬로 처리됩니다. 전사를 위해 외부 서버로 데이터가 전송되지 않습니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O CaptionMate usa o WhisperKit para reconhecimento de fala, processando todos os dados localmente no seu dispositivo. Nenhum dado é enviado a servidores externos para transcrição."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "CaptionMate 使用 WhisperKit 进行语音识别，所有数据都在你的设备本地处理。转录不会把数据发送到外部服务器。"
           }
         }
       }
@@ -12101,76 +14589,6 @@
         }
       }
     },
-    "Last Updated: January 2025" : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "آخر تحديث: يناير 2025"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zuletzt aktualisiert: Januar 2025"
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last Updated: January 2025"
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Last Updated: January 2025"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Última actualización: enero de 2025"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Dernière mise à jour : janvier 2025"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "अंतिम अपडेट: जनवरी 2025"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最終更新: 2025年1月"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "최종 업데이트: 2025년 1월"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Última atualização: janeiro de 2025"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "最后更新：2025年1月"
-          }
-        }
-      }
-    },
     "Later" : {
       "comment" : "A button that dismisses the first run guide and dismisses the app.",
       "isCommentAutoGenerated" : true,
@@ -14432,76 +16850,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "需要修复"
-          }
-        }
-      }
-    },
-    "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يُستخدم الاتصال بالشبكة فقط لتنزيل نماذج الذكاء الاصطناعي من Hugging Face. لا تُرسل بيانات المستخدم أو تحليلات الاستخدام."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die Netzwerkverbindung wird ausschließlich zum Herunterladen von KI-Modellen von Hugging Face verwendet. Es werden keine Nutzerdaten oder Analysen übertragen."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La conexión de red solo se usa para descargar modelos de IA desde Hugging Face. No se transmiten datos de usuario ni analíticas de uso."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La connexion réseau sert uniquement à télécharger des modèles d’IA depuis Hugging Face. Aucune donnée utilisateur ni analyse d’utilisation n’est transmise."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "नेटवर्क कनेक्टिविटी केवल Hugging Face से AI मॉडल डाउनलोड करने के लिए उपयोग होती है। उपयोगकर्ता डेटा या उपयोग विश्लेषण प्रसारित नहीं होते।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ネットワーク接続はHugging FaceからAIモデルをダウンロードする目的にのみ使用されます。ユーザーデータや利用分析は送信されません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "네트워크 연결은 Hugging Face에서 AI 모델을 다운로드할 때만 사용됩니다. 사용자 데이터나 사용 분석은 전송되지 않습니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "A conexão de rede é usada apenas para baixar modelos de IA do Hugging Face. Nenhum dado do usuário ou análise de uso é transmitido."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "网络连接仅用于从 Hugging Face 下载 AI 模型。不会传输用户数据或使用分析。"
           }
         }
       }
@@ -22570,76 +24918,6 @@
         }
       }
     },
-    "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "بما أننا لا نجمع بيانات شخصية، فلا توجد بيانات لطلبها أو تعديلها أو حذفها. تتم كل المعالجة محليًا على جهازك، ولديك تحكم كامل في ملفاتك والترجمات المولدة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Da wir keine personenbezogenen Daten erfassen, gibt es keine Daten anzufordern, zu ändern oder zu löschen. Die gesamte Verarbeitung erfolgt lokal auf deinem Gerät, und du behältst die vollständige Kontrolle über deine Dateien und erzeugten Untertitel."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Como no recopilamos datos personales, no hay datos que solicitar, modificar ni eliminar. Todo el procesamiento ocurre localmente en tu dispositivo y tienes control total sobre tus archivos y subtítulos generados."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Comme nous ne collectons pas de données personnelles, il n’y a aucune donnée à demander, modifier ou supprimer. Tout le traitement s’effectue localement sur votre appareil, et vous gardez le contrôle total de vos fichiers et sous-titres générés."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "क्योंकि हम व्यक्तिगत डेटा एकत्र नहीं करते, अनुरोध, संशोधन या हटाने के लिए कोई डेटा नहीं है। सारी प्रोसेसिंग आपके डिवाइस पर स्थानीय रूप से होती है, और आपकी फ़ाइलों व बनाए गए उपशीर्षकों पर पूरा नियंत्रण आपका है।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "個人データを収集しないため、請求、変更、削除の対象となるデータはありません。すべての処理はデバイス上でローカルに行われ、ファイルと生成された字幕はあなたが完全に管理できます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "개인 데이터를 수집하지 않으므로 요청, 수정, 삭제할 데이터가 없습니다. 모든 처리는 기기에서 로컬로 이루어지며 파일과 생성된 자막을 사용자가 완전히 제어합니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Como não coletamos dados pessoais, não há dados para solicitar, modificar ou excluir. Todo o processamento ocorre localmente no seu dispositivo, e você tem controle total sobre seus arquivos e legendas geradas."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "由于我们不收集个人数据，因此没有可请求、修改或删除的数据。所有处理都在你的设备本地进行，你完全控制自己的文件和生成的字幕。"
-          }
-        }
-      }
-    },
     "Source Language" : {
       "localizations" : {
         "ar" : {
@@ -25258,76 +27536,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文本解码器"
-          }
-        }
-      }
-    },
-    "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action." : {
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "لا يصل التطبيق إلا إلى ملفات الصوت/الفيديو التي تختارها صراحة عبر منتقي الملفات. لا نصل إلى أي ملفات دون إجراء مباشر منك."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Die App greift nur auf Audio-/Videodateien zu, die du ausdrücklich über die Dateiauswahl auswählst. Ohne deine direkte Aktion greifen wir auf keine Dateien zu."
-          }
-        },
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action."
-          }
-        },
-        "en-GB" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "La app solo accede a los archivos de audio o video que seleccionas explícitamente mediante el selector de archivos. No accedemos a ningún archivo sin tu acción directa."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’app accède uniquement aux fichiers audio/vidéo que vous sélectionnez explicitement via le sélecteur de fichiers. Nous n’accédons à aucun fichier sans action directe de votre part."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ऐप केवल उन ऑडियो/वीडियो फ़ाइलों तक पहुँचता है जिन्हें आप फ़ाइल पिकर से स्पष्ट रूप से चुनते हैं। आपकी सीधी कार्रवाई के बिना हम कोई फ़ाइल एक्सेस नहीं करते।"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "このアプリは、ファイルピッカーで明示的に選択した音声/動画ファイルにのみアクセスします。あなたの操作なしにファイルへアクセスすることはありません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "앱은 파일 선택기를 통해 사용자가 명시적으로 선택한 오디오/비디오 파일에만 접근합니다. 사용자의 직접 동작 없이 파일에 접근하지 않습니다."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "O app acessa apenas arquivos de áudio/vídeo que você seleciona explicitamente pelo seletor de arquivos. Não acessamos nenhum arquivo sem sua ação direta."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "本应用只访问你通过文件选择器明确选择的音频/视频文件。没有你的直接操作，我们不会访问任何文件。"
           }
         }
       }

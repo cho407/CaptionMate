@@ -72,7 +72,7 @@ struct PrivacyPolicyView: View {
                     .font(.title.bold())
                     .padding(.bottom, 8)
 
-                Text("Last Updated: January 2025")
+                Text("Last Updated: November 2026")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.bottom, 16)
@@ -80,32 +80,32 @@ struct PrivacyPolicyView: View {
                 Group {
                     SectionTitle("Data Collection")
                     Text(
-                        "CaptionMate does not collect, store, or transmit any personal data. All processing is done locally on your device."
+                        "CaptionMate processes audio on your device. Audio and transcript content are not sent to a remote transcription service."
                     )
 
                     SectionTitle("File Access")
                     Text(
-                        "The app only accesses audio/video files that you explicitly select through the file picker. We do not access any files without your direct action."
+                        "CaptionMate accesses audio and video you choose, including files opened through a saved project reference."
                     )
 
                     SectionTitle("Network Usage")
                     Text(
-                        "Network connectivity is used solely for downloading AI models from Hugging Face. No user data or usage analytics are transmitted."
+                        "Model downloads and model catalog checks use network access. Audio inference stays on your device."
                     )
 
                     SectionTitle("Local Storage")
                     Text(
-                        "App preferences and settings are stored locally using UserDefaults. AI models are downloaded and cached locally on your device."
+                        "Preferences, cached models, saved projects, and recovery files are stored locally. Saved projects and recovery files can contain transcript text, speaker labels, timing data, and audio file references."
                     )
 
                     SectionTitle("Third-Party Services")
                     Text(
-                        "CaptionMate uses WhisperKit for speech recognition, which processes all data locally on your device. No data is sent to external servers for transcription."
+                        "CaptionMate uses WhisperKit and SpeakerKit for on-device transcription and speaker analysis."
                     )
 
                     SectionTitle("Your Rights")
                     Text(
-                        "Since we don't collect personal data, there is no data to request, modify, or delete. All processing occurs locally on your device, and you have complete control over your files and generated subtitles."
+                        "Manage saved projects in the project library. Delete exported subtitles and recovery files separately in Finder. Deleting a project does not delete the original recording."
                     )
 
                     SectionTitle("Contact")
@@ -115,6 +115,56 @@ struct PrivacyPolicyView: View {
                 }
             }
             .padding()
+        }
+    }
+}
+
+struct LocalProcessingNotice: View {
+    @ObservedObject var viewModel: ContentViewModel
+    @State private var showStorageInfo = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Label("Audio is processed on this Mac.", systemImage: "lock.shield")
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Privacy & Storage") { showStorageInfo = true }
+                .buttonStyle(.borderless)
+                .accessibilityIdentifier("privacy.storageInfo")
+        }
+        .font(.caption)
+        .padding(.vertical, 6)
+        .sheet(isPresented: $showStorageInfo) {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Label("Privacy & Storage", systemImage: "lock.shield")
+                        .font(.title3.weight(.semibold))
+                    Spacer()
+                    Button("Close") { showStorageInfo = false }
+                        .keyboardShortcut(.cancelAction)
+                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text("CaptionMate processes audio on your device. Audio and transcript content are not sent to a remote transcription service.")
+                        Text("Model downloads and model catalog checks use network access. Audio inference stays on your device.")
+                        Text("Saved projects contain transcript text, speaker labels, timing data, and a reference to the original audio. They do not copy the recording.")
+                        Text("Project Folder").font(.headline)
+                        Text(verbatim: viewModel.localProjectStorageURL.path)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                        Button("Show Project Folder") { viewModel.revealLocalProjectStorage() }
+                            .accessibilityIdentifier("privacy.showProjectFolder")
+                        Text("Manage saved projects in the project library. Delete exported subtitles and recovery files separately in Finder. Deleting a project does not delete the original recording.")
+                        Text("Recovery files ending in .captionmate.json are saved beside exported subtitles. Delete them separately in Finder.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(20)
+            .frame(width: 540, height: 490)
+            .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
     }
 }

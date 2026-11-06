@@ -173,6 +173,20 @@ class ContentViewModel: ObservableObject {
     private var isConfirmingUnsavedChanges = false
     weak var subtitleUndoManager: UndoManager?
     private var playbackSegmentEnd: TimeInterval?
+    private var speakerReanalysisBackup: (before: SubtitleEditSnapshot, after: SubtitleEditSnapshot)?
+
+    var localProjectStorageURL: URL { projectStore.rootURL }
+
+    func revealLocalProjectStorage() {
+        do {
+            try FileManager.default.createDirectory(at: projectStore.rootURL, withIntermediateDirectories: true)
+            guard NSWorkspace.shared.open(projectStore.rootURL) else {
+                throw CocoaError(.fileReadUnknown)
+            }
+        } catch {
+            showUserMessage(.warning, title: "Could Not Open Project Folder", detail: error.localizedDescription)
+        }
+    }
 
     private struct ProjectSnapshot: Equatable {
         let sidecar: CaptionMateSidecar
@@ -1110,7 +1124,8 @@ class ContentViewModel: ObservableObject {
             selectedExportPreset: selectedExportPreset,
             frameRate: frameRate,
             includeSpeakerLabelsInExport: includeSpeakerLabelsInExport,
-            speakerDiarizationSpeakerCount: speakerDiarizationSpeakerCount
+            speakerDiarizationSpeakerCount: speakerDiarizationSpeakerCount,
+            speakerAnalysis: transcriptionState.speakerAnalysis
         )
     }
 
@@ -1438,6 +1453,10 @@ class ContentViewModel: ObservableObject {
         transcriptionState.speakerAssignments = []
         transcriptionState.speakerNames = [:]
         transcriptionState.speakerDiarization = SpeakerDiarizationState()
+        transcriptionState.speakerAnalysis = nil
+        speakerReanalysisBackup = nil
+        uiState.showSpeakerReanalysisConfirmation = false
+        uiState.subtitleReviewIsForExport = false
         uiState.subtitleQualityIssues = []
         uiState.showSubtitleReview = false
         uiState.focusedSubtitleSegmentIndex = nil
@@ -3178,6 +3197,8 @@ class ContentViewModel: ObservableObject {
             transcriptionState.speakerAssignments = Array(repeating: nil, count: segments.count)
             transcriptionState.speakerNames = [:]
             transcriptionState.speakerDiarization = SpeakerDiarizationState()
+            transcriptionState.speakerAnalysis = nil
+            speakerReanalysisBackup = nil
             uiState.isSubtitleEditing = false
             refreshSubtitleQualityIssues()
             showUserMessage(
@@ -3236,7 +3257,7 @@ class ContentViewModel: ObservableObject {
         activeSpeakerDiarizationTaskID = operationID
         transcriptionState.speakerDiarization.isRunning = true
         transcriptionState.speakerDiarization.isCancelling = false
-        transcriptionState.speakerDiarization.progress = 0
+        transcriptionState.speakerDiarization.phase = .preparingAudio
         transcriptionState.speakerDiarization.errorMessage = nil
         showUserMessage(.info, title: "Analyzing Speakers", detail: audioState.audioFileName)
 
@@ -3255,15 +3276,17 @@ class ContentViewModel: ObservableObject {
             do {
                 let audioSamples = try await audioSamplesProvider()
                 try Task.checkCancellation()
+                self?.transcriptionState.speakerDiarization.phase = .analyzing
                 let timeline = try await analyze(audioSamples, expectedSpeakerCount) { [weak self] progress in
-                    let value = progress.fractionCompleted.isFinite ? progress.fractionCompleted : 0
+                    guard progress.fractionCompleted.isFinite, progress.fractionCompleted >= 1 else { return }
                     Task { @MainActor [weak self] in
                         guard let self, self.activeSpeakerDiarizationTaskID == operationID,
                               !self.transcriptionState.speakerDiarization.isCancelling else { return }
-                        self.transcriptionState.speakerDiarization.progress = min(max(value, 0), 1)
+                        self.transcriptionState.speakerDiarization.phase = .finalizing
                     }
                 }
                 try Task.checkCancellation()
+                self?.transcriptionState.speakerDiarization.phase = .finalizing
                 self?.publishSpeakerDiarizationResult(
                     timeline, segments: segments, originalSnapshot: originalSnapshot,
                     operationID: operationID, previousStatus: previousStatus
@@ -3271,11 +3294,11 @@ class ContentViewModel: ObservableObject {
             } catch is CancellationError {
                 guard self?.activeSpeakerDiarizationTaskID == operationID,
                       self?.makeCurrentProjectSnapshot() == originalSnapshot else { return }
-                self?.transcriptionState.speakerDiarization = previousStatus
+                self?.transcriptionState.speakerDiarization = self?.previousSpeakerDiarizationStatus ?? previousStatus
             } catch {
                 guard let self, self.activeSpeakerDiarizationTaskID == operationID,
                       self.makeCurrentProjectSnapshot() == originalSnapshot else { return }
-                self.transcriptionState.speakerDiarization = previousStatus
+                self.transcriptionState.speakerDiarization = self.previousSpeakerDiarizationStatus ?? previousStatus
                 guard !Task.isCancelled else { return }
                 var detail: String? = error.localizedDescription
                 if case let .modelUnavailable(failure) = error as? SpeakerDiarizationServiceError {
@@ -3309,7 +3332,7 @@ class ContentViewModel: ObservableObject {
               enableSpeakerDiarization else { return }
         guard makeCurrentProjectSnapshot() == originalSnapshot else {
             let detail = "The transcript changed during speaker analysis. Previous speaker labels were kept."
-            transcriptionState.speakerDiarization = previousStatus
+            transcriptionState.speakerDiarization = previousSpeakerDiarizationStatus ?? previousStatus
             transcriptionState.speakerDiarization.errorMessage = detail
             showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: detail)
             return
@@ -3318,7 +3341,7 @@ class ContentViewModel: ObservableObject {
               timelineSegments.allSatisfy({ Self.normalizedSpeakerID($0.speakerID) != nil }) else {
             let detail = timelineSegments.isEmpty ? "No speakers detected." :
                 "Too many speakers detected. Previous speaker labels were kept."
-            transcriptionState.speakerDiarization = previousStatus
+            transcriptionState.speakerDiarization = previousSpeakerDiarizationStatus ?? previousStatus
             transcriptionState.speakerDiarization.errorMessage = detail
             showUserMessage(.warning, title: "Speaker Analysis Skipped", detail: detail)
             return
@@ -3334,15 +3357,22 @@ class ContentViewModel: ObservableObject {
             to: assignments
         )
         let namesNeedReview = names.count < transcriptionState.speakerNames.count
+        let before = makeSubtitleEditSnapshot(speakerStatus: previousStatus)
+        let hadPreviousResult = hasSpeakerReviewContext
+        registerSubtitleUndo(speakerStatus: previousStatus)
         let speakerCount = Set(timelineSegments.map(\.speakerID)).count
         transcriptionState.speakerAssignments = assignments
         transcriptionState.speakerNames = names
+        transcriptionState.speakerAnalysis = SpeakerAnalysisRecord(
+            timeline: timelineSegments,
+            requestedSpeakerCount: speakerDiarizationExpectedSpeakerCount()
+        )
         transcriptionState.speakerDiarization = SpeakerDiarizationState(
             isRunning: false,
-            progress: 1,
             detectedSpeakerCount: speakerCount,
             errorMessage: namesNeedReview ? "Speaker names need review after reanalysis." : nil
         )
+        speakerReanalysisBackup = hadPreviousResult ? (before, makeSubtitleEditSnapshot()) : nil
         refreshSubtitleQualityIssues()
 
         let assignedCount = assignments.compactMap { $0 }.count
@@ -3359,17 +3389,32 @@ class ContentViewModel: ObservableObject {
         let segments: [TranscriptionSegment]
         let assignments: [SpeakerSegmentAssignment?]
         let names: [Int: String]
+        let analysis: SpeakerAnalysisRecord?
+        let status: SpeakerDiarizationState
         let focusedIndex: Int?
     }
 
-    private func registerSubtitleUndo() {
-        guard let subtitleUndoManager else { return }
-        let snapshot = SubtitleEditSnapshot(
+    private func makeSubtitleEditSnapshot(
+        speakerStatus: SpeakerDiarizationState? = nil
+    ) -> SubtitleEditSnapshot {
+        var status = speakerStatus ??
+            (isSpeakerDiarizationBusy ? previousSpeakerDiarizationStatus : nil) ??
+            transcriptionState.speakerDiarization
+        status.isRunning = false
+        status.isCancelling = false
+        return SubtitleEditSnapshot(
             segments: transcriptionState.confirmedSegments,
             assignments: transcriptionState.speakerAssignments,
             names: transcriptionState.speakerNames,
+            analysis: transcriptionState.speakerAnalysis,
+            status: status,
             focusedIndex: uiState.focusedSubtitleSegmentIndex
         )
+    }
+
+    private func registerSubtitleUndo(speakerStatus: SpeakerDiarizationState? = nil) {
+        guard let subtitleUndoManager else { return }
+        let snapshot = makeSubtitleEditSnapshot(speakerStatus: speakerStatus)
         subtitleUndoManager.registerUndo(withTarget: self) { target in
             target.restoreSubtitleEdit(snapshot)
         }
@@ -3380,6 +3425,14 @@ class ContentViewModel: ObservableObject {
         transcriptionState.confirmedSegments = snapshot.segments
         transcriptionState.speakerAssignments = snapshot.assignments
         transcriptionState.speakerNames = snapshot.names
+        transcriptionState.speakerAnalysis = snapshot.analysis
+        if isSpeakerDiarizationBusy {
+            previousSpeakerDiarizationStatus = snapshot.status
+            transcriptionState.speakerDiarization.detectedSpeakerCount = snapshot.status.detectedSpeakerCount
+            transcriptionState.speakerDiarization.errorMessage = snapshot.status.errorMessage
+        } else {
+            transcriptionState.speakerDiarization = snapshot.status
+        }
         transcriptionResult?.segments = snapshot.segments
         transcriptionResult?.text = snapshot.segments.map(\.text).joined(separator: " ")
         uiState.focusedSubtitleSegmentIndex = snapshot.focusedIndex
@@ -3425,9 +3478,8 @@ class ContentViewModel: ObservableObject {
     }
 
     private func speakerLabelReviewIssues() -> [SubtitleQualityIssue] {
-        guard includeSpeakerLabelsInExport,
-              !transcriptionState.confirmedSegments.isEmpty,
-              !availableSpeakerIDs().isEmpty else {
+        guard hasSpeakerReviewContext,
+              !transcriptionState.confirmedSegments.isEmpty else {
             return []
         }
 
@@ -3438,6 +3490,16 @@ class ContentViewModel: ObservableObject {
             let segment = transcriptionState.confirmedSegments[index]
             let trimmedText = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedText.isEmpty else { continue }
+            if let timeline = transcriptionState.speakerAnalysis?.timeline,
+               SpeakerAssignmentMapper.speakerIDsNeedingReview(for: segment, from: timeline).count > 1 {
+                issues.append(.init(
+                    segmentIndex: index,
+                    severity: .warning,
+                    kind: .mixedSpeakers,
+                    message: "Multiple speaker candidates in one subtitle",
+                    suggestion: "Listen to this range and split at a speaker change when word timings are available."
+                ))
+            }
 
             guard let assignment = speakerAssignment(forSegmentAt: index) else {
                 issues.append(.init(
@@ -3445,7 +3507,7 @@ class ContentViewModel: ObservableObject {
                     severity: .warning,
                     kind: .missingSpeaker,
                     message: "Missing speaker label",
-                    suggestion: "Assign a speaker or turn off speaker labels before export."
+                    suggestion: "Listen to the original audio and assign a speaker if identifiable. Leave uncertain speech unassigned."
                 ))
                 continue
             }
@@ -3472,6 +3534,104 @@ class ContentViewModel: ObservableObject {
         uiState.subtitleQualityIssues.filter { $0.segmentIndex == index }
     }
 
+    var hasSpeakerReviewContext: Bool {
+        transcriptionState.speakerAnalysis != nil ||
+            transcriptionState.speakerDiarization.detectedSpeakerCount > 0 ||
+            transcriptionState.speakerAssignments.contains { $0 != nil }
+    }
+
+    var unassignedSpeakerSegmentCount: Int {
+        uiState.subtitleQualityIssues.reduce(0) { $0 + ($1.kind == .missingSpeaker ? 1 : 0) }
+    }
+
+    var mixedSpeakerSegmentCount: Int {
+        uiState.subtitleQualityIssues.reduce(0) { $0 + ($1.kind == .mixedSpeakers ? 1 : 0) }
+    }
+
+    func openSubtitleReview(forExport: Bool = false, filter: SubtitleIssueFilter = .all) {
+        refreshSubtitleQualityIssues()
+        uiState.subtitleIssueFilter = filter
+        uiState.subtitleReviewIsForExport = forExport
+        uiState.showSubtitleReview = true
+    }
+
+    var hasManualSpeakerCorrections: Bool {
+        if !transcriptionState.speakerNames.isEmpty { return true }
+        guard let analysis = transcriptionState.speakerAnalysis else {
+            return transcriptionState.speakerAssignments.contains { $0 != nil }
+        }
+        return transcriptionState.speakerAssignments != SpeakerAssignmentMapper.assignments(
+            for: transcriptionState.confirmedSegments, from: analysis.timeline
+        )
+    }
+
+    var canRestorePreviousSpeakerAnalysis: Bool {
+        guard !isSpeakerDiarizationBusy, let backup = speakerReanalysisBackup else { return false }
+        return transcriptionState.confirmedSegments == backup.after.segments &&
+            transcriptionState.speakerAssignments == backup.after.assignments &&
+            transcriptionState.speakerNames == backup.after.names &&
+            transcriptionState.speakerAnalysis == backup.after.analysis
+    }
+
+    func restorePreviousSpeakerAnalysis() {
+        guard canRestorePreviousSpeakerAnalysis, let backup = speakerReanalysisBackup else { return }
+        restoreSubtitleEdit(backup.before)
+        speakerReanalysisBackup = nil
+    }
+
+    func representativeSpeakerRange(for speakerID: Int) -> ClosedRange<Float>? {
+        let mixedIndices = Set(uiState.subtitleQualityIssues.lazy
+            .filter { $0.kind == .mixedSpeakers }.map(\.segmentIndex))
+        let candidates = transcriptionState.confirmedSegments.enumerated().lazy.filter {
+            self.speakerAssignment(forSegmentAt: $0.offset)?.speakerID == speakerID &&
+                !mixedIndices.contains($0.offset) && $0.element.start.isFinite &&
+                $0.element.end.isFinite && $0.element.start >= 0 && $0.element.end > $0.element.start
+        }
+        guard let turn = candidates.max(by: {
+            $0.element.end - $0.element.start < $1.element.end - $1.element.start
+        })?.element else { return nil }
+        return turn.start ... min(turn.end, turn.start + 8)
+    }
+
+    func playRepresentativeSpeaker(_ speakerID: Int) {
+        guard let range = representativeSpeakerRange(for: speakerID) else { return }
+        playAudioRange(start: range.lowerBound, end: range.upperBound)
+    }
+
+    func canSplitAtSpeakerChanges(at index: Int) -> Bool {
+        guard transcriptionState.confirmedSegments.indices.contains(index),
+              let timeline = transcriptionState.speakerAnalysis?.timeline else { return false }
+        return SpeakerAssignmentMapper.splitAtSpeakerChanges(
+            transcriptionState.confirmedSegments[index], from: timeline
+        ) != nil
+    }
+
+    func splitAtSpeakerChanges(at index: Int) {
+        guard !isSpeakerDiarizationBusy,
+              transcriptionState.confirmedSegments.indices.contains(index),
+              let timeline = transcriptionState.speakerAnalysis?.timeline,
+              let parts = SpeakerAssignmentMapper.splitAtSpeakerChanges(
+                  transcriptionState.confirmedSegments[index], from: timeline
+              ) else {
+            showUserMessage(.info, title: "Split Unavailable",
+                            detail: "Speaker-boundary splitting needs matching word timings. Transcribe again with speaker diarization enabled.")
+            return
+        }
+        registerSubtitleUndo()
+        normalizeSpeakerAssignmentCount()
+        transcriptionState.confirmedSegments.replaceSubrange(index ... index, with: parts)
+        for index in transcriptionState.confirmedSegments.indices {
+            transcriptionState.confirmedSegments[index].id = index
+        }
+        transcriptionState.speakerAssignments.replaceSubrange(
+            index ... index, with: SpeakerAssignmentMapper.assignments(for: parts, from: timeline)
+        )
+        transcriptionResult?.segments = transcriptionState.confirmedSegments
+        transcriptionResult?.text = transcriptionState.confirmedSegments.map(\.text).joined(separator: " ")
+        uiState.focusedSubtitleSegmentIndex = index
+        refreshSubtitleQualityIssues()
+    }
+
     func speakerAssignment(forSegmentAt index: Int) -> SpeakerSegmentAssignment? {
         guard transcriptionState.speakerAssignments.indices.contains(index) else { return nil }
         return transcriptionState.speakerAssignments[index]
@@ -3482,9 +3642,6 @@ class ContentViewModel: ObservableObject {
         return clampedCount > 0 ? clampedCount : nil
     }
 
-    func speakerCountOptionTitle(for count: Int) -> String {
-        count == 0 ? "Auto" : "\(count)"
-    }
 
     func speakerCountOptionTitleKey(for count: Int) -> LocalizedStringKey {
         guard count == 0 else { return LocalizedStringKey(String(count)) }
@@ -3492,15 +3649,17 @@ class ContentViewModel: ObservableObject {
     }
 
     func availableSpeakerIDs() -> [Int] {
-        let detectedSpeakerCount = min(
-            max(transcriptionState.speakerDiarization.detectedSpeakerCount, 0),
-            Self.supportedSpeakerIDRange.count
-        )
-        let detectedIDs = Array(0 ..< detectedSpeakerCount)
-        let configuredIDs = Array(0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0))
-        let assignedIDs = transcriptionState.speakerAssignments
-            .compactMap { Self.normalizedSpeakerID($0?.speakerID) }
-        return Array(Set(detectedIDs + configuredIDs + assignedIDs)).sorted()
+        var ids = Set(transcriptionState.speakerAssignments.lazy.compactMap { Self.normalizedSpeakerID($0?.speakerID) })
+        for turn in transcriptionState.speakerAnalysis?.timeline ?? [] {
+            if let id = Self.normalizedSpeakerID(turn.speakerID) { ids.insert(id) }
+        }
+        for id in transcriptionState.speakerNames.keys {
+            if let id = Self.normalizedSpeakerID(id) { ids.insert(id) }
+        }
+        if transcriptionState.speakerAnalysis == nil {
+            for id in 0 ..< (speakerDiarizationExpectedSpeakerCount() ?? 0) { ids.insert(id) }
+        }
+        return ids.sorted()
     }
 
     func defaultSpeakerName(for speakerID: Int) -> String {
@@ -3528,6 +3687,8 @@ class ContentViewModel: ObservableObject {
     ) {
         cancelActiveSpeakerDiarizationTask()
         subtitleUndoManager?.removeAllActions(withTarget: self)
+        speakerReanalysisBackup = nil
+        uiState.showSpeakerReanalysisConfirmation = false
         let restoredSegments = sidecar.segments.map { segment in
             TranscriptionSegment(
                 start: segment.start,
@@ -3558,6 +3719,17 @@ class ContentViewModel: ObservableObject {
             }
         }
         transcriptionState.speakerNames = restoredSpeakerNames
+        if let record = sidecar.speakerAnalysis {
+            let timeline = record.timeline.filter {
+                Self.normalizedSpeakerID($0.speakerID) != nil &&
+                    $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end > $0.start
+            }
+            let count = record.requestedSpeakerCount.flatMap { (1 ... 8).contains($0) ? $0 : nil }
+            transcriptionState.speakerAnalysis = timeline.isEmpty ? nil :
+                SpeakerAnalysisRecord(timeline: timeline, requestedSpeakerCount: count)
+        } else {
+            transcriptionState.speakerAnalysis = nil
+        }
 
         let preset = SubtitleExportPreset(rawValue: sidecar.exportSettings.selectedExportPreset)
         if let preset {
@@ -3570,13 +3742,9 @@ class ContentViewModel: ObservableObject {
         speakerDiarizationSpeakerCount = restoredSpeakerCount
         let restoredSpeakerIDs = Set(
             transcriptionState.speakerAssignments.compactMap { $0?.speakerID } +
-                Array(transcriptionState.speakerNames.keys)
+                (transcriptionState.speakerAnalysis?.timeline.map(\.speakerID) ?? [])
         )
-        let highestRestoredSpeakerID = restoredSpeakerIDs.max() ?? -1
-        let detectedCount = min(
-            Self.supportedSpeakerIDRange.count,
-            max(restoredSpeakerCount, highestRestoredSpeakerID + 1)
-        )
+        let detectedCount = restoredSpeakerIDs.count
         transcriptionState.speakerDiarization = SpeakerDiarizationState(
             detectedSpeakerCount: detectedCount
         )
@@ -3600,6 +3768,7 @@ class ContentViewModel: ObservableObject {
         guard Self.normalizedSpeakerID(speakerID) != nil else { return }
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard speakerName(for: speakerID) != trimmedName else { return }
+        registerSubtitleUndo()
         if trimmedName.isEmpty {
             transcriptionState.speakerNames.removeValue(forKey: speakerID)
         } else {
@@ -3640,24 +3809,29 @@ class ContentViewModel: ObservableObject {
             enableSpeakerDiarization = false
             cancelActiveSpeakerDiarizationTask()
             if !isSpeakerDiarizationBusy {
-                transcriptionState.speakerDiarization = SpeakerDiarizationState()
+                transcriptionState.speakerDiarization = SpeakerDiarizationState(
+                    detectedSpeakerCount: transcriptionState.speakerDiarization.detectedSpeakerCount
+                )
             }
         }
         refreshSubtitleQualityIssues()
     }
 
-    func reanalyzeSpeakersForCurrentAudio() {
+    @discardableResult
+    func reanalyzeSpeakersForCurrentAudio(
+        replacingManualCorrections: Bool = false
+    ) -> Task<Void, Never>? {
         guard !transcriptionState.confirmedSegments.isEmpty else {
             showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: "No subtitles are ready.")
-            return
+            return nil
         }
 
         guard let audioURL = audioState.importedAudioURL else {
             showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: "No imported audio file.")
-            return
+            return nil
         }
 
-        guard !isSpeakerDiarizationBusy else { return }
+        guard !isSpeakerDiarizationBusy else { return nil }
 
         guard isSpeakerDiarizationAvailable else {
             let detail = modelManagementState.isSpeakerDiarizationModelPreparing
@@ -3665,12 +3839,17 @@ class ContentViewModel: ObservableObject {
                 : (modelManagementState.speakerDiarizationModelError ??
                     "Speaker model is not ready.")
             showUserMessage(.warning, title: "Speaker Analysis Unavailable", detail: detail)
-            return
+            return nil
         }
+        if hasManualSpeakerCorrections, !replacingManualCorrections {
+            uiState.showSpeakerReanalysisConfirmation = true
+            return nil
+        }
+        uiState.showSpeakerReanalysisConfirmation = false
 
         enableSpeakerDiarization = true
 
-        beginSpeakerDiarization {
+        return beginSpeakerDiarization {
             try await CancellableAudioWork.run {
                 try autoreleasepool {
                     try AudioProcessor.loadAudioAsFloatArray(fromPath: audioURL.path)
@@ -3974,6 +4153,15 @@ class ContentViewModel: ObservableObject {
             showUserMessage(.warning, title: "Split Unavailable")
             return
         }
+        if let parts = SpeakerAssignmentMapper.splitAtWordBoundary(
+            segment, near: segment.start + duration / 2
+        ) {
+            var segments = transcriptionState.confirmedSegments
+            segments.replaceSubrange(index ... index, with: parts)
+            for index in segments.indices { segments[index].id = index }
+            replaceTranscriptionSegments(segments)
+            return
+        }
 
         let midpoint = segment.start + duration / 2
         let firstSegment = TranscriptionSegment(
@@ -4270,7 +4458,7 @@ class ContentViewModel: ObservableObject {
             detectLanguage: isAutoLanguageEnable,
             skipSpecialTokens: !enableSpecialCharacters,
             withoutTimestamps: false,
-            wordTimestamps: enableWordTimestamp,
+            wordTimestamps: enableWordTimestamp || enableSpeakerDiarization,
             clipTimestamps: seekClip,
             concurrentWorkerCount: min(max(Int(concurrentWorkerCount), 1), 8),
             chunkingStrategy: chunkingStrategy
@@ -4767,6 +4955,7 @@ class ContentViewModel: ObservableObject {
         let qualityIssues = refreshSubtitleQualityIssues()
         let hasBlockingIssues = qualityIssues.contains { $0.severity == .error }
         if hasBlockingIssues || (!skipQualityReview && !qualityIssues.isEmpty) {
+            uiState.subtitleReviewIsForExport = true
             uiState.showSubtitleReview = true
             showUserMessage(
                 hasBlockingIssues ? .error : .warning,
@@ -4796,6 +4985,10 @@ class ContentViewModel: ObservableObject {
                 speakerName: speakerDisplayName(for: speakerAssignment),
                 includeSpeakerLabel: includeSpeakerLabelsInExport
             )
+            // Alignment is retained for editing/recovery; per-word output is a separate preference.
+            if usesCaptionLayout, !enableWordTimestamp {
+                cleanSegment.words = nil
+            }
             if usesCaptionLayout {
                 cleanSegment.text = Self.wrappedSubtitleText(
                     cleanSegment.text,
@@ -4803,7 +4996,7 @@ class ContentViewModel: ObservableObject {
                     maxLines: exportPreset.maxLines
                 )
             }
-            if usesCaptionLayout, let words = segment.words {
+            if usesCaptionLayout, enableWordTimestamp, let words = segment.words {
                 var cleanWords: [WordTiming] = []
                 for word in words {
                     var cleanWord = word

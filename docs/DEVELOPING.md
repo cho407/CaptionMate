@@ -147,14 +147,20 @@ ASR or diarization accuracy test; use real cached models for runtime smoke check
 
 ## Editing and Export Contracts
 
-- Recovery sidecars use schema version 2 and preserve optional word timings.
-  Version 1 remains readable; missing legacy alignments are not reconstructed.
-  Project save/load, recovery, and structural Undo must preserve existing words,
-  timestamps, speaker assignments, and speaker names.
+- Recovery sidecars use schema version 2 and preserve optional word timings and
+  an optional acoustic speaker-analysis record (timeline and requested count).
+  Version 1 and existing version 2 files remain readable. Missing alignments or
+  acoustic evidence are not reconstructed; older writers may discard new optional
+  metadata. Project save/load, recovery, and structural Undo preserve existing
+  words, timestamps, speaker assignments, speaker names, and acoustic evidence.
 - Speaker labels and caption layout are export-only transformations. SRT, VTT,
   and FCPXML must apply them to word-timed output as well as segment output,
   without modifying the editor or recovery sidecar. JSON word alignments stay
   canonical; caption layout does not apply to JSON, text, or document output.
+- Diarization collects word timings for review even when word-level export is off.
+  SRT, VTT, and FCPXML export copies omit words in segment-output mode; canonical
+  editor/recovery words and JSON alignments remain intact. Never let the presence
+  of internal word alignments silently choose a different output granularity.
 - Export opens the format/options review from both completed and editing modes.
   Caption presets apply only to subtitle formats; frame rate applies only to
   FCPXML. Missing speaker attribution needs manual review or acoustic analysis:
@@ -169,6 +175,9 @@ ASR or diarization accuracy test; use real cached models for runtime smoke check
   Keep model selection, unloading, deletion, and compute changes blocked while
   relevant work is active. SpeakerKit does not promise immediate interruption;
   use indeterminate analysis/cancellation UI rather than a guessed percentage.
+  The pinned SpeakerKit aggregate callback can report 85% before awaiting its
+  preprocessing worker. Do not present that value as measured completed work.
+  Audio preparation, analysis, finalization, and cancellation are honest stages.
 - Model loading, Core ML specialization, and unloading expose stages rather than
   measured fractions. Show indeterminate activity only during those stages;
   loaded/unloaded states must not retain a loading bar. Do not synthesize load
@@ -195,6 +204,38 @@ ASR or diarization accuracy test; use real cached models for runtime smoke check
   Use it for lifecycle stress, not as an accuracy baseline, and do not disable
   quality thresholds merely to pass that fixture. Nonrepeating speech smoke
   runs are still not Korean ASR or multi-speaker accuracy benchmarks.
+
+### Speaker review workflow
+
+- Read and edit modes share a review summary. Missing attribution and mixed-voice
+  candidates remain visible independently of the export-speaker-label preference.
+  Review filters lead to the original cue, with timestamp and range playback.
+- Mixed candidates require accumulated acoustic activity from at least two IDs
+  (each at least 0.25 seconds or 10% of the cue, whichever is greater). These are
+  review heuristics, not calibrated confidence, proven overlap, or speaker accuracy.
+- Acoustic boundary splitting requires matching, ordered, positive word timings
+  and unambiguous acoustic coverage. Reject stale text, ambiguous words, and
+  intervening unaligned turns rather than estimating timings or identities.
+- The detected-group count describes the acoustic result; the count picker is a
+  request for the next analysis. Legacy/manual choices must survive naming,
+  assignment, and project recovery without pretending a request is detection.
+- Representative playback follows current assignments and excludes mixed cues.
+  Corrected or cleared turns must not play under their original cluster's name.
+- Reanalysis asks before replacing manual attribution. Its previous result can
+  be restored before further edits, and native Undo/Redo preserves document data.
+  Never put live running/cancelling flags into document Undo snapshots. A busy
+  Undo also updates the task's completed-result baseline so late completion cannot
+  restore a different result's count or status.
+- The privacy/storage notice appears near execution and export. Its folder is
+  the actual project-store root. Project deletion removes its local project JSON,
+  not the original recording or exports. Recovery sidecars sit beside exports
+  and are deleted separately in Finder.
+- Offscreen native hosting can inspect review/editor layout without activating a
+  window. It does not replace GUI interaction checks: native material/control
+  compositing, dialogs, keyboard routing, playback, and Finder need an explicitly
+  resumed GUI session. Keep private recordings, transcript text, raw timelines,
+  logs, and recording-derived diagnostics out of repository and issue attachments.
+
 
 ## Continuous Integration
 

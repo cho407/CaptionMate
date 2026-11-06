@@ -67,8 +67,7 @@ struct TranscriptionControlView: View {
 
                 // 자막 내보내기 버튼
                 Button {
-                    viewModel.refreshSubtitleQualityIssues()
-                    viewModel.uiState.showSubtitleReview = true
+                    viewModel.openSubtitleReview(forExport: true)
                 } label: {
                     HStack {
                         if viewModel.isExporting {
@@ -88,6 +87,7 @@ struct TranscriptionControlView: View {
                     viewModel.isSpeakerDiarizationBusy)
                 .accessibilityIdentifier("transcription.exportButton")
             }
+            LocalProcessingNotice(viewModel: viewModel)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal)

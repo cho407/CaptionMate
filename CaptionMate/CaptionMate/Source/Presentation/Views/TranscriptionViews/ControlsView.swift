@@ -110,6 +110,7 @@ struct ControlsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.top, 12)
+            LocalProcessingNotice(viewModel: viewModel)
         }
         .frame(maxWidth: contentMaxWidth)
         .frame(maxWidth: .infinity)

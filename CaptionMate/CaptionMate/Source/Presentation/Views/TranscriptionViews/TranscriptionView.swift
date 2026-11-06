@@ -35,6 +35,19 @@ struct TranscriptionView: View {
                !viewModel.transcriptionState.confirmedSegments.isEmpty {
                 TranscriptionPlaybackBar(viewModel: viewModel)
             }
+            if !viewModel.audioState.isTranscribing {
+                if viewModel.transcriptionState.speakerDiarization.isRunning ||
+                    viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
+                    SpeakerDiarizationStatusView(viewModel: viewModel)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                }
+                if viewModel.hasSpeakerReviewContext || !viewModel.uiState.subtitleQualityIssues.isEmpty {
+                    SubtitleQualitySummaryView(viewModel: viewModel)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 6)
+                }
+            }
 
             if viewModel.uiState.isSubtitleEditing {
                 ScrollViewReader { proxy in
@@ -45,18 +58,8 @@ struct TranscriptionView: View {
                                     .padding(.bottom, 8)
                             }
 
-                            if !viewModel.uiState.subtitleQualityIssues.isEmpty {
-                                SubtitleQualitySummaryView(viewModel: viewModel)
-                                    .padding(.bottom, 8)
-                            }
 
-                            if viewModel.transcriptionState.speakerDiarization.isRunning ||
-                                viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
-                                SpeakerDiarizationStatusView(viewModel: viewModel)
-                                    .padding(.bottom, 8)
-                            }
-
-                            if viewModel.enableSpeakerDiarization,
+                            if viewModel.enableSpeakerDiarization || viewModel.hasSpeakerReviewContext,
                                !viewModel.transcriptionState.confirmedSegments.isEmpty {
                                 SpeakerNameEditorView(viewModel: viewModel)
                                     .padding(.bottom, 8)
@@ -200,6 +203,18 @@ struct TranscriptionView: View {
                 .frame(width: 600, height: 620)
                 .environment(\.locale, .init(identifier: viewModel.appLanguage))
         }
+        .confirmationDialog(
+            "Replace manual speaker corrections?",
+            isPresented: $viewModel.uiState.showSpeakerReanalysisConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Reanalyze and Replace", role: .destructive) {
+                viewModel.reanalyzeSpeakersForCurrentAudio(replacingManualCorrections: true)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Reanalysis replaces speaker assignments. Previous labels can be restored before further edits.")
+        }
     }
 
     private func issuesBorderColor(for issues: [SubtitleQualityIssue]) -> Color {
@@ -227,18 +242,49 @@ private struct SubtitleQualitySummaryView: View {
         let infos = viewModel.uiState.subtitleQualityIssues
             .filter { $0.severity == .info }.count
 
-        HStack(spacing: 8) {
-            Image(systemName: summaryIconName(errors: errors, warnings: warnings))
-                .foregroundStyle(summaryColor(errors: errors, warnings: warnings))
-            Text(summaryText(errors: errors, warnings: warnings, infos: infos))
-                .font(.subheadline.weight(.medium))
-            Spacer()
-            Button {
-                viewModel.uiState.showSubtitleReview = true
-            } label: {
-                Label("Review", systemImage: "list.bullet.rectangle")
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: summaryIconName(errors: errors, warnings: warnings))
+                    .foregroundStyle(summaryColor(errors: errors, warnings: warnings))
+                Text(summaryText(errors: errors, warnings: warnings, infos: infos))
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Button {
+                    viewModel.openSubtitleReview()
+                } label: {
+                    Label("Review", systemImage: "list.bullet.rectangle")
+                }
+                .buttonStyle(.borderless)
+                .disabled(viewModel.isSpeakerDiarizationBusy)
             }
-            .buttonStyle(.borderless)
+            if viewModel.hasSpeakerReviewContext {
+                HStack(alignment: .top, spacing: 12) {
+                    if viewModel.transcriptionState.speakerAnalysis != nil {
+                        Text("Detected groups: \(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount)")
+                    } else {
+                        Text("Speakers")
+                    }
+                    Button {
+                        viewModel.openSubtitleReview(filter: .unassignedSpeakers)
+                    } label: {
+                        Text("Unassigned: \(viewModel.unassignedSpeakerSegmentCount)")
+                    }
+                    .disabled(viewModel.unassignedSpeakerSegmentCount == 0 || viewModel.isSpeakerDiarizationBusy)
+                    Button {
+                        viewModel.openSubtitleReview(filter: .mixedSpeakers)
+                    } label: {
+                        Text("Mixed candidates: \(viewModel.mixedSpeakerSegmentCount)")
+                    }
+                    .disabled(viewModel.mixedSpeakerSegmentCount == 0 || viewModel.isSpeakerDiarizationBusy)
+                }
+                .buttonStyle(.borderless)
+                .font(.caption.monospacedDigit())
+                if viewModel.transcriptionState.speakerAnalysis != nil {
+                    Text("Automatic speaker labels need listening review.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .padding(10)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.75))
@@ -265,6 +311,7 @@ private struct SubtitleQualitySummaryView: View {
         if warnings > 0 {
             return "\(warnings) warnings"
         }
+        if infos == 0 { return "No formatting issues" }
         return "\(infos) notes"
     }
 }
@@ -338,6 +385,12 @@ private struct SubtitleSegmentToolButtons: View {
                 viewModel.splitTranscriptionSegment(at: index)
             }
             .accessibilityIdentifier("transcription.splitSegment.\(index)")
+            Button("Split at Speaker Changes") {
+                viewModel.splitAtSpeakerChanges(at: index)
+            }
+            .disabled(!viewModel.canSplitAtSpeakerChanges(at: index) || viewModel.isSpeakerDiarizationBusy)
+            .help("Requires matching word timings and a detected speaker change.")
+            .accessibilityIdentifier("transcription.splitSpeakerChanges.\(index)")
             Button("Merge Next") {
                 viewModel.mergeTranscriptionSegment(at: index, withNext: true)
             }
@@ -462,15 +515,11 @@ struct SpeakerDiarizationStatusView: View {
     @ObservedObject var viewModel: ContentViewModel
 
     var body: some View {
+        let state = viewModel.transcriptionState.speakerDiarization
         HStack(spacing: 8) {
-            if viewModel.transcriptionState.speakerDiarization.isRunning {
-                ProgressView()
-                    .controlSize(.small)
-                Label(
-                    viewModel.transcriptionState.speakerDiarization.isCancelling
-                        ? LocalizedStringKey("Cancelling...") : LocalizedStringKey("Analyzing Speakers"),
-                    systemImage: "person.2.wave.2"
-                )
+            if state.isRunning {
+                ProgressView().controlSize(.small)
+                Label(state.titleKey, systemImage: "person.2.wave.2")
                     .font(.caption.weight(.medium))
                 Button {
                     viewModel.cancelSpeakerDiarization()
@@ -480,8 +529,8 @@ struct SpeakerDiarizationStatusView: View {
                 .buttonStyle(.borderless)
                 .help("Cancel")
                 .accessibilityLabel(Text("Cancel"))
-                .disabled(viewModel.transcriptionState.speakerDiarization.isCancelling)
-            } else if let errorMessage = viewModel.transcriptionState.speakerDiarization.errorMessage {
+                .disabled(state.isCancelling)
+            } else if let errorMessage = state.errorMessage {
                 Label(LocalizedStringKey(errorMessage), systemImage: "exclamationmark.triangle.fill")
                     .font(.caption.weight(.medium))
                     .foregroundStyle(.secondary)
@@ -517,7 +566,10 @@ private struct SpeakerNameEditorView: View {
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("speakerEditor.container")
                 Spacer()
-                Picker("", selection: $viewModel.speakerDiarizationSpeakerCount) {
+                Text("Next Analysis")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Picker("Next Analysis", selection: $viewModel.speakerDiarizationSpeakerCount) {
                     ForEach(0 ... 8, id: \.self) { count in
                         Text(viewModel.speakerCountOptionTitleKey(for: count)).tag(count)
                     }
@@ -525,8 +577,10 @@ private struct SpeakerNameEditorView: View {
                 .frame(width: 96)
                 .disabled(viewModel.transcriptionState.speakerDiarization.isRunning ||
                     !viewModel.isSpeakerDiarizationAvailable)
-                .accessibilityLabel(Text("Speaker Count"))
+                .accessibilityLabel(Text("Next Analysis Speaker Count"))
                 .accessibilityIdentifier("speakerEditor.speakerCountPicker")
+                .labelsHidden()
+                .help("Changes apply only when you reanalyze.")
                 Button {
                     viewModel.reanalyzeSpeakersForCurrentAudio()
                 } label: {
@@ -540,6 +594,13 @@ private struct SpeakerNameEditorView: View {
                 .help("Run speaker analysis again")
                 .accessibilityIdentifier("speakerEditor.reanalyzeButton")
             }
+            if viewModel.canRestorePreviousSpeakerAnalysis {
+                Button("Restore Previous Speaker Labels") {
+                    viewModel.restorePreviousSpeakerAnalysis()
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("speakerEditor.restorePrevious")
+            }
             Text("Rename speakers used in subtitles and exports.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -548,6 +609,17 @@ private struct SpeakerNameEditorView: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                     ForEach(speakerIDs, id: \.self) { speakerID in
                         HStack(spacing: 6) {
+                            Button {
+                                viewModel.playRepresentativeSpeaker(speakerID)
+                            } label: {
+                                Image(systemName: "play.circle")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(!viewModel.canPlayImportedAudio ||
+                                viewModel.representativeSpeakerRange(for: speakerID) == nil)
+                            .help("Play a representative speaker range")
+                            .accessibilityLabel(Text("Play a representative speaker range"))
+                            .accessibilityIdentifier("speakerEditor.playSample.\(speakerID)")
                             Text("Speaker \(speakerID + 1)")
                                 .font(.caption.monospacedDigit())
                                 .foregroundStyle(.secondary)
@@ -562,6 +634,7 @@ private struct SpeakerNameEditorView: View {
                             .textFieldStyle(.roundedBorder)
                             .accessibilityLabel(Text("Name for \(viewModel.defaultSpeakerName(for: speakerID))"))
                             .accessibilityIdentifier("speakerEditor.nameField.\(speakerID)")
+                            .disabled(viewModel.isSpeakerDiarizationBusy)
                         }
                     }
                 }
@@ -589,12 +662,12 @@ private struct SpeakerAssignmentMenu: View {
     }
 
     private var selectedSpeakerText: Text {
-        guard let assignment else { return Text("No Speaker") }
+        guard let assignment else { return Text("Unassigned Speaker") }
         return speakerNameText(for: assignment.speakerID)
     }
 
     private var selectedSpeakerAccessibilityName: String {
-        guard let assignment else { return "No Speaker" }
+        guard let assignment else { return "Unassigned Speaker" }
         return viewModel.speakerDisplayName(for: assignment.speakerID)
     }
 
@@ -660,13 +733,17 @@ private struct SubtitleReviewSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Label("Review Before Export", systemImage: "checklist")
+                Label(viewModel.uiState.subtitleReviewIsForExport ?
+                      LocalizedStringKey("Review Before Export") : LocalizedStringKey("Subtitle review"),
+                      systemImage: "checklist")
                     .font(.title3.weight(.semibold))
                     .accessibilityIdentifier("subtitleReview.sheet")
                 Spacer()
             }
 
-            ExportOptionsView(viewModel: viewModel)
+            if viewModel.uiState.subtitleReviewIsForExport {
+                ExportOptionsView(viewModel: viewModel)
+            }
 
             Picker("", selection: Binding(
                 get: { viewModel.uiState.subtitleIssueFilter },
@@ -676,7 +753,8 @@ private struct SubtitleReviewSheet: View {
                     Text(filter.titleKey).tag(filter)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
+            .frame(maxWidth: 240, alignment: .leading)
             .accessibilityLabel(Text("Subtitle Review Filter"))
             .accessibilityIdentifier("subtitleReview.filterPicker")
 
@@ -700,6 +778,12 @@ private struct SubtitleReviewSheet: View {
                             Text("Segment \(issue.segmentIndex + 1)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            if viewModel.transcriptionState.confirmedSegments.indices.contains(issue.segmentIndex) {
+                                let segment = viewModel.transcriptionState.confirmedSegments[issue.segmentIndex]
+                                Text(TimeInterval(segment.start).formatTimeRange(to: TimeInterval(segment.end)))
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
                             Text(LocalizedStringKey(issue.message))
                                 .font(.subheadline.weight(.medium))
                             Text(LocalizedStringKey(issue.suggestion))
@@ -707,6 +791,16 @@ private struct SubtitleReviewSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button {
+                            viewModel.playTranscriptionSegment(at: issue.segmentIndex)
+                        } label: {
+                            Image(systemName: "play.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .disabled(!viewModel.canPlayImportedAudio)
+                        .help("Replay Segment")
+                        .accessibilityLabel(Text("Replay Segment"))
+                        .accessibilityIdentifier("subtitleReview.replay.\(issue.segmentIndex)")
                         Button {
                             viewModel.focusSubtitleIssue(issue)
                             dismiss()
@@ -726,38 +820,44 @@ private struct SubtitleReviewSheet: View {
             }
 
             HStack {
-                Button("Cancel", role: .cancel) {
-                    dismiss()
+                if viewModel.uiState.subtitleReviewIsForExport {
+                    Button("Cancel", role: .cancel) { dismiss() }
+                        .accessibilityIdentifier("subtitleReview.cancelButton")
                 }
-                .accessibilityIdentifier("subtitleReview.cancelButton")
                 Button {
                     viewModel.applySubtitleReviewQuickFixes()
                 } label: {
                     Label("Quick Fix", systemImage: "wand.and.stars")
                 }
                 .disabled(!viewModel.uiState.subtitleQualityIssues.contains {
-                    $0.kind != .missingSpeaker && $0.kind != .defaultSpeakerName
+                    $0.kind != .missingSpeaker && $0.kind != .defaultSpeakerName && $0.kind != .mixedSpeakers
                 })
                 .accessibilityIdentifier("subtitleReview.quickFixButton")
                 Spacer()
-                if hasBlockingIssues {
+                if hasBlockingIssues && viewModel.uiState.subtitleReviewIsForExport {
                     Text("Fix errors before export")
                         .font(.caption)
                         .foregroundStyle(.red)
                         .accessibilityIdentifier("subtitleReview.blockingMessage")
                 }
-                Button {
-                    viewModel.uiState.showSubtitleReview = false
-                    Task {
-                        await viewModel.exportTranscription(skipQualityReview: true)
+                if viewModel.uiState.subtitleReviewIsForExport {
+                    Button {
+                        viewModel.uiState.showSubtitleReview = false
+                        Task {
+                            await viewModel.exportTranscription(skipQualityReview: true)
+                        }
+                    } label: {
+                        Text(viewModel.uiState.subtitleQualityIssues.isEmpty
+                             ? LocalizedStringKey("Export Subtitle") : LocalizedStringKey("Export Anyway"))
                     }
-                } label: {
-                    Text(viewModel.uiState.subtitleQualityIssues.isEmpty
-                         ? LocalizedStringKey("Export Subtitle") : LocalizedStringKey("Export Anyway"))
+                    .disabled(hasBlockingIssues || viewModel.isSpeakerDiarizationBusy ||
+                        (viewModel.selectedExportFileType == .fcpxml &&
+                            (!viewModel.frameRate.isFinite || !(1 ... 240).contains(viewModel.frameRate))))
+                    .accessibilityIdentifier("subtitleReview.exportAnywayButton")
+                } else {
+                    Button("Close") { dismiss() }
+                        .keyboardShortcut(.defaultAction)
                 }
-                .disabled(hasBlockingIssues || (viewModel.selectedExportFileType == .fcpxml &&
-                    (!viewModel.frameRate.isFinite || !(1 ... 240).contains(viewModel.frameRate))))
-                .accessibilityIdentifier("subtitleReview.exportAnywayButton")
             }
         }
         .padding()

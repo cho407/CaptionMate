@@ -173,7 +173,7 @@ struct BasicSettingsView: View {
                     }
                     .labelsHidden()
                     .frame(width: 104)
-                    .disabled(!viewModel.isSpeakerDiarizationAvailable)
+                    .disabled(!viewModel.isSpeakerDiarizationAvailable || viewModel.isSpeakerDiarizationBusy)
                     .accessibilityIdentifier("transcription.speakerCountPicker")
                 }
                 .fixedSize(horizontal: true, vertical: false)

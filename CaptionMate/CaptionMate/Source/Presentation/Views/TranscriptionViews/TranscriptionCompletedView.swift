@@ -65,7 +65,10 @@ struct TranscriptionModeHeader: View {
     @Environment(\.undoManager) private var undoManager
 
     private var title: LocalizedStringKey {
-        viewModel.uiState.isSubtitleEditing
+        if viewModel.transcriptionState.speakerDiarization.isRunning {
+            return viewModel.transcriptionState.speakerDiarization.titleKey
+        }
+        return viewModel.uiState.isSubtitleEditing
             ? "Edit Subtitles"
             : "Transcription Complete"
     }
@@ -91,13 +94,14 @@ struct TranscriptionModeHeader: View {
             HStack(spacing: 12) {
                 Label(
                     title,
-                    systemImage: viewModel.uiState.isSubtitleEditing
-                        ? "pencil.line"
-                        : "checkmark.circle.fill"
+                    systemImage: viewModel.transcriptionState.speakerDiarization.isRunning
+                        ? "person.2.wave.2"
+                        : (viewModel.uiState.isSubtitleEditing ? "pencil.line" : "checkmark.circle.fill")
                 )
                 .font(.headline)
                 .foregroundStyle(
-                    viewModel.uiState.isSubtitleEditing ? Color.primary : Color.green
+                    viewModel.transcriptionState.speakerDiarization.isRunning ? Color.secondary :
+                        (viewModel.uiState.isSubtitleEditing ? Color.primary : Color.green)
                 )
 
                 Spacer()
@@ -107,14 +111,14 @@ struct TranscriptionModeHeader: View {
                         Label("Undo", systemImage: "arrow.uturn.backward")
                             .labelStyle(.iconOnly)
                     }
-                    .disabled(undoManager?.canUndo != true)
+                    .disabled(undoManager?.canUndo != true || viewModel.isSpeakerDiarizationBusy)
                     .help("Undo")
                     .accessibilityIdentifier("transcription.undoButton")
                     Button { undoManager?.redo() } label: {
                         Label("Redo", systemImage: "arrow.uturn.forward")
                             .labelStyle(.iconOnly)
                     }
-                    .disabled(undoManager?.canRedo != true)
+                    .disabled(undoManager?.canRedo != true || viewModel.isSpeakerDiarizationBusy)
                     .help("Redo")
                     .accessibilityIdentifier("transcription.redoButton")
                     Button {
@@ -160,14 +164,11 @@ struct TranscriptionCompletedView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
-                if viewModel.transcriptionState.speakerDiarization.isRunning ||
-                    viewModel.transcriptionState.speakerDiarization.errorMessage != nil {
-                    SpeakerDiarizationStatusView(viewModel: viewModel)
-                }
 
                 ForEach(readBlocks) { block in
                     VStack(alignment: .leading, spacing: 6) {
-                        if block.speakerID != nil || viewModel.enableTimestamps || viewModel.canPlayImportedAudio {
+                        if block.speakerID != nil || viewModel.hasSpeakerReviewContext ||
+                            viewModel.enableTimestamps || viewModel.canPlayImportedAudio {
                             HStack(spacing: 10) {
                                 Button {
                                     viewModel.playAudioRange(start: block.start, end: block.end)
@@ -184,6 +185,10 @@ struct TranscriptionCompletedView: View {
                                         .accessibilityIdentifier(
                                             "transcription.completedSpeaker.\(block.id)"
                                         )
+                                } else if viewModel.hasSpeakerReviewContext {
+                                    Label("Unassigned Speaker", systemImage: "person.crop.circle.badge.questionmark")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
 
                                 if viewModel.enableTimestamps {

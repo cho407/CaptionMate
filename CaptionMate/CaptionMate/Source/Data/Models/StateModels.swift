@@ -70,6 +70,7 @@ struct TranscriptionState {
     var speakerAssignments: [SpeakerSegmentAssignment?] = []
     var speakerNames: [Int: String] = [:]
     var speakerDiarization = SpeakerDiarizationState()
+    var speakerAnalysis: SpeakerAnalysisRecord?
 
     // 전사 처리 시간 및 속도 관련
     var effectiveRealTimeFactor: TimeInterval = 0
@@ -86,11 +87,27 @@ struct SpeakerSegmentAssignment: Equatable, Sendable {
 }
 
 struct SpeakerDiarizationState: Equatable, Sendable {
+    enum Phase: Equatable, Sendable {
+        case preparingAudio
+        case analyzing
+        case finalizing
+    }
+
     var isRunning: Bool = false
     var isCancelling: Bool = false
-    var progress: Double = 0
     var detectedSpeakerCount: Int = 0
     var errorMessage: String?
+    var phase: Phase = .preparingAudio
+
+    var titleKey: LocalizedStringKey {
+        if isCancelling { return "Cancelling..." }
+        switch phase {
+        case .preparingAudio: return "Preparing Audio"
+        case .analyzing: return "Analyzing Speakers"
+        case .finalizing: return "Finalizing Speaker Labels"
+        }
+    }
+
 }
 
 struct UserMessage: Identifiable, Equatable, Sendable {
@@ -213,6 +230,8 @@ enum SubtitleIssueFilter: String, CaseIterable, Identifiable {
     case errors
     case warnings
     case notes
+    case unassignedSpeakers
+    case mixedSpeakers
 
     var id: String { rawValue }
 
@@ -226,6 +245,10 @@ enum SubtitleIssueFilter: String, CaseIterable, Identifiable {
             return "Warnings"
         case .notes:
             return "Notes"
+        case .unassignedSpeakers:
+            return "Unassigned Speakers"
+        case .mixedSpeakers:
+            return "Mixed Speaker Candidates"
         }
     }
 
@@ -239,6 +262,10 @@ enum SubtitleIssueFilter: String, CaseIterable, Identifiable {
             return "Warnings"
         case .notes:
             return "Notes"
+        case .unassignedSpeakers:
+            return "Unassigned Speakers"
+        case .mixedSpeakers:
+            return "Mixed Speaker Candidates"
         }
     }
 
@@ -252,6 +279,10 @@ enum SubtitleIssueFilter: String, CaseIterable, Identifiable {
             return issue.severity == .warning
         case .notes:
             return issue.severity == .info
+        case .unassignedSpeakers:
+            return issue.kind == .missingSpeaker
+        case .mixedSpeakers:
+            return issue.kind == .mixedSpeakers
         }
     }
 }
@@ -273,6 +304,7 @@ struct SubtitleQualityIssue: Identifiable, Equatable, Sendable {
         case highReadingSpeed
         case missingSpeaker
         case defaultSpeakerName
+        case mixedSpeakers
     }
 
     let segmentIndex: Int
@@ -761,6 +793,8 @@ struct UIState {
     var showFirstRunGuide: Bool = false
     var subtitleQualityIssues: [SubtitleQualityIssue] = []
     var showSubtitleReview: Bool = false
+    var subtitleReviewIsForExport: Bool = false
+    var showSpeakerReanalysisConfirmation: Bool = false
     var focusedSubtitleSegmentIndex: Int?
     var subtitleIssueFilter: SubtitleIssueFilter = .all
     var subtitleSearchText: String = ""

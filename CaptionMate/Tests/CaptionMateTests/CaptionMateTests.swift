@@ -74,6 +74,237 @@ private final class TestWindowCloseDelegate: NSObject, NSWindowDelegate {
 
 @Suite(.serialized)
 struct ContentViewModelTests {
+    @Test("Native Undo during analysis restores completed attribution, never a phantom task", arguments: [false, true]) @MainActor
+    func testSpeakerAnalysisUndoKeepsDocumentAndStatusTogether(cancel: Bool) async throws {
+        let gate = SuspendedTestValue<[SpeakerTimelineSegment]>()
+        let viewModel = ContentViewModel(speakerAnalyzer: { _, count, _ in
+            if count == 2 {
+                return [.init(speakerID: 0, start: 0, end: 1), .init(speakerID: 1, start: 1, end: 2)]
+            }
+            return await gate.value()
+        })
+        let enabled = viewModel.enableSpeakerDiarization
+        let count = viewModel.speakerDiarizationSpeakerCount
+        defer {
+            viewModel.prepareForClose()
+            viewModel.enableSpeakerDiarization = enabled
+            viewModel.speakerDiarizationSpeakerCount = count
+        }
+        viewModel.enableSpeakerDiarization = true
+        viewModel.modelManagementState.speakerDiarizationModelState = .downloaded
+        viewModel.transcriptionState.confirmedSegments = [
+            .init(start: 0, end: 1, text: "First turn"), .init(start: 1, end: 2, text: "Second turn"),
+        ]
+        viewModel.transcriptionState.speakerAssignments = [.init(speakerID: 0), .init(speakerID: 0)]
+        let original = SpeakerAnalysisRecord(
+            timeline: [.init(speakerID: 0, start: 0, end: 2)], requestedSpeakerCount: nil
+        )
+        viewModel.transcriptionState.speakerAnalysis = original
+        viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount = 1
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        viewModel.subtitleUndoManager = manager
+        viewModel.speakerDiarizationSpeakerCount = 2
+        manager.beginUndoGrouping()
+        let first = try #require(viewModel.beginSpeakerDiarization(audioSamplesProvider: { [0] }))
+        await first.value
+        manager.endUndoGrouping()
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 2)
+        viewModel.speakerDiarizationSpeakerCount = 1
+        let second = try #require(viewModel.beginSpeakerDiarization(audioSamplesProvider: { [0] }))
+        await gate.waitUntilRequested()
+        manager.undo()
+        #expect(viewModel.transcriptionState.speakerDiarization.isRunning)
+        #expect(viewModel.transcriptionState.speakerAnalysis == original)
+        if cancel { viewModel.cancelSpeakerDiarization() }
+        await gate.resume(returning: [.init(speakerID: 0, start: 0, end: 2)])
+        await second.value
+        #expect(!viewModel.isSpeakerDiarizationBusy)
+        #expect(!viewModel.transcriptionState.speakerDiarization.isRunning)
+        #expect(!viewModel.transcriptionState.speakerDiarization.isCancelling)
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 1)
+        #expect(viewModel.transcriptionState.speakerAnalysis == original)
+        #expect(viewModel.transcriptionState.speakerAssignments.compactMap { $0?.speakerID } == [0, 0])
+        manager.redo()
+        #expect(!viewModel.isSpeakerDiarizationBusy)
+        #expect(!viewModel.transcriptionState.speakerDiarization.isRunning)
+        #expect(!viewModel.transcriptionState.speakerDiarization.isCancelling)
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 2)
+        #expect(viewModel.transcriptionState.speakerAssignments.compactMap { $0?.speakerID } == [0, 1])
+    }
+
+    @Test("Speaker samples exclude turns whose attribution was corrected or cleared", arguments: [false, true]) @MainActor
+    func testRepresentativeSpeakerRangeFollowsCurrentAssignments(clear: Bool) {
+        let viewModel = ContentViewModel()
+        viewModel.transcriptionState.confirmedSegments = [
+            .init(start: 0, end: 10, text: "A long turn"),
+            .init(start: 20, end: 22, text: "A short turn"),
+        ]
+        viewModel.transcriptionState.speakerAssignments = [.init(speakerID: 0), .init(speakerID: 0)]
+        viewModel.transcriptionState.speakerAnalysis = .init(timeline: [
+            .init(speakerID: 0, start: 0, end: 10), .init(speakerID: 0, start: 20, end: 22),
+        ], requestedSpeakerCount: nil)
+        viewModel.refreshSubtitleQualityIssues()
+        #expect(viewModel.representativeSpeakerRange(for: 0) == 0 ... 8)
+        viewModel.setSpeakerAssignment(at: 0, speakerID: clear ? nil : 1)
+        #expect(viewModel.representativeSpeakerRange(for: 0) == 20 ... 22)
+        #expect(viewModel.representativeSpeakerRange(for: 1) == (clear ? nil : 0 ... 8))
+    }
+
+    @Test("Speaker-boundary edits preserve words, attribution and analysis through Undo, Redo and project recovery") @MainActor
+    func testSpeakerBoundaryEditRecoveryAndUndo() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = CaptionMateProjectStore(rootURL: root)
+        let viewModel = ContentViewModel(projectStore: store)
+        let preferences = (viewModel.enableSpeakerDiarization, viewModel.speakerDiarizationSpeakerCount,
+                           viewModel.includeSpeakerLabelsInExport, viewModel.selectedExportPreset, viewModel.frameRate)
+        defer {
+            viewModel.prepareForClose()
+            viewModel.enableSpeakerDiarization = preferences.0
+            viewModel.speakerDiarizationSpeakerCount = preferences.1
+            viewModel.includeSpeakerLabelsInExport = preferences.2
+            viewModel.selectedExportPreset = preferences.3
+            viewModel.frameRate = preferences.4
+        }
+        let words: [WordTiming] = [
+            .init(word: "안녕", tokens: [10], start: 0.1, end: 0.9, probability: 0.8),
+            .init(word: " 반가워", tokens: [20, 21], start: 1.1, end: 1.9, probability: 0.7),
+        ]
+        let original = TranscriptionSegment(start: 0, end: 2, text: "안녕 반가워", words: words)
+        let analysis = SpeakerAnalysisRecord(timeline: [
+            .init(speakerID: 2, start: 0, end: 1),
+            .init(speakerID: 7, start: 1, end: 2),
+        ], requestedSpeakerCount: nil)
+        var sidecar = CaptionMateSidecar(
+            result: .init(text: original.text, segments: [original], language: "ko", timings: .init()),
+            audioFileName: "Synthetic meeting", speakerAssignments: [.init(speakerID: 2)],
+            speakerNames: [2: "Host", 7: "Guest"], selectedExportPreset: .general,
+            frameRate: 30, includeSpeakerLabelsInExport: false, speakerDiarizationSpeakerCount: 0,
+            speakerAnalysis: analysis
+        )
+        viewModel.restoreTranscriptionSidecar(sidecar)
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        viewModel.subtitleUndoManager = manager
+        #expect(viewModel.mixedSpeakerSegmentCount == 1)
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 2)
+        viewModel.speakerDiarizationSpeakerCount = 8
+        #expect(viewModel.availableSpeakerIDs() == [2, 7])
+        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 2)
+
+        manager.beginUndoGrouping()
+        viewModel.splitAtSpeakerChanges(at: 0)
+        manager.endUndoGrouping()
+        let parts = viewModel.transcriptionState.confirmedSegments
+        #expect(parts.map(\.text).joined() == original.text)
+        #expect(parts.flatMap { $0.words ?? [] } == words)
+        #expect(parts.map(\.start) == [0, 1.1])
+        #expect(parts.map(\.end) == [0.9, 2])
+        #expect(parts.map(\.id) == [0, 1])
+        #expect(viewModel.transcriptionState.speakerAssignments.compactMap { $0?.speakerID } == [2, 7])
+        #expect(viewModel.mixedSpeakerSegmentCount == 0)
+        manager.undo()
+        #expect(viewModel.transcriptionState.confirmedSegments == [original])
+        #expect(viewModel.transcriptionState.speakerAnalysis == analysis)
+        #expect(viewModel.transcriptionState.speakerNames == [2: "Host", 7: "Guest"])
+        manager.redo()
+        #expect(viewModel.transcriptionState.confirmedSegments == parts)
+        #expect(viewModel.transcriptionResult?.segments == parts)
+        let saved = try #require(viewModel.saveCurrentProject(showMessage: false))
+        sidecar = try store.load(id: saved.id).sidecar
+        #expect(sidecar.speakerAnalysis == analysis)
+        #expect(sidecar.segments.map(\.speakerID) == [2, 7])
+        #expect(sidecar.segments.flatMap { $0.words ?? [] } == words)
+        viewModel.restoreTranscriptionSidecar(sidecar)
+        #expect(viewModel.transcriptionState.confirmedSegments.map(\.text).joined() == original.text)
+        #expect(viewModel.transcriptionState.speakerAnalysis == analysis)
+    }
+
+    @Test("A mixed-speaker review candidate opens the original cue without changing text or attribution") @MainActor
+    func testMixedSpeakerReviewFocusPreservesDocument() throws {
+        let viewModel = ContentViewModel()
+        let include = viewModel.includeSpeakerLabelsInExport
+        defer { viewModel.includeSpeakerLabelsInExport = include }
+        let segment = TranscriptionSegment(start: 10, end: 12, text: "A question and reply")
+        viewModel.transcriptionState.confirmedSegments = [segment]
+        viewModel.transcriptionState.speakerAssignments = [.init(speakerID: 0)]
+        viewModel.transcriptionState.speakerAnalysis = .init(timeline: [
+            .init(speakerID: 0, start: 10, end: 11),
+            .init(speakerID: 1, start: 11, end: 12),
+        ], requestedSpeakerCount: nil)
+        viewModel.includeSpeakerLabelsInExport = false
+        viewModel.openSubtitleReview(filter: .mixedSpeakers)
+        let issue = try #require(viewModel.uiState.subtitleQualityIssues.first { $0.kind == .mixedSpeakers })
+        #expect(!viewModel.uiState.subtitleReviewIsForExport)
+        viewModel.focusSubtitleIssue(issue)
+        #expect(viewModel.uiState.isSubtitleEditing)
+        #expect(viewModel.uiState.focusedSubtitleSegmentIndex == 0)
+        #expect(viewModel.transcriptionState.confirmedSegments == [segment])
+        #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 0)
+        #expect(!viewModel.canSplitAtSpeakerChanges(at: 0))
+        viewModel.setSpeakerAssignment(at: 0, speakerID: nil)
+        for includeLabels in [false, true] {
+            viewModel.includeSpeakerLabelsInExport = includeLabels
+            viewModel.refreshSubtitleQualityIssues()
+            #expect(viewModel.mixedSpeakerSegmentCount == 1)
+            #expect(viewModel.unassignedSpeakerSegmentCount == 1)
+        }
+    }
+
+    @Test("Manual attribution is not replaced until confirmed and the previous analysis can be restored") @MainActor
+    func testConfirmedSpeakerReanalysisCanRestoreManualCorrections() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let audioURL = root.appendingPathComponent("synthetic.wav")
+        try {
+            let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 16000, channels: 1))
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 32000))
+            buffer.frameLength = 32000
+            buffer.floatChannelData?[0].initialize(repeating: 0, count: 32000)
+            let file = try AVAudioFile(forWriting: audioURL, settings: format.settings)
+            try file.write(from: buffer)
+        }()
+        let viewModel = ContentViewModel(
+            projectStore: .init(rootURL: root.appendingPathComponent("Projects")),
+            speakerAnalyzer: { _, _, _ in [.init(speakerID: 0, start: 0, end: 2)] }
+        )
+        let enabled = viewModel.enableSpeakerDiarization
+        let count = viewModel.speakerDiarizationSpeakerCount
+        defer {
+            viewModel.prepareForClose()
+            viewModel.enableSpeakerDiarization = enabled
+            viewModel.speakerDiarizationSpeakerCount = count
+        }
+        viewModel.enableSpeakerDiarization = true
+        viewModel.modelManagementState.speakerDiarizationModelState = .downloaded
+        viewModel.audioState.importedAudioURL = audioURL
+        viewModel.transcriptionState.confirmedSegments = [.init(start: 0, end: 2, text: "A reviewed turn")]
+        let previous = SpeakerAnalysisRecord(
+            timeline: [.init(speakerID: 0, start: 0, end: 2)], requestedSpeakerCount: nil
+        )
+        viewModel.transcriptionState.speakerAnalysis = previous
+        viewModel.setSpeakerAssignment(at: 0, speakerID: 1)
+        viewModel.setSpeakerName("Reviewed", for: 1)
+        #expect(viewModel.reanalyzeSpeakersForCurrentAudio() == nil)
+        #expect(viewModel.uiState.showSpeakerReanalysisConfirmation)
+        #expect(!viewModel.isSpeakerDiarizationBusy)
+        #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 1)
+        let started = try #require(viewModel.reanalyzeSpeakersForCurrentAudio(replacingManualCorrections: true))
+        await started.value
+        #expect(!viewModel.uiState.showSpeakerReanalysisConfirmation)
+        #expect(!viewModel.isSpeakerDiarizationBusy)
+        #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 0)
+        #expect(viewModel.canRestorePreviousSpeakerAnalysis)
+        viewModel.restorePreviousSpeakerAnalysis()
+        #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 1)
+        #expect(viewModel.transcriptionState.speakerNames == [1: "Reviewed"])
+        #expect(viewModel.transcriptionState.speakerAnalysis == previous)
+        #expect(viewModel.hasManualSpeakerCorrections)
+        #expect(!viewModel.canRestorePreviousSpeakerAnalysis)
+    }
+
     @Test("A VAD chunk failure is reported instead of being returned as a successful empty transcript")
     func testVADTranscriptionPropagatesChunkFailures() async throws {
         let kit = try await WhisperKit(WhisperKitConfig(load: false, download: false))
@@ -132,9 +363,11 @@ struct ContentViewModelTests {
         #expect(viewModel.transcriptionState.confirmedSegments[0].words == nil)
     }
 
-    @Test("Word-timed captions retain speaker labels without changing recovery alignment",
-          arguments: ["srt", "vtt", "fcpxml", "json"]) @MainActor
-    func testWordTimedWriterIncludesSpeakerLabels(format: String) async throws {
+    @Test("Word-output preference changes subtitle granularity without changing canonical recovery words",
+          arguments: [("srt", false), ("srt", true), ("vtt", false), ("vtt", true),
+                      ("fcpxml", false), ("fcpxml", true), ("json", false)]) @MainActor
+    func testWordTimedWriterIncludesSpeakerLabels(testCase: (String, Bool)) async throws {
+        let (format, wordOutputEnabled) = testCase
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
@@ -142,10 +375,12 @@ struct ContentViewModelTests {
         let enabled = viewModel.enableSpeakerDiarization
         let include = viewModel.includeSpeakerLabelsInExport
         let frameRate = viewModel.frameRate
+        let wordOutput = viewModel.enableWordTimestamp
         defer {
             viewModel.enableSpeakerDiarization = enabled
             viewModel.includeSpeakerLabelsInExport = include
             viewModel.frameRate = frameRate
+            viewModel.enableWordTimestamp = wordOutput
         }
         let words = [
             WordTiming(word: "Hello", tokens: [10], start: 0.4, end: 1.2, probability: 0.9),
@@ -156,6 +391,7 @@ struct ContentViewModelTests {
         viewModel.transcriptionState.confirmedSegments = segments
         viewModel.enableSpeakerDiarization = true
         viewModel.includeSpeakerLabelsInExport = true
+        viewModel.enableWordTimestamp = wordOutputEnabled
         viewModel.frameRate = 30
         viewModel.selectedExportFileType = try #require(SubtitleFileType(rawValue: format))
         viewModel.setSpeakerAssignment(at: 0, speakerID: 0)
@@ -184,8 +420,19 @@ struct ContentViewModelTests {
             #expect(exported.segments[0].text == "Alice: Hello there.")
             #expect(exported.segments[0].words == words)
         } else {
-            #expect(text.contains("Alice: Hello"))
-            #expect(text.contains("Alice: there."))
+            if wordOutputEnabled {
+                #expect(text.contains("Alice: Hello"))
+                #expect(text.contains("Alice: there."))
+            } else {
+                #expect(text.contains("Alice: Hello there."))
+            }
+            let cueCount: Int
+            if format == "fcpxml" {
+                cueCount = try XMLDocument(xmlString: text).nodes(forXPath: "//title").count
+            } else {
+                cueCount = text.components(separatedBy: " --> ").count - 1
+            }
+            #expect(cueCount == (wordOutputEnabled ? 2 : 1))
         }
         let recovered = try CaptionMateSidecarService.read(from: CaptionMateSidecarService.sidecarURL(forMediaURL: url))
         #expect(recovered.segments[0].words == words)
@@ -1007,8 +1254,6 @@ struct ContentViewModelTests {
             nil,
         ])
         #expect(viewModel.transcriptionState.speakerNames == [7: "Panelist"])
-        #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 8)
-        #expect(viewModel.availableSpeakerIDs() == Array(0 ..< 8))
     }
 
     @Test("A never-saved transcript requires confirmation before replacement") @MainActor
@@ -1381,7 +1626,7 @@ struct ContentViewModelTests {
         viewModel.setSpeakerAssignment(at: 0, speakerID: 1)
         viewModel.setSpeakerName("Host", for: 1)
         viewModel.transcriptionState.speakerDiarization = .init(
-            progress: 1, detectedSpeakerCount: 2, errorMessage: "Previous review warning"
+            detectedSpeakerCount: 2, errorMessage: "Previous review warning"
         )
         let startedTask = viewModel.beginSpeakerDiarization(audioSamplesProvider: { [0] })
         let task = try #require(startedTask)
@@ -1401,7 +1646,6 @@ struct ContentViewModelTests {
         #expect(viewModel.speakerAssignment(forSegmentAt: 0)?.speakerID == 1)
         #expect(viewModel.speakerName(for: 1) == "Host")
         #expect(!viewModel.transcriptionState.speakerDiarization.isRunning)
-        #expect(viewModel.transcriptionState.speakerDiarization.progress == 1)
         #expect(viewModel.transcriptionState.speakerDiarization.detectedSpeakerCount == 2)
         #expect(viewModel.transcriptionState.speakerDiarization.errorMessage == "Previous review warning")
     }
@@ -1733,30 +1977,41 @@ struct ContentViewModelTests {
 
     @Test("화자 수 자동 기본값과 이름 지정 테스트") @MainActor
     func testSpeakerCountAndNameOptions() throws {
-        let viewModel = ContentViewModel()
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = CaptionMateProjectStore(rootURL: root)
+        let viewModel = ContentViewModel(projectStore: store)
         let originalSpeakerCount = viewModel.speakerDiarizationSpeakerCount
+        let enabled = viewModel.enableSpeakerDiarization
         defer {
             viewModel.speakerDiarizationSpeakerCount = originalSpeakerCount
+            viewModel.enableSpeakerDiarization = enabled
         }
 
         viewModel.speakerDiarizationSpeakerCount = 0
         #expect(viewModel.speakerDiarizationExpectedSpeakerCount() == nil)
-        #expect(viewModel.speakerCountOptionTitle(for: 0) == "Auto")
 
         viewModel.speakerDiarizationSpeakerCount = 3
         #expect(viewModel.speakerDiarizationExpectedSpeakerCount() == 3)
         #expect(viewModel.availableSpeakerIDs() == [0, 1, 2])
 
         viewModel.setSpeakerName(" Host ", for: 0)
+        #expect(viewModel.availableSpeakerIDs() == [0, 1, 2])
         #expect(viewModel.speakerDisplayName(for: 0) == "Host")
         #expect(viewModel.speakerDisplayName(for: SpeakerSegmentAssignment(speakerID: 0)) == "Host")
+        viewModel.transcriptionState.confirmedSegments = [.init(start: 0, end: 1, text: "Manual turn")]
+        viewModel.setSpeakerAssignment(at: 0, speakerID: 0)
+        let saved = try #require(viewModel.saveCurrentProject(showMessage: false))
+        viewModel.restoreTranscriptionSidecar(try store.load(id: saved.id).sidecar)
+        #expect(viewModel.transcriptionState.speakerAnalysis == nil)
+        #expect(viewModel.availableSpeakerIDs() == [0, 1, 2])
 
         viewModel.setSpeakerName(" ", for: 0)
-        #expect(viewModel.speakerDisplayName(for: 0) == "Speaker 1")
+        #expect(viewModel.transcriptionState.speakerNames[0] == nil)
     }
 
-    @Test("화자 라벨 export 전 검토 이슈 테스트") @MainActor
-    func testSpeakerReviewIssuesBeforeExport() throws {
+    @Test("Missing-speaker review survives disabling labels in exported files", arguments: [false, true]) @MainActor
+    func testSpeakerReviewIssuesBeforeExport(includeLabels: Bool) throws {
         let viewModel = ContentViewModel()
         let segments = [
             TranscriptionSegment(start: 0, end: 1, text: "first"),
@@ -1777,7 +2032,7 @@ struct ContentViewModelTests {
             SpeakerSegmentAssignment(speakerID: 0),
         ]
         viewModel.enableSpeakerDiarization = true
-        viewModel.includeSpeakerLabelsInExport = true
+        viewModel.includeSpeakerLabelsInExport = includeLabels
         viewModel.speakerDiarizationSpeakerCount = 1
 
         let issues = viewModel.refreshSubtitleQualityIssues()
@@ -3052,6 +3307,267 @@ struct SpeakerDiarizationTests {
         #expect(preserved == [speakerB, speakerA, speakerA])
     }
 
+    @Test("Mixed-speaker review accumulates acoustic overlap and requires two qualifying clusters")
+    func testMixedSpeakerReviewUsesAccumulatedDuration() {
+        let segment = TranscriptionSegment(start: 0, end: 10, text: "A mixed cue")
+        let timeline = [
+            SpeakerTimelineSegment(speakerID: 7, start: 2, end: 2.5),
+            SpeakerTimelineSegment(speakerID: 2, start: 3, end: 8),
+            SpeakerTimelineSegment(speakerID: 7, start: 0, end: 0.5),
+            SpeakerTimelineSegment(speakerID: 9, start: 8, end: 8.75),
+            SpeakerTimelineSegment(speakerID: 11, start: 9.75, end: 12),
+        ]
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(for: segment, from: timeline) == [2, 7])
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: segment, from: timeline.filter { $0.speakerID != 7 }
+        ).isEmpty)
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: segment, from: [
+                .init(speakerID: 2, start: 0, end: 10),
+                .init(speakerID: 7, start: 2, end: 2.75),
+                .init(speakerID: 7, start: 2, end: 2.75),
+            ]
+        ).isEmpty)
+    }
+
+    @Test("Mixed-speaker review applies the quarter-second floor without labeling a single voice")
+    func testMixedSpeakerReviewFloorAndSingleVoice() {
+        let segment = TranscriptionSegment(start: 0, end: 2, text: "A short cue")
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: segment, from: [
+                .init(speakerID: 3, start: 0, end: 1.75),
+                .init(speakerID: 4, start: 1.75, end: 2),
+            ]
+        ) == [3, 4])
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: segment, from: [
+                .init(speakerID: 3, start: 0, end: 1.8),
+                .init(speakerID: 4, start: 1.8, end: 2),
+                .init(speakerID: 5, start: 2, end: 3),
+            ]
+        ).isEmpty)
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: segment, from: [
+                .init(speakerID: 3, start: 0, end: 1),
+                .init(speakerID: 3, start: 1, end: 2),
+            ]
+        ).isEmpty)
+    }
+
+    @Test("Review ignores invalid acoustic intervals and rejects invalid cue timing")
+    func testMixedSpeakerReviewInvalidIntervals() {
+        let timeline: [SpeakerTimelineSegment] = [
+            .init(speakerID: 1, start: 0, end: 2),
+            .init(speakerID: -1, start: 0, end: 2),
+            .init(speakerID: 2, start: .nan, end: 2),
+            .init(speakerID: 2, start: 1, end: .infinity),
+            .init(speakerID: 2, start: 1, end: 1),
+            .init(speakerID: 2, start: 2, end: 1),
+            .init(speakerID: 2, start: -1, end: 2),
+        ]
+        #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+            for: .init(start: 0, end: 2, text: "Single voice"), from: timeline
+        ).isEmpty)
+        let invalidIntervals: [(Float, Float)] = [
+            (0, 0), (2, 1), (-1, 2), (.nan, 2), (0, .infinity),
+        ]
+        for (start, end) in invalidIntervals {
+            #expect(SpeakerAssignmentMapper.speakerIDsNeedingReview(
+                for: .init(start: start, end: end, text: "Invalid cue"), from: timeline
+            ).isEmpty)
+        }
+    }
+
+    private func wordTimedBoundarySegment() -> TranscriptionSegment {
+        let words = [
+            WordTiming(word: "First", tokens: [101, 102], start: 0.25, end: 1, probability: 0.95),
+            WordTiming(word: " second", tokens: [201], start: 1.25, end: 2, probability: 0.85),
+            WordTiming(word: " third", tokens: [301], start: 2.5, end: 3, probability: 0.75),
+            WordTiming(word: " fourth", tokens: [401, 402], start: 3.25, end: 4, probability: 0.65),
+        ]
+        let tokens = words.flatMap(\.tokens)
+        return TranscriptionSegment(
+            id: 7, seek: 48000, start: 0, end: 4.5,
+            text: " First  second\nthird\tfourth ",
+            tokens: tokens, tokenLogProbs: tokens.map { [$0: -0.2] },
+            temperature: 0.4, avgLogprob: -0.2, compressionRatio: 1.2, noSpeechProb: 0.01,
+            words: words
+        )
+    }
+
+    @Test("Speaker splitting follows acoustic turns and keeps canonical text, word evidence, and silence gaps")
+    func testSpeakerSplittingPreservesCanonicalTextAndWordEvidence() throws {
+        let segment = wordTimedBoundarySegment()
+        let timeline: [SpeakerTimelineSegment] = [
+            .init(speakerID: 0, start: 3.2, end: 4.5),
+            .init(speakerID: 1, start: 2.4, end: 3.1),
+            .init(speakerID: 0, start: 1.2, end: 2.1),
+            .init(speakerID: 0, start: 0, end: 1.1),
+            .init(speakerID: 0, start: 0.2, end: 0.8),
+        ]
+        let parts = try #require(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline))
+        #expect(parts.map(\.text) == [" First  second", "\nthird", "\tfourth "])
+        #expect(parts.map(\.text).joined().utf8.elementsEqual(segment.text.utf8))
+        #expect(parts.map(\.start) == [0, 2.5, 3.25])
+        #expect(parts.map(\.end) == [2, 3, 4.5])
+        #expect(parts.flatMap { $0.words ?? [] } == segment.words)
+        #expect(parts.flatMap(\.tokens) == segment.tokens)
+        #expect(parts.flatMap(\.tokenLogProbs) == segment.tokenLogProbs)
+        #expect(parts.allSatisfy { $0.end > $0.start && $0.seek == segment.seek })
+        #expect(parts.allSatisfy { $0.temperature == segment.temperature && $0.avgLogprob == segment.avgLogprob })
+        #expect(SpeakerAssignmentMapper.assignments(for: parts, from: timeline).map { $0?.speakerID } == [0, 1, 0])
+    }
+
+    @Test("Word-aligned splitting preserves CJK, Arabic, Unicode, punctuation, and original spacing byte-for-byte")
+    func testBoundarySplittingPreservesMultilingualText() throws {
+        let fixtures: [(text: String, words: [String])] = [
+            ("你好世界！", ["你好", "世界！"]),
+            ("\n  안녕\t \n세계! \r\n", [" 안녕", " 세계!"]),
+            ("  مرحبًا بالعالم!  ", ["مرحبًا", " بالعالم!"]),
+            ("cafe\u{301}  encore.", ["cafe\u{301}", " encore."]),
+            ("👨‍👩‍👧‍👦 함께!", ["👨‍👩‍👧‍👦", " 함께!"]),
+        ]
+        for fixture in fixtures {
+            let words = [
+                WordTiming(word: fixture.words[0], tokens: [10], start: 0.1, end: 0.8, probability: 0.9),
+                WordTiming(word: fixture.words[1], tokens: [20, 21], start: 1.2, end: 1.8, probability: 0.8),
+            ]
+            let segment = TranscriptionSegment(start: 0, end: 2, text: fixture.text, words: words)
+            let acousticParts = try #require(SpeakerAssignmentMapper.splitAtSpeakerChanges(
+                segment, from: [.init(speakerID: 0, start: 0, end: 1), .init(speakerID: 1, start: 1, end: 2)]
+            ))
+            let manualParts = try #require(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 1))
+            #expect(acousticParts == manualParts)
+            #expect(acousticParts.map(\.text).joined().utf8.elementsEqual(fixture.text.utf8))
+            #expect(acousticParts.flatMap { $0.words ?? [] } == words)
+            #expect(acousticParts.map(\.start) == [0, 1.2])
+            #expect(acousticParts.map(\.end) == [0.8, 2])
+        }
+    }
+
+    @Test("Manual splitting selects the nearest actual word boundary with deterministic earlier ties")
+    func testManualWordBoundarySelection() throws {
+        let segment = wordTimedBoundarySegment()
+        for time in [2.25, 2.75] as [Float] {
+            let parts = try #require(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: time))
+            #expect(parts.map(\.text) == [" First  second", "\nthird\tfourth "])
+            #expect(parts.map(\.start) == [0, 2.5])
+            #expect(parts.map(\.end) == [2, 4.5])
+            #expect(parts.flatMap { $0.words ?? [] } == segment.words)
+        }
+        let earlyParts = try #require(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 0.5))
+        #expect(earlyParts.map(\.end) == [1, 4.5])
+        let lateParts = try #require(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 4))
+        #expect(lateParts.map(\.start) == [0, 3.25])
+        for time in [-1, 0, 4.5, 10, .nan, .infinity, -.infinity] as [Float] {
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: time) == nil)
+        }
+    }
+
+    @Test("Speaker splitting refuses unknown words, mixed words, overlapping speakers, and unaligned acoustic turns")
+    func testSpeakerSplittingRejectsAmbiguousAcoustics() {
+        let segment = wordTimedBoundarySegment()
+        let timelines: [[SpeakerTimelineSegment]] = [
+            [],
+            [.init(speakerID: 0, start: 0, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 1.6), .init(speakerID: 1, start: 1.6, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2.75, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 3.1), .init(speakerID: 1, start: 2.25, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: -1, start: 2.25, end: 3.1),
+             .init(speakerID: 1, start: 3.1, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.1), .init(speakerID: 2, start: 2.15, end: 2.2),
+             .init(speakerID: 1, start: 2.3, end: 4.5)],
+            [.init(speakerID: 2, start: 0, end: 0.1), .init(speakerID: 0, start: 0.1, end: 2.25),
+             .init(speakerID: 1, start: 2.25, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2.25, end: 4.1),
+             .init(speakerID: 2, start: 4.1, end: 4.5)],
+            [.init(speakerID: 0, start: .nan, end: 2.25), .init(speakerID: 1, start: 2.25, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2.25, end: .infinity)],
+            [.init(speakerID: 0, start: -1, end: 2.25), .init(speakerID: 1, start: 2.25, end: 4.5)],
+            [.init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2, end: 1)],
+        ]
+        for timeline in timelines {
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+        }
+    }
+
+    @Test("Both split helpers refuse absent, overlapping, unordered, nonfinite, or out-of-cue word timings")
+    func testBoundarySplittingRejectsInvalidWordTiming() throws {
+        let original = wordTimedBoundarySegment()
+        let words = try #require(original.words)
+        let timeline: [SpeakerTimelineSegment] = [
+            .init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2.25, end: 4.5),
+        ]
+        let missingWords: [[WordTiming]?] = [nil, [], [words[0]]]
+        for missing in missingWords {
+            var segment = original
+            segment.words = missing
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25) == nil)
+        }
+        let invalidTimings: [(Int, Float, Float)] = [
+            (0, -0.1, 1), (0, 0.25, 0.25), (0, 1, 0.25), (0, .nan, 1),
+            (0, 0.25, .infinity), (1, 0.9, 2), (1, 0.1, 0.2), (3, 3.25, 4.6),
+        ]
+        for (index, start, end) in invalidTimings {
+            var invalidWords = words
+            invalidWords[index].start = start
+            invalidWords[index].end = end
+            var segment = original
+            segment.words = invalidWords
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25) == nil)
+        }
+        let invalidIntervals: [(Float, Float)] = [(0, 0), (2, 1), (-1, 4.5), (.nan, 4.5), (0, .infinity)]
+        for (start, end) in invalidIntervals {
+            var segment = original
+            segment.start = start
+            segment.end = end
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25) == nil)
+        }
+    }
+
+    @Test("Splitting never reconstructs edited or unaligned text from stale word surfaces")
+    func testBoundarySplittingRejectsStaleWordText() throws {
+        let original = wordTimedBoundarySegment()
+        let timeline: [SpeakerTimelineSegment] = [
+            .init(speakerID: 0, start: 0, end: 2.25), .init(speakerID: 1, start: 2.25, end: 4.5),
+        ]
+        for text in ["", "First second third edited", "second third fourth",
+                     "First second third fourth extra", "First, second third fourth", "first second third fourth"] {
+            var segment = original
+            segment.text = text
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25) == nil)
+        }
+        for surface in ["", " \n\t", "Edited"] {
+            var words = try #require(original.words)
+            words[1].word = surface
+            var segment = original
+            segment.words = words
+            #expect(SpeakerAssignmentMapper.splitAtSpeakerChanges(segment, from: timeline) == nil)
+            #expect(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25) == nil)
+        }
+        let normalizedText = TranscriptionSegment(start: 0, end: 2, text: "café encore", words: [
+            .init(word: "cafe\u{301}", tokens: [1], start: 0.1, end: 0.8, probability: 0.9),
+            .init(word: " encore", tokens: [2], start: 1.2, end: 1.8, probability: 0.8),
+        ])
+        #expect(SpeakerAssignmentMapper.splitAtWordBoundary(normalizedText, near: 1) == nil)
+    }
+
+    @Test("Splitting retains word tokens without pretending whole-cue timestamp log probabilities align")
+    func testBoundarySplittingDoesNotMisattributeDecoderTokenLogProbabilities() throws {
+        var segment = wordTimedBoundarySegment()
+        segment.tokens.insert(50000, at: 0)
+        segment.tokenLogProbs.insert([50000: -0.1], at: 0)
+        let parts = try #require(SpeakerAssignmentMapper.splitAtWordBoundary(segment, near: 2.25))
+        let words = try #require(segment.words)
+        #expect(parts.flatMap(\.tokens) == words.flatMap(\.tokens))
+        #expect(parts.flatMap { $0.words ?? [] } == words)
+        #expect(parts.allSatisfy { $0.tokenLogProbs.isEmpty })
+    }
+
     @Test("화자 라벨 export prefix 테스트")
     func testSpeakerLabelFormatterPrefixesWithoutDuplication() throws {
         let assignment = SpeakerSegmentAssignment(speakerID: 0)
@@ -3106,8 +3622,9 @@ struct CaptionMateSidecarServiceTests {
         )
     }
 
-    @Test("Sidecar write/read roundtrip 테스트")
-    func testSidecarWriteReadRoundtripPreservesSubtitleState() throws {
+    @Test("Sidecar write/read roundtrip preserves word timing and raw optional acoustic analysis",
+          arguments: [nil, 2] as [Int?])
+    func testSidecarWriteReadRoundtripPreservesSubtitleState(requestedSpeakerCount: Int?) throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("CaptionMateSidecar-\(UUID().uuidString)", isDirectory: true)
         defer {
@@ -3116,14 +3633,26 @@ struct CaptionMateSidecarServiceTests {
 
         let mediaURL = directoryURL.appendingPathComponent("clip.wav")
         let segments = [
-            TranscriptionSegment(start: 0.25, end: 1.75, text: "Hello"),
-            TranscriptionSegment(start: 2.0, end: 3.5, text: "World"),
+            TranscriptionSegment(start: 0.25, end: 1.75, text: "Hello", words: [
+                .init(word: "Hello", tokens: [10, 11], start: 0.3, end: 1.7, probability: 0.9),
+            ]),
+            TranscriptionSegment(start: 2.0, end: 3.5, text: "World", words: [
+                .init(word: "World", tokens: [20], start: 2.1, end: 3.4, probability: 0.8),
+            ]),
         ]
         let result = TranscriptionResult(
             text: "Hello World",
             segments: segments,
             language: "en",
             timings: TranscriptionTimings()
+        )
+        let analysis = SpeakerAnalysisRecord(
+            timeline: [
+                .init(speakerID: 1, start: 2, end: 3.5),
+                .init(speakerID: 0, start: 0.25, end: 1.5),
+                .init(speakerID: 1, start: 1.5, end: 1.75),
+            ],
+            requestedSpeakerCount: requestedSpeakerCount
         )
         let expectedSidecar = CaptionMateSidecar(
             result: result,
@@ -3139,7 +3668,8 @@ struct CaptionMateSidecarServiceTests {
             selectedExportPreset: .premiereResolve,
             frameRate: 24.0,
             includeSpeakerLabelsInExport: false,
-            speakerDiarizationSpeakerCount: 2
+            speakerDiarizationSpeakerCount: 2,
+            speakerAnalysis: analysis
         )
 
         let writtenURL = try CaptionMateSidecarService.write(expectedSidecar, nextToMediaURL: mediaURL)
@@ -3156,6 +3686,51 @@ struct CaptionMateSidecarServiceTests {
         #expect(restoredSidecar.exportSettings.frameRate == 24.0)
         #expect(restoredSidecar.exportSettings.includeSpeakerLabelsInExport == false)
         #expect(restoredSidecar.exportSettings.speakerDiarizationSpeakerCount == 2)
+        #expect(restoredSidecar.version == 2)
+        #expect(restoredSidecar.speakerAnalysis == analysis)
+        #expect(restoredSidecar.segments.map(\.words) == segments.map(\.words))
+    }
+
+    @Test("Version-one and version-two sidecars without acoustic metadata remain readable", arguments: [1, 2])
+    func testLegacySidecarDecodesWithoutSpeakerAnalysis(version: Int) throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("CaptionMateLegacySidecar-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let url = directoryURL.appendingPathComponent("legacy.captionmate.json")
+        let wordJSON = version == 2 ? """
+        ,"words":[{"word":"Hello","tokens":[10,11],"start":0.25,"end":1.75,"probability":0.9}]
+        """ : ""
+        let json = """
+        {
+          "version": \(version),
+          "audioFileName": "legacy",
+          "language": "en",
+          "segments": [{"start":0,"end":2,"text":" Hello ","speakerID":3\(wordJSON)}],
+          "speakerNames": {"3":"Host"},
+          "exportSettings": {
+            "selectedExportPreset":"general","frameRate":30,
+            "includeSpeakerLabelsInExport":false,"speakerDiarizationSpeakerCount":0
+          }
+        }
+        """
+        try Data(json.utf8).write(to: url)
+        let restored = try CaptionMateSidecarService.read(from: url)
+        #expect(restored.version == version)
+        #expect(restored.speakerAnalysis == nil)
+        #expect(restored.segments[0].text == " Hello ")
+        #expect(restored.segments[0].speakerID == 3)
+        #expect(restored.speakerNames == ["3": "Host"])
+        #expect(restored.exportSettings.includeSpeakerLabelsInExport == false)
+        #expect(restored.exportSettings.speakerDiarizationSpeakerCount == 0)
+        if version == 1 {
+            #expect(restored.segments[0].words == nil)
+        } else {
+            #expect(restored.segments[0].words == [
+                WordTiming(word: "Hello", tokens: [10, 11], start: 0.25, end: 1.75, probability: 0.9),
+            ])
+        }
+        #expect(try JSONDecoder().decode(CaptionMateSidecar.self, from: JSONEncoder().encode(restored)) == restored)
     }
 
     @Test("Unsupported sidecar version throw 테스트")

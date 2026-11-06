@@ -18,6 +18,7 @@ import Foundation
 import WhisperKit
 
 struct CaptionMateSidecar: Codable, Equatable, Sendable {
+    // Additive optional metadata stays on v2 so older readers can still restore the subtitles.
     static let currentVersion = 2
 
     let version: Int
@@ -26,6 +27,7 @@ struct CaptionMateSidecar: Codable, Equatable, Sendable {
     let segments: [Segment]
     let speakerNames: [String: String]
     let exportSettings: ExportSettings
+    var speakerAnalysis: SpeakerAnalysisRecord? = nil
 
     struct Segment: Codable, Equatable, Sendable {
         let start: Float
@@ -134,7 +136,8 @@ extension CaptionMateSidecar {
         selectedExportPreset: SubtitleExportPreset,
         frameRate: Double,
         includeSpeakerLabelsInExport: Bool,
-        speakerDiarizationSpeakerCount: Int
+        speakerDiarizationSpeakerCount: Int,
+        speakerAnalysis: SpeakerAnalysisRecord? = nil
     ) {
         self.version = Self.currentVersion
         self.audioFileName = audioFileName
@@ -154,6 +157,7 @@ extension CaptionMateSidecar {
                 (String(key), value)
             }
         )
+        self.speakerAnalysis = speakerAnalysis
         self.exportSettings = ExportSettings(
             selectedExportPreset: selectedExportPreset.rawValue,
             frameRate: frameRate,

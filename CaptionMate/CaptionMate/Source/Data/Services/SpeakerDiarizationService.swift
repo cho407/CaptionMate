@@ -18,10 +18,15 @@ import Foundation
 import SpeakerKit
 import WhisperKit
 
-struct SpeakerTimelineSegment: Equatable, Sendable {
+struct SpeakerTimelineSegment: Codable, Equatable, Sendable {
     let speakerID: Int
     let start: Float
     let end: Float
+}
+
+struct SpeakerAnalysisRecord: Codable, Equatable, Sendable {
+    let timeline: [SpeakerTimelineSegment]
+    let requestedSpeakerCount: Int?
 }
 
 enum SpeakerAssignmentGranularity: Equatable, Sendable {
@@ -176,6 +181,96 @@ enum SpeakerAssignmentMapper {
         return assignments
     }
 
+    // These are accumulated acoustic-overlap candidates, not calibrated confidence.
+    static func speakerIDsNeedingReview(
+        for segment: TranscriptionSegment,
+        from timelineSegments: [SpeakerTimelineSegment]
+    ) -> [Int] {
+        guard isValidInterval(start: segment.start, end: segment.end) else { return [] }
+        let threshold = max(0.25, (segment.end - segment.start) * 0.1)
+        let timeline = timelineSegments.filter {
+            $0.speakerID >= 0 && isValidInterval(start: $0.start, end: $0.end) &&
+                $0.end > segment.start && $0.start < segment.end
+        }.sorted { $0.start < $1.start }
+        var scores: [Int: Float] = [:]
+        var coveredEnds: [Int: Float] = [:]
+        for interval in timeline {
+            // Repeated/overlapping intervals for one cluster must not inflate its duration.
+            let start = max(segment.start, interval.start, coveredEnds[interval.speakerID] ?? segment.start)
+            let end = min(segment.end, interval.end)
+            if end > start {
+                scores[interval.speakerID, default: 0] += end - start
+                coveredEnds[interval.speakerID] = end
+            }
+        }
+        let candidates = scores.compactMap { $0.value >= threshold ? $0.key : nil }.sorted()
+        return candidates.count >= 2 ? candidates : []
+    }
+
+    static func splitAtSpeakerChanges(
+        _ segment: TranscriptionSegment,
+        from timelineSegments: [SpeakerTimelineSegment]
+    ) -> [TranscriptionSegment]? {
+        guard let words = segment.words,
+              let wordEnds = alignedWordEnds(in: segment, words: words),
+              let runs = speakerRuns(for: segment, from: timelineSegments),
+              !runs.isEmpty else { return nil }
+        var boundaries: [Int] = []
+        var runIndex = 0
+        var previousRunIndex: Int?
+        for wordIndex in words.indices {
+            let word = words[wordIndex]
+            while runIndex < runs.count, runs[runIndex].end <= word.start {
+                runIndex += 1
+            }
+            // Never assign an unknown or mixed word by majority overlap.
+            guard runIndex < runs.count,
+                  runs[runIndex].start <= word.start,
+                  runs[runIndex].end >= word.end else { return nil }
+            if let previousRunIndex {
+                if runs[previousRunIndex].speakerID == runs[runIndex].speakerID {
+                    guard runs[previousRunIndex ..< runIndex].allSatisfy({
+                        $0.speakerID == runs[runIndex].speakerID
+                    }) else { return nil }
+                } else {
+                    // An intervening turn without aligned words cannot be safely partitioned.
+                    guard runIndex == previousRunIndex + 1 else { return nil }
+                    boundaries.append(wordIndex)
+                }
+            } else {
+                guard runs[..<runIndex].allSatisfy({
+                    $0.speakerID == runs[runIndex].speakerID
+                }) else { return nil }
+            }
+            previousRunIndex = runIndex
+        }
+        guard !boundaries.isEmpty,
+              runs[runIndex...].allSatisfy({
+                  $0.speakerID == runs[runIndex].speakerID
+              }) else { return nil }
+        return split(segment, words: words, wordEnds: wordEnds, at: boundaries)
+    }
+
+    static func splitAtWordBoundary(
+        _ segment: TranscriptionSegment,
+        near time: Float
+    ) -> [TranscriptionSegment]? {
+        guard time.isFinite, time > segment.start, time < segment.end,
+              let words = segment.words,
+              let wordEnds = alignedWordEnds(in: segment, words: words) else { return nil }
+        var boundary = 1
+        var nearestDistance = Float.infinity
+        for index in 1 ..< words.count {
+            let distance = min(abs(words[index - 1].end - time), abs(words[index].start - time))
+            // Equal distances consistently choose the earlier boundary.
+            if distance < nearestDistance {
+                boundary = index
+                nearestDistance = distance
+            }
+        }
+        return split(segment, words: words, wordEnds: wordEnds, at: [boundary])
+    }
+
     // Cluster numbers are local to a run. Preserve a name only for an unchanged
     // group of subtitle turns, even when the new run permutes those numbers.
     static func reconciledNames(
@@ -256,6 +351,112 @@ enum SpeakerAssignmentMapper {
         }
 
         return preserved
+    }
+
+    private static func isValidInterval(start: Float, end: Float) -> Bool {
+        start.isFinite && end.isFinite && start >= 0 && end > start
+    }
+
+    private static func alignedWordEnds(
+        in segment: TranscriptionSegment,
+        words: [WordTiming]
+    ) -> [String.Index]? {
+        guard isValidInterval(start: segment.start, end: segment.end),
+              words.count >= 2 else { return nil }
+        var cursor = segment.text.startIndex
+        var previousEnd = segment.start
+        var wordEnds: [String.Index] = []
+        wordEnds.reserveCapacity(words.count)
+        for word in words {
+            guard isValidInterval(start: word.start, end: word.end),
+                  word.start >= previousEnd, word.end <= segment.end else { return nil }
+            var surface = word.word.drop(while: \.isWhitespace)
+            while surface.last?.isWhitespace == true {
+                surface.removeLast()
+            }
+            guard !surface.isEmpty else { return nil }
+            while cursor < segment.text.endIndex, segment.text[cursor].isWhitespace {
+                cursor = segment.text.index(after: cursor)
+            }
+            // Only edge whitespace may differ. Never reconstruct edited text from stale words,
+            // normalize Unicode, insert spaces between CJK words, or discard punctuation.
+            guard let range = segment.text.range(
+                of: surface, options: [.anchored, .literal], range: cursor ..< segment.text.endIndex
+            ), range.upperBound.samePosition(in: segment.text) != nil else { return nil }
+            cursor = range.upperBound
+            wordEnds.append(cursor)
+            previousEnd = word.end
+        }
+        guard segment.text[cursor...].allSatisfy(\.isWhitespace) else { return nil }
+        return wordEnds
+    }
+
+    private static func speakerRuns(
+        for segment: TranscriptionSegment,
+        from timelineSegments: [SpeakerTimelineSegment]
+    ) -> [SpeakerTimelineSegment]? {
+        var timeline: [SpeakerTimelineSegment] = []
+        for interval in timelineSegments {
+            guard interval.start.isFinite, interval.end.isFinite else { return nil }
+            guard interval.end > segment.start, interval.start < segment.end else { continue }
+            guard interval.speakerID >= 0,
+                  isValidInterval(start: interval.start, end: interval.end) else { return nil }
+            timeline.append(SpeakerTimelineSegment(
+                speakerID: interval.speakerID,
+                start: max(segment.start, interval.start),
+                end: min(segment.end, interval.end)
+            ))
+        }
+        timeline.sort { $0.start < $1.start }
+        var runs: [SpeakerTimelineSegment] = []
+        for interval in timeline {
+            if let last = runs.last, interval.start <= last.end, interval.speakerID == last.speakerID {
+                runs[runs.count - 1] = SpeakerTimelineSegment(
+                    speakerID: last.speakerID, start: last.start, end: max(last.end, interval.end)
+                )
+            } else {
+                if let last = runs.last, interval.start < last.end { return nil }
+                runs.append(interval)
+            }
+        }
+        return runs
+    }
+
+    private static func split(
+        _ segment: TranscriptionSegment,
+        words: [WordTiming],
+        wordEnds: [String.Index],
+        at boundaries: [Int]
+    ) -> [TranscriptionSegment] {
+        let tokenCount = words.reduce(0) { $0 + $1.tokens.count }
+        let hasAlignedTokenLogProbs = segment.tokenLogProbs.count == tokenCount &&
+            segment.tokens.elementsEqual(words.lazy.flatMap(\.tokens))
+        var parts: [TranscriptionSegment] = []
+        parts.reserveCapacity(boundaries.count + 1)
+        var lowerBound = 0
+        var textStart = segment.text.startIndex
+        var tokenOffset = 0
+        for partIndex in 0 ... boundaries.count {
+            let upperBound = partIndex < boundaries.count ? boundaries[partIndex] : words.count
+            let textEnd = upperBound == words.count ? segment.text.endIndex : wordEnds[upperBound - 1]
+            let partWords = Array(words[lowerBound ..< upperBound])
+            var part = segment
+            // Preserve silence gaps using real word edges, and retain the original outer cue bounds.
+            part.start = lowerBound == 0 ? segment.start : words[lowerBound].start
+            part.end = upperBound == words.count ? segment.end : words[upperBound - 1].end
+            part.text = String(segment.text[textStart ..< textEnd])
+            part.words = partWords
+            part.tokens = partWords.flatMap(\.tokens)
+            // Whole-cue decoder tokens can include timestamps absent from WordTiming.
+            // Keep token log probabilities only when their positional alignment is established.
+            part.tokenLogProbs = hasAlignedTokenLogProbs ?
+                Array(segment.tokenLogProbs[tokenOffset ..< tokenOffset + part.tokens.count]) : []
+            parts.append(part)
+            lowerBound = upperBound
+            textStart = textEnd
+            tokenOffset += part.tokens.count
+        }
+        return parts
     }
 
     private static func bestAssignment(from speakerScores: [Int: Float]) -> SpeakerSegmentAssignment? {
