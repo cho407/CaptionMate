@@ -312,7 +312,7 @@ class ContentViewModel: ObservableObject {
     }
 
     func decodingCallbackForTesting() -> TranscriptionCallback {
-        makeDecodingCallback(options: DecodingOptions())
+        makeDecodingCallback()
     }
 #endif
 
@@ -373,8 +373,6 @@ class ContentViewModel: ObservableObject {
     @AppStorage("speakerDiarizationSpeakerCount") var speakerDiarizationSpeakerCount: Int = 0
     @AppStorage("temperatureStart") var temperatureStart: Double = 0.0
     @AppStorage("fallbackCount") var fallbackCount: Double = 5.0
-    @AppStorage("compressionCheckWindow") var compressionCheckWindow: Double =
-        60.0
     @AppStorage("sampleLength") var sampleLength: Int = 224
     @AppStorage("concurrentWorkerCount") var concurrentWorkerCount: Double =
         4.0
@@ -4277,7 +4275,7 @@ class ContentViewModel: ObservableObject {
             concurrentWorkerCount: min(max(Int(concurrentWorkerCount), 1), 8),
             chunkingStrategy: chunkingStrategy
         )
-        let decodingCallback: TranscriptionCallback? = makeDecodingCallback(options: options)
+        let decodingCallback = makeDecodingCallback()
         let transcriptionResults = try await WhisperTranscriptionService.transcribe(
             samples: samples,
             using: whisperKit,
@@ -4287,13 +4285,8 @@ class ContentViewModel: ObservableObject {
         return TranscriptionUtilities.mergeTranscriptionResults(transcriptionResults)
     }
 
-    private func makeDecodingCallback(
-        options: DecodingOptions
-    ) -> TranscriptionCallback {
+    private func makeDecodingCallback() -> TranscriptionCallback {
         let operationID = activeTranscribeTaskID
-        let compressionCheckWindow = min(max(Int(compressionCheckWindow), 5), 100)
-        let compressionRatioThreshold = options.compressionRatioThreshold
-        let logProbThreshold = options.logProbThreshold
 
         return { [weak self] progress in
             guard let self else { return false }
@@ -4321,22 +4314,8 @@ class ContentViewModel: ObservableObject {
                 self.transcriptionState.currentDecodingLoops += 1
             }
 
-            let currentTokens = progress.tokens
-            if currentTokens.count > compressionCheckWindow {
-                let checkTokens: [Int] = Array(currentTokens.suffix(compressionCheckWindow))
-                let compressionRatio = TextUtilities.compressionRatio(of: checkTokens)
-                if let compressionRatioThreshold,
-                   compressionRatio > compressionRatioThreshold {
-                    Logging.debug("Early stopping due to compression threshold")
-                    return false
-                }
-            }
-            if let avgLogprob = progress.avgLogprob,
-               let logProbThreshold,
-               avgLogprob < logProbThreshold {
-                Logging.debug("Early stopping due to logprob threshold")
-                return false
-            }
+            // Preview confidence is provisional. Let WhisperKit finish the window
+            // and apply its own quality thresholds and temperature fallback.
             return nil
         }
     }

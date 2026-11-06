@@ -144,7 +144,6 @@ VStack {
 | `enableCachePrefill` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
 | `temperatureStart` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
 | `fallbackCount` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
-| `compressionCheckWindow` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
 | `sampleLength` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
 | `concurrentWorkerCount` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |
 | `chunkingStrategy` | ContentViewModel | ✅ 사용 | ✅ 사용 | **유지** |

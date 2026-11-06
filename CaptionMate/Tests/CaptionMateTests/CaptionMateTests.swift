@@ -334,6 +334,23 @@ struct ContentViewModelTests {
         }
     }
 
+    @Test("Unfinished decoder windows retain SDK quality and fallback decisions",
+          arguments: ["lowConfidencePrefix", "repetitivePrefix"]) @MainActor
+    func testDecoderPreviewDoesNotStopUnfinishedWindow(prefix: String) {
+        let viewModel = ContentViewModel()
+        defer { viewModel.prepareForClose() }
+        viewModel.setTranscriptionTaskForTesting(makeCancellableTask())
+        let callback = viewModel.decodingCallbackForTesting()
+        let progress = TranscriptionProgress(
+            timings: .init(),
+            text: "Unfinished window",
+            tokens: prefix == "repetitivePrefix" ? Array(repeating: 42, count: 100) : [42],
+            avgLogprob: prefix == "lowConfidencePrefix" ? -2 : -0.1
+        )
+
+        #expect(callback(progress) != false)
+    }
+
     @Test("Revised decoder progress cannot duplicate text or overwrite another window") @MainActor
     func testDecoderPreviewPreservesConcurrentWindows() async throws {
         let viewModel = ContentViewModel()

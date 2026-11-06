@@ -185,6 +185,9 @@ ASR or diarization accuracy test; use real cached models for runtime smoke check
   prove model-format, word-timing, cancellation, licensing, and native-runtime
   compatibility. VAD chunk failures must propagate instead of returning a
   silently shortened success.
+- Decoder previews must not stop unfinished windows on provisional log probability
+  or rolling token compression. Let WhisperKit apply its completed-window quality
+  thresholds and temperature fallback; cancellation remains task-based.
 - Repeated speech can trigger compression/no-speech decisions in the SDK itself.
   Use it for lifecycle stress, not as an accuracy baseline, and do not disable
   quality thresholds merely to pass that fixture. Nonrepeating speech smoke

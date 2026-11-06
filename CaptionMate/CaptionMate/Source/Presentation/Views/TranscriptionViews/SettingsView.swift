@@ -99,8 +99,6 @@ struct SettingsView: View {
                                                   value: $viewModel.temperatureStart, range: 0 ... 1, step: 0.1)
                                     settingSlider("Max Fallback Count", info: "info.max_fallback_count",
                                                   value: $viewModel.fallbackCount, range: 0 ... 5, step: 1)
-                                    settingSlider("Compression Check Tokens", info: "info.compression_check_tokens",
-                                                  value: $viewModel.compressionCheckWindow, range: 5 ... 100, step: 5)
                                     settingSlider(
                                         "Max Tokens Per Loop", info: "info.max_tokens_per_loop",
                                         value: Binding(
@@ -153,7 +151,6 @@ struct SettingsView: View {
         .onAppear {
             viewModel.sampleLength = min(max(viewModel.sampleLength, 1), tokenLimit)
             viewModel.concurrentWorkerCount = min(max(viewModel.concurrentWorkerCount, 1), 8)
-            viewModel.compressionCheckWindow = min(max(viewModel.compressionCheckWindow, 5), 100)
         }
     }
 
